@@ -3,8 +3,6 @@ module TTCal
 import Base: show
 using CasaCore
 
-export run
-
 include("sourcemodel.jl")
 include("interferometer.jl")
 include("visibilities.jl")
@@ -13,6 +11,7 @@ include("applycal.jl")
 
 function run(args)
     ms = [MeasurementSet(ASCIIString(input)) for input in args["measurementsets"]]
+    println(typeof(ms))
     if args["applycal"]
         # Apply the calibration only
         gains = load(args["gaintable"])
@@ -20,10 +19,8 @@ function run(args)
     else
         # Array parameters
         flaggedantennas = readdlm("flags.dat")
-        delays = readdlm("fitted_delays2.txt")*1e-9
         lwa = LWA()
-        lwa.delays = delays
-        lwa.flaggedantennas = squeeze(flaggedantennas,2)
+        lwa.flaggedantennas = args["flags"]
         lwa.refant = args["refant"]
 
         # Calibrate

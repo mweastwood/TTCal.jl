@@ -66,8 +66,7 @@ function test_one()
     name = tempname()*".ms"
     @show name
     ms = create_ms(name,x,y,z,ν)
-    interferometer = TTCal.Interferometer(length(x),length(ν),1,zeros(Bool,0),zeros(Float64,length(x),2),0,0.)
-    cyga = TTCal.Source("Cyg A",q"19h59m17.24s",q"+40d44m23.35s",21850.24,47e6,[-0.51,-0.18])
+    interferometer = TTCal.Interferometer(length(x),length(ν),1,Int[])
     sources = TTCal.getsources(ms)
     data = TTCal.visibilities(interferometer,ms,sources)
     putData!(ms,data)
