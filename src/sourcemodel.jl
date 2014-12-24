@@ -31,7 +31,7 @@ to the OVRO MMA, but the local time is read from the measurement set.
 """ ->
 function isabovehorizon(ms::MeasurementSet,source::Source)
     frame = ReferenceFrame()
-    set!(frame,getTime(ms))
+    set!(frame,Epoch("UTC",Quantity(getTime(ms)[1],"s")))
     set!(frame,observatory(frame,"OVRO_MMA"))
     dir  = Direction("J2000",source.ra,source.dec)
     azel = measure(frame,"AZEL",dir)

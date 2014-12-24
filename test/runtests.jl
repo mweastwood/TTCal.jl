@@ -49,7 +49,7 @@ function create_ms(name,x,y,z,ν)
     putAntenna1!(ms,ant1)
     putAntenna2!(ms,ant2)
     putUVW!(ms,u,v,w)
-    putTime!(ms,t)
+    putTime!(ms,fill(t,Nbase))
     putFreq!(ms,ν)
 
     ms

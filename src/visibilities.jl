@@ -78,7 +78,7 @@ function visibilities(interferometer::Interferometer,
     Nsource = length(sources)
 
     frame = ReferenceFrame()
-    set!(frame,getTime(ms))
+    set!(frame,Epoch("UTC",Quantity(getTime(ms)[1],"s")))
     set!(frame,observatory(frame,"OVRO_MMA"))
 
     fringe = Array(Complex64,Nfreq)
