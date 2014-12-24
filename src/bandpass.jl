@@ -26,6 +26,7 @@ function BandpassOptions(maxiter::Int,
                          tol::Float64,
                          RKn::Int,
                          doubleprecision::Bool)
+    # This is not type stable! Fix!
     BandpassOptions{RKn,doubleprecision}(maxiter,tol)
 end
 
@@ -76,7 +77,7 @@ function bandpass{_,doubleprecision}(interferometer::Interferometer,
     Nfreq = interferometer.Nfreq
     Nant  = interferometer.Nant
     gains = ones(doubleprecision? Complex128 : Complex64,Nant,2,Nms*Nfreq)
-    @time for i = 1:length(ms)
+    for i = 1:length(ms)
         bandpass_helper!(sub(gains,:,:,(i-1)*Nfreq+1:i*Nfreq),
                          interferometer,ms[i],sources,options)
     end
@@ -88,10 +89,9 @@ function bandpass_helper!(gains,
                           ms::MeasurementSet,
                           sources::Vector{Source},
                           options::BandpassOptions)
-    @time data  = getData(ms)
-    @time model = visibilities(interferometer,ms,sources)
-    @time putModelData!(ms,model)
-    println("===")
+    data  = getData(ms)
+    model = visibilities(interferometer,ms,sources)
+    putModelData!(ms,model)
 
     # Transpose the data and model arrays to create a better
     # memory access pattern
@@ -100,7 +100,7 @@ function bandpass_helper!(gains,
 
     workspace = getworkspace(interferometer,options)
     # β = frequency channel index
-    @time for β = 1:interferometer.Nfreq
+    for β = 1:interferometer.Nfreq
         # TODO: A fully polarized calibration does not deal with the polarizations
         # separately. Fix this!
 
@@ -152,7 +152,7 @@ function bandpass_onechannel!{T}(gains::SubArray{T},
         workspace.g = workspace.newg
         iter += 1
     end
-    @show χ2(workspace)
+    #@show χ2(workspace)
 
     # Output
     idx = 1
