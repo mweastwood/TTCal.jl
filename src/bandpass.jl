@@ -91,7 +91,7 @@ function bandpass_helper!(gains,
                           options::BandpassOptions)
     data  = getData(ms)
     model = visibilities(interferometer,ms,sources)
-    putModelData!(ms,model)
+    checkImagingColumnsExist(ms) && putModelData!(ms,model)
 
     # Transpose the data and model arrays to create a better
     # memory access pattern

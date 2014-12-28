@@ -25,8 +25,11 @@ function applycal(interferometer::Interferometer,
         corrected[α,β,3] = gains[ant1[α],2,β]\(conj(gains[ant2[α],1,β])\data[α,β,3]) # with this one ?
         corrected[α,β,4] = gains[ant1[α],2,β]\(conj(gains[ant2[α],2,β])\data[α,β,4])
     end
-    putCorrectedData!(ms,permutedims(corrected,(3,2,1)))
-    #putData!(ms,permutedims(corrected,(3,2,1)))
+    if checkImagingColumnsExist(ms)
+        putCorrectedData!(ms,permutedims(corrected,(3,2,1)))
+    else
+        putData!(ms,permutedims(corrected,(3,2,1)))
+    end
     nothing
 end
 

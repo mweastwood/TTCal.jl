@@ -11,27 +11,22 @@ include("applycal.jl")
 
 function run(args)
     ms = [MeasurementSet(ASCIIString(input)) for input in args["measurementsets"]]
-    println(typeof(ms))
-    if args["applycal"]
-        # Apply the calibration only
-        gains = load(args["gaintable"])
-        applycal(ms,gains)
-    else
-        # Array parameters
-        flaggedantennas = readdlm("flags.dat")
-        lwa = LWA()
-        lwa.flaggedantennas = args["flags"]
-        lwa.refant = args["refant"]
 
-        # Calibrate
+    lwa = LWA()
+    lwa.flaggedantennas = args["flags"]::Vector{Int}
+    lwa.refant = args["refant"]::Int
+
+    applycal_flag = args["applycal"]::Bool
+    if applycal_flag
+        gains = load(args["gaintable"])
+        applycal(lwa,ms,gains)
+    else
         sources = getsources(ms[1])
-        println(sources)
         options = BandpassOptions(args["niter"],
                                   args["tol"],
                                   args["RK"],
                                   args["doubleprecision"])
-        gains = bandpass(lwa,ms,sources,options)
-        applycal(lwa,ms,gains)
+        bandpass(lwa,ms,sources,options)
         save(args["gaintable"],gains)
     end
     nothing
