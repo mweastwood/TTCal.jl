@@ -1,5 +1,5 @@
 function applycal(interferometer::Interferometer,
-                  ms::Vector{MeasurementSet},
+                  ms::Vector{Table},
                   gains)
     Nfreq = interferometer.Nfreq
     for i = 1:length(ms)
@@ -9,7 +9,7 @@ function applycal(interferometer::Interferometer,
 end
 
 function applycal(interferometer::Interferometer,
-                  ms::MeasurementSet,
+                  ms::Table,
                   gains)
     data = permutedims(getData(ms),(3,2,1))
     ant1 = getAntenna1(ms)

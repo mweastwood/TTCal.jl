@@ -1,7 +1,8 @@
 module TTCal
 
 import Base: show
-using CasaCore
+using CasaCore.Measures
+using CasaCore.Tables
 
 include("sourcemodel.jl")
 include("interferometer.jl")
@@ -10,13 +11,13 @@ include("bandpass.jl")
 include("applycal.jl")
 
 function run(args)
-    ms = [MeasurementSet(ASCIIString(input)) for input in args["measurementsets"]]
+    ms = [Table(ASCIIString(input)) for input in args["measurementsets"]]
 
     lwa = LWA()
-    lwa.flaggedantennas = args["flags"]::Vector{Int}
-    lwa.refant = args["refant"]::Int
+    lwa.flaggedantennas = args["flags"]
+    lwa.refant = args["refant"]
 
-    applycal_flag = args["applycal"]::Bool
+    applycal_flag = args["applycal"]
     if applycal_flag
         gains = load(args["gaintable"])
         applycal(lwa,ms,gains)

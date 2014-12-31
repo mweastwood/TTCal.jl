@@ -70,7 +70,7 @@ end
 Calibrate the given measurement set!
 """ ->
 function bandpass{_,doubleprecision}(interferometer::Interferometer,
-                                     ms::Vector{MeasurementSet},
+                                     ms::Vector{Table},
                                      sources::Vector{Source},
                                      options::BandpassOptions{_,doubleprecision})
     Nms   = length(ms)
@@ -86,12 +86,14 @@ end
 
 function bandpass_helper!(gains,
                           interferometer::Interferometer,
-                          ms::MeasurementSet,
+                          ms::Table,
                           sources::Vector{Source},
                           options::BandpassOptions)
-    data  = getData(ms)
+    data  = ms["DATA"]
     model = visibilities(interferometer,ms,sources)
-    checkImagingColumnsExist(ms) && putModelData!(ms,model)
+    if Tables.checkColumnExists(ms,"MODEL_DATA")
+        ms["MODEL_DATA"] = model
+    end
 
     # Transpose the data and model arrays to create a better
     # memory access pattern

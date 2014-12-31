@@ -1,32 +1,13 @@
 using TTCal
 using Base.Test
 using Base.Dates
-using CasaCore
+using CasaCore.Tables
 
 function create_ms(name,x,y,z,ν)
     Nant  = length(x)
     Nfreq = length(ν)
     Nbase = div(Nant*(Nant-1),2) + Nant
 
-    table = Table(name)
-    addScalarColumn!(table,"ANTENNA1",Int32)
-    addScalarColumn!(table,"ANTENNA2",Int32)
-    addArrayColumn!(table,"UVW",Float64,[3])
-    addScalarColumn!(table,"TIME",Float64)
-    addArrayColumn!(table,"DATA",Complex64,[4,Nfreq])
-    addArrayColumn!(table,"MODEL_DATA",Complex64,[4,Nfreq])
-    addArrayColumn!(table,"CORRECTED_DATA",Complex64,[4,Nfreq])
-    addRows!(table,Nbase)
-
-    subtable = Table("$name/SPECTRAL_WINDOW")
-    addArrayColumn!(subtable,"CHAN_FREQ",Cdouble,[Nfreq])
-    addRows!(subtable,1)
-    finalize(subtable)
-    putKeyword!(table,"SPECTRAL_WINDOW","Table: $name/SPECTRAL_WINDOW")
-    finalize(table)
-
-    ms = MeasurementSet(name)
-    # Initialize the Measurement Set with the interferometer details
     ant1 = Array(Cint,Nbase)
     ant2 = Array(Cint,Nbase)
     u = Array(Cdouble,Nbase)
@@ -43,16 +24,23 @@ function create_ms(name,x,y,z,ν)
         α += 1
     end
 
-    # Get a rough, current Julian date
-    t = (2015.-1858.)*365.*24.*60.*60.
+    t = (2015.-1858.)*365.*24.*60.*60. # a rough, current Julian date
 
-    putAntenna1!(ms,ant1)
-    putAntenna2!(ms,ant2)
-    putUVW!(ms,u,v,w)
-    putTime!(ms,fill(t,Nbase))
-    putFreq!(ms,ν)
+    table = Table(name)
+    subtable = Table("$name/SPECTRAL_WINDOW")
 
-    ms
+    Tables.addRows!(subtable,1)
+    subtable["CHAN_FREQ"] = reshape(ν,length(ν),1)
+    finalize(subtable)
+
+    Tables.addRows!(table,Nbase)
+    table[kw"SPECTRAL_WINDOW"] = "Table: $name/SPECTRAL_WINDOW"
+    table["ANTENNA1"] = ant1
+    table["ANTENNA2"] = ant2
+    table["UVW"] = [u v w]'
+    table["TIME"] = fill(t,Nbase)
+
+    table
 end
 
 function test_one()
@@ -69,7 +57,7 @@ function test_one()
     interferometer = TTCal.Interferometer(length(x),length(ν),1,Int[])
     sources = TTCal.getsources(ms)
     data = TTCal.visibilities(interferometer,ms,sources)
-    putData!(ms,data)
+    ms["DATA"] = data
 
     gains = TTCal.bandpass(interferometer,[ms],sources,TTCal.BandpassOptions(30,1e-5,4,true))
     truegains = ones(size(gains))

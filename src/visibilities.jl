@@ -59,7 +59,7 @@ naive algorithm scales os O(Nbase×Nsource)
 An instance of the `Interferometer` type that contains information
 about the interferometer.
 * `ms`:
-An instance of the `MeasurementSet` type.
+A measurement set (opened as a CasaCore table).
 * `sources`:
 A list of `Source`s to use in the model.
 
@@ -68,18 +68,22 @@ A list of `Source`s to use in the model.
 The MODEL_DATA column of the measurement set.
 """ ->
 function visibilities(interferometer::Interferometer,
-                      ms::MeasurementSet,
+                      ms::Table,
                       sources::Vector{Source})
-    u,v,w = getUVW(ms)
-    ν = getFreq(ms)
+    uvw = ms["UVW"]
+    u = uvw[1,:]
+    v = uvw[2,:]
+    w = uvw[3,:]
+    spw = Table(ms[kw"SPECTRAL_WINDOW"])
+    ν = spw["CHAN_FREQ",1]
     Δν = ν[2] - ν[1]
     Nbase   = length(u)
     Nfreq   = length(ν)
     Nsource = length(sources)
 
     frame = ReferenceFrame()
-    set!(frame,Epoch("UTC",Quantity(getTime(ms)[1],"s")))
-    set!(frame,observatory(frame,"OVRO_MMA"))
+    set!(frame,Epoch("UTC",Quantity(ms["TIME",1],"s")))
+    set!(frame,Measures.observatory(frame,"OVRO_MMA"))
 
     fringe = Array(Complex64,Nfreq)
     model = zeros(Complex64,4,Nfreq,Nbase)
@@ -132,7 +136,7 @@ Convert a given RA and dec to the standard radio coordinate system.
 """ ->
 function getlm(frame,ra,dec)
     dir  = Direction("J2000",ra,dec)
-    azel = measure(frame,"AZEL",dir)
+    azel = measure(frame,dir,"AZEL")
     az = azel.m[1].value
     el = azel.m[2].value
     l = cos(el)*sin(az)

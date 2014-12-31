@@ -3,8 +3,8 @@
 #                        + index[2]*log²(ν/reffreq) + ...
 type Source
     name::ASCIIString
-    ra::Quantity{Float64,ASCIIString}
-    dec::Quantity{Float64,ASCIIString}
+    ra::Quantity
+    dec::Quantity
     flux::Float64
     reffreq::Float64
     index::Vector{Float64}
@@ -29,12 +29,12 @@ Returns true if the source is above the horizon, false if the source
 is below the horizon. The location of the observatory is hardcoded
 to the OVRO MMA, but the local time is read from the measurement set.
 """ ->
-function isabovehorizon(ms::MeasurementSet,source::Source)
+function isabovehorizon(ms::Table,source::Source)
     frame = ReferenceFrame()
-    set!(frame,Epoch("UTC",Quantity(getTime(ms)[1],"s")))
-    set!(frame,observatory(frame,"OVRO_MMA"))
+    set!(frame,Epoch("UTC",Quantity(ms["TIME",1],"s")))
+    set!(frame,Measures.observatory(frame,"OVRO_MMA"))
     dir  = Direction("J2000",source.ra,source.dec)
-    azel = measure(frame,"AZEL",dir)
+    azel = measure(frame,dir,"AZEL")
     el   = azel.m[2]
     ifelse(el.value > 0.,true,false)
 end
@@ -43,7 +43,7 @@ end
 Returns a list of sources that are above the horizon for the given
 measurement set.
 """ ->
-function getsources(ms::MeasurementSet)
+function getsources(ms::Table)
     # TODO: Make this significantly better
     sources = Source[]
     push!(sources,Source("Cyg A",q"19h59m17.24s",q"+40d44m23.35s",21850.24,47e6,[-0.51,-0.18]))
