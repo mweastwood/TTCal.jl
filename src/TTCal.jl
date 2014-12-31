@@ -13,9 +13,11 @@ include("applycal.jl")
 function run(args)
     ms = [Table(ASCIIString(input)) for input in args["measurementsets"]]
 
-    lwa = LWA()
-    lwa.flaggedantennas = args["flags"]
-    lwa.refant = args["refant"]
+    Nbase = numrows(ms[1])
+    Nant  = round(Int,(sqrt(8Nbase+1)-1)/2)
+    spw = Table(ms[1][kw"SPECTRAL_WINDOW"])
+    Nfreq = length(spw["CHAN_FREQ",1])
+    lwa = Interferometer(Nant,Nfreq,args["refant"],args["flags"])
 
     applycal_flag = args["applycal"]
     if applycal_flag
@@ -27,7 +29,7 @@ function run(args)
                                   args["tol"],
                                   args["RK"],
                                   args["doubleprecision"])
-        bandpass(lwa,ms,sources,options)
+        gains = bandpass(lwa,ms,sources,options)
         save(args["gaintable"],gains)
     end
     nothing

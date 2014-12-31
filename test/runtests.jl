@@ -2,6 +2,7 @@ using TTCal
 using Base.Test
 using Base.Dates
 using CasaCore.Tables
+using NPZ
 
 function create_ms(name,x,y,z,ν)
     Nant  = length(x)
@@ -64,6 +65,22 @@ function test_one()
 
     # TODO: tighten this tolerance (at the moment I'm setting
     # it based on the tolerance passed to BandpassOptions)
+    @test vecnorm(gains-truegains)/vecnorm(truegains) < 1e-5
+
+    finalize(ms)
+
+    gaintable = tempname()*".npy"
+    args = Dict("gaintable"=>gaintable,
+                "measurementsets"=>[name],
+                "applycal"=>false,
+                "doubleprecision"=>false,
+                "flags"=>Int[],
+                "niter"=>30,
+                "refant"=>1,
+                "RK"=>4,
+                "tol"=>1e-5)
+    TTCal.run(args)
+    gains = npzread(gaintable)
     @test vecnorm(gains-truegains)/vecnorm(truegains) < 1e-5
 end
 test_one()
