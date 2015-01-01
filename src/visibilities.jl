@@ -84,7 +84,7 @@ Using the sine and cosine angle addition rules, you can define
 an iterative method such that you only need to compute sines
 and cosines for a single iteration.
 """ ->
-function fringepattern!(output,ϕ,Δϕ)
+function fringepattern!{T<:Complex}(output::Array{T,1},ϕ,Δϕ)
     N = length(output)
     sin_Δϕ = sin(Δϕ)
     cos_Δϕ = cos(Δϕ)
@@ -94,5 +94,11 @@ function fringepattern!(output,ϕ,Δϕ)
                               imag(output[n])*cos_Δϕ + real(output[n])*sin_Δϕ)
     end
     nothing
+end
+
+function fringepattern(ϕ,Δϕ,N)
+    output = Array(Complex128,N)
+    fringepattern!(output,ϕ,Δϕ)
+    output
 end
 
