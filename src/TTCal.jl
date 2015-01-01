@@ -24,7 +24,10 @@ function run(args)
         gains = load(args["gaintable"])
         applycal(lwa,ms,gains)
     else
-        sources = getsources(ms[1])
+        frame = ReferenceFrame()
+        set!(frame,Epoch("UTC",Quantity(ms[1]["TIME",1],"s")))
+        set!(frame,Measures.observatory(frame,"OVRO_MMA"))
+        sources = getsources(frame)
         options = BandpassOptions(args["niter"],
                                   args["tol"],
                                   args["RK"],

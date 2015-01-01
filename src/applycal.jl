@@ -11,25 +11,34 @@ end
 function applycal(interferometer::Interferometer,
                   ms::Table,
                   gains)
-    data = permutedims(getData(ms),(3,2,1))
-    ant1 = getAntenna1(ms)
-    ant2 = getAntenna2(ms)
-    corrected = similar(data)
-
-    Nfreq = interferometer.Nfreq
-    Nbase = size(data,1)
-
-    for β = 1:Nfreq, α = 1:Nbase
-        corrected[α,β,1] = gains[ant1[α],1,β]\(conj(gains[ant2[α],1,β])\data[α,β,1])
-        corrected[α,β,2] = gains[ant1[α],1,β]\(conj(gains[ant2[α],2,β])\data[α,β,2]) # this one could be swapped
-        corrected[α,β,3] = gains[ant1[α],2,β]\(conj(gains[ant2[α],1,β])\data[α,β,3]) # with this one ?
-        corrected[α,β,4] = gains[ant1[α],2,β]\(conj(gains[ant2[α],2,β])\data[α,β,4])
-    end
-    if checkImagingColumnsExist(ms)
-        putCorrectedData!(ms,permutedims(corrected,(3,2,1)))
+    data = ms["DATA"]
+    applycal!(data,gains)
+    if Tables.checkColumnExists(ms,"CORRECTED_DATA")
+        ms["CORRECTED_DATA"] = data
     else
-        putData!(ms,permutedims(corrected,(3,2,1)))
+        ms["DATA"] = data
     end
     nothing
+end
+
+function applycal(data::Array{Complex64,3},gains::Array{Complex64,3})
+    corrected = copy(data)
+    applycal!(corrected,gains)
+    corrected
+end
+
+function applycal!(data::Array{Complex64,3},gains::Array{Complex64,3})
+    Nant  = size(gains,1)
+    Nfreq = size(gains,3)
+    α = 1 # baseline counter
+    for ant1 = 1:Nant, ant2 = ant1:Nant
+        for β = 1:Nfreq
+            data[1,β,α] = (gains[ant1,1,β]*conj(gains[ant2,1,β]))\data[1,β,α]
+            data[2,β,α] = (gains[ant1,1,β]*conj(gains[ant2,2,β]))\data[2,β,α] # this one could be swapped
+            data[3,β,α] = (gains[ant1,2,β]*conj(gains[ant2,1,β]))\data[3,β,α] # with this one
+            data[4,β,α] = (gains[ant1,2,β]*conj(gains[ant2,2,β]))\data[4,β,α]
+        end
+        α += 1
+    end
 end
 

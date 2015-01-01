@@ -1,49 +1,4 @@
-# TODO: Make visibility generation a lot faster!
 const c = 2.99792e+8 # m/s
-
-#=
-@doc """
-Calculates the visibility for a given point source on a given baseline.
-This function accounts for the decorrelation due to input signals
-arriving at the correlator at different times.
-
-# Inputs
-* `interferometer`:
-An instance of the `Interferometer` type that contains information
-about the interferometer.
-* `ant1`, `ant2`:
-The index of the antennas composing the given baseline. These are
-used for accessing properties from within `interferometer`.
-* `ν`:
-The frequency in Hz.
-* `u`, `v`, `w`:
-The baseline (in the usual coordinate system) measured in units of
-centimeters (not wavelengths).
-* `l`, `m`:
-The position of the source (in the usual coordinate system).
-* `flux`:
-The flux of the source. The source is assumed to be unpolarized.
-
-# Outputs
-* `vis_xx`: The xx visibility.
-* `vis_yy`: The yy visibility.
-""" ->
-=#
-#=
-function visibility(interferometer::Interferometer,ant1,ant2,ν,u,v,w,l,m,flux)
-    n = sqrt(1-l^2-m^2)
-    geometric_delay = (u*l + v*m + w*n)/c
-    signal_delay_x  = interferometer.delays[ant2,1] - interferometer.delays[ant1,1]
-    signal_delay_y  = interferometer.delays[ant2,2] - interferometer.delays[ant1,2]
-    decorrelation_x = 1-(abs(geometric_delay+signal_delay_x)
-                        / (interferometer.fftlength/interferometer.samplerate))
-    decorrelation_y = 1-(abs(geometric_delay+signal_delay_y)
-                        / (interferometer.fftlength/interferometer.samplerate))
-
-    vis = flux*exp(complex(0.,2π*ν*geometric_delay))
-    0.5*vis*decorrelation_x,0.5*vis*decorrelation_y
-end
-=#
 
 # TODO
 # - incorporate polarization
@@ -67,8 +22,7 @@ A list of `Source`s to use in the model.
 * `model`:
 The MODEL_DATA column of the measurement set.
 """ ->
-function visibilities(interferometer::Interferometer,
-                      ms::Table,
+function visibilities(ms::Table,
                       sources::Vector{Source})
     uvw = ms["UVW"]
     u = uvw[1,:]
@@ -76,17 +30,30 @@ function visibilities(interferometer::Interferometer,
     w = uvw[3,:]
     spw = Table(ms[kw"SPECTRAL_WINDOW"])
     ν = spw["CHAN_FREQ",1]
-    Δν = ν[2] - ν[1]
-    Nbase   = length(u)
-    Nfreq   = length(ν)
-    Nsource = length(sources)
 
     frame = ReferenceFrame()
     set!(frame,Epoch("UTC",Quantity(ms["TIME",1],"s")))
     set!(frame,Measures.observatory(frame,"OVRO_MMA"))
+    
+    visibilities(frame,sources,u,v,w,ν)
+end
 
-    fringe = Array(Complex64,Nfreq)
+function visibilities(frame::ReferenceFrame,sources::Vector{Source},
+                      u,v,w,ν)
+    Nbase   = length(u)
+    Nfreq   = length(ν)
     model = zeros(Complex64,4,Nfreq,Nbase)
+    visibilities!(model,frame,sources,u,v,w,ν)
+    model
+end
+
+function visibilities!(model::Array{Complex64,3},
+                       frame::ReferenceFrame,sources::Vector{Source},
+                       u,v,w,ν)
+    Δν = ν[2] - ν[1]
+    Nbase  = length(u)
+    Nfreq  = length(ν)
+    fringe = Array(Complex64,Nfreq)
     for source in sources
         # Get the position and flux of the source
         l,m = getlm(frame,source.ra,source.dec)
@@ -107,7 +74,6 @@ function visibilities(interferometer::Interferometer,
             end
         end
     end
-    model
 end
 
 @doc """
@@ -128,19 +94,5 @@ function fringepattern!(output,ϕ,Δϕ)
                               imag(output[n])*cos_Δϕ + real(output[n])*sin_Δϕ)
     end
     nothing
-end
-
-# TODO: move this to sourcemodel.jl and rework
-@doc """
-Convert a given RA and dec to the standard radio coordinate system.
-""" ->
-function getlm(frame,ra,dec)
-    dir  = Direction("J2000",ra,dec)
-    azel = measure(frame,dir,"AZEL")
-    az = azel.m[1].value
-    el = azel.m[2].value
-    l = cos(el)*sin(az)
-    m = cos(el)*cos(az)
-    l::Float64,m::Float64
 end
 

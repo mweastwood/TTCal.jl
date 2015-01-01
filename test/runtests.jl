@@ -1,32 +1,53 @@
 using TTCal
 using Base.Test
 using Base.Dates
+using CasaCore.Measures
 using CasaCore.Tables
 using NPZ
 
-function create_ms(name,x,y,z,ν)
-    Nant  = length(x)
-    Nfreq = length(ν)
-    Nbase = div(Nant*(Nant-1),2) + Nant
+srand(123)
 
-    ant1 = Array(Cint,Nbase)
-    ant2 = Array(Cint,Nbase)
-    u = Array(Cdouble,Nbase)
-    v = Array(Cdouble,Nbase)
-    w = Array(Cdouble,Nbase)
+# Define the interferometer
+const x = [  0.  10.  30.  70. 150.] # m
+const y = [150.  70.  30.  10.   0.] # m
+const z = [  0.  -1.  +1.  -2.  +2.] # m
+const ν = linspace(40e6,60e6,3) # Hz
+const t = (2015.-1858.)*365.*24.*60.*60. # a rough, current Julian date
 
+const Nant  = length(x)
+const Nbase = div(Nant*(Nant-1),2) + Nant
+const Nfreq = length(ν)
+
+function xyz2uvw(x,y,z)
+    u = Array(Float64,Nbase)
+    v = Array(Float64,Nbase)
+    w = Array(Float64,Nbase)
     α = 1
     for i = 1:Nant, j = i:Nant
-        ant1[α]  = i
-        ant2[α]  = j
         u[α] = x[j]-x[i]
         v[α] = y[j]-y[i]
         w[α] = z[j]-z[i]
         α += 1
     end
+    u,v,w
+end
+const u,v,w = xyz2uvw(x,y,z)
 
-    t = (2015.-1858.)*365.*24.*60.*60. # a rough, current Julian date
+function getant1ant2()
+    ant1 = Array(Int32,Nbase)
+    ant2 = Array(Int32,Nbase)
+    α = 1
+    for i = 1:Nant, j = i:Nant
+        ant1[α] = i
+        ant2[α] = j
+        α += 1
+    end
+    ant1,ant2
+end
+const ant1,ant2 = getant1ant2()
 
+function createms()
+    name  = tempname()*".ms"
     table = Table(name)
     subtable = Table("$name/SPECTRAL_WINDOW")
 
@@ -41,47 +62,82 @@ function create_ms(name,x,y,z,ν)
     table["UVW"] = [u v w]'
     table["TIME"] = fill(t,Nbase)
 
-    table
+    name,table
 end
 
-function test_one()
-    # Define the interferometer
-    # (we'll assume the antennas all lie on east-west baselines)
-    x = [  0.  10.  30.  70. 150.] # m
-    y = [  0.   0.   0.   0.   0.] # m
-    z = [  0.   0.   0.   0.   0.] # m
-    ν = linspace(40e6,60e6,3) # Hz
+const gaintable = tempname()*".npy"
+const args = Dict(      "gaintable" => gaintable,
+                  "measurementsets" => [""],
+                         "applycal" => false,
+                  "doubleprecision" => false,
+                            "flags" => Int[],
+                            "niter" => 100,
+                           "refant" => 1,
+                               "RK" => 4,
+                              "tol" => 1e-6)
 
-    name = tempname()*".ms"
-    @show name
-    ms = create_ms(name,x,y,z,ν)
-    interferometer = TTCal.Interferometer(length(x),length(ν),1,Int[])
-    sources = TTCal.getsources(ms)
-    data = TTCal.visibilities(interferometer,ms,sources)
+const options = TTCal.BandpassOptions(100,1e-6,4,false)
+const interferometer = TTCal.Interferometer(Nant,Nfreq,1,Int[])
+
+const frame = ReferenceFrame()
+set!(frame,Epoch("UTC",Quantity(t,"s"))) # a rough, current Julian date
+set!(frame,Measures.observatory(frame,"OVRO_MMA"))
+
+const sources = TTCal.getsources(frame)
+for source in sources
+    @test TTCal.isabovehorizon(frame,source) == true
+end
+
+function test_bandpass(gains,data,model)
+    mygains = similar(gains)
+    TTCal.bandpass!(mygains,interferometer,data,model,options)
+    @test vecnorm(mygains-gains)/vecnorm(gains) < 1e-5
+
+    name,ms = createms()
+    args["measurementsets"] = [name]
     ms["DATA"] = data
-
-    gains = TTCal.bandpass(interferometer,[ms],sources,TTCal.BandpassOptions(30,1e-5,4,true))
-    truegains = ones(size(gains))
-
-    # TODO: tighten this tolerance (at the moment I'm setting
-    # it based on the tolerance passed to BandpassOptions)
-    @test vecnorm(gains-truegains)/vecnorm(truegains) < 1e-5
-
     finalize(ms)
 
-    gaintable = tempname()*".npy"
-    args = Dict("gaintable"=>gaintable,
-                "measurementsets"=>[name],
-                "applycal"=>false,
-                "doubleprecision"=>false,
-                "flags"=>Int[],
-                "niter"=>30,
-                "refant"=>1,
-                "RK"=>4,
-                "tol"=>1e-5)
     TTCal.run(args)
-    gains = npzread(gaintable)
-    @test vecnorm(gains-truegains)/vecnorm(truegains) < 1e-5
+    mygains = npzread(gaintable)
+    @test vecnorm(mygains-gains)/vecnorm(gains) < 1e-5
+end
+
+# Unity gains
+function test_one()
+    println("1")
+    gains = ones(Complex64,Nant,2,Nfreq)
+    model = TTCal.visibilities(frame,sources,u,v,w,ν)
+    data  = copy(model)
+    test_bandpass(gains,data,model)
 end
 test_one()
+
+# Random gains
+function test_two()
+    println("2")
+    gains = rand(Complex64,interferometer.Nant,2,interferometer.Nfreq)
+    gains = gains .* conj(gains[1,:,:]) ./ abs(gains[1,:,:])
+    model = TTCal.visibilities(frame,sources,u,v,w,ν)
+    data  = TTCal.applycal(model,1./gains)
+    test_bandpass(gains,data,model)
+end
+test_two()
+
+# Random gains
+# Corrupted autocorrelations
+function test_three()
+    println("3")
+    gains = rand(Complex64,interferometer.Nant,2,interferometer.Nfreq)
+    gains = gains .* conj(gains[1,:,:]) ./ abs(gains[1,:,:])
+    model = TTCal.visibilities(frame,sources,u,v,w,ν)
+    data  = TTCal.applycal(model,1./gains)
+    α = 1
+    for ant = 1:Nant
+        data[:,:,α] = rand(4,Nfreq)
+        α += Nant-ant+1
+    end
+    test_bandpass(gains,data,model)
+end
+test_three()
 

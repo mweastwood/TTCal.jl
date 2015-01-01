@@ -78,23 +78,30 @@ function bandpass{_,doubleprecision}(interferometer::Interferometer,
     Nant  = interferometer.Nant
     gains = ones(doubleprecision? Complex128 : Complex64,Nant,2,Nms*Nfreq)
     for i = 1:length(ms)
-        bandpass_helper!(sub(gains,:,:,(i-1)*Nfreq+1:i*Nfreq),
-                         interferometer,ms[i],sources,options)
+        bandpass!(sub(gains,:,:,(i-1)*Nfreq+1:i*Nfreq),
+                  interferometer,ms[i],sources,options)
     end
     gains
 end
 
-function bandpass_helper!(gains,
-                          interferometer::Interferometer,
-                          ms::Table,
-                          sources::Vector{Source},
-                          options::BandpassOptions)
+function bandpass!(gains,
+                   interferometer::Interferometer,
+                   ms::Table,
+                   sources::Vector{Source},
+                   options::BandpassOptions)
     data  = ms["DATA"]
-    model = visibilities(interferometer,ms,sources)
+    model = visibilities(ms,sources)
     if Tables.checkColumnExists(ms,"MODEL_DATA")
         ms["MODEL_DATA"] = model
     end
+    bandpass!(gains,interferometer,data,model,options)
+end
 
+function bandpass!(gains,
+                   interferometer::Interferometer,
+                   data::Array{Complex64,3},
+                   model::Array{Complex64,3},
+                   options::BandpassOptions)
     # Transpose the data and model arrays to create a better
     # memory access pattern
     data  = permutedims(data, (3,2,1))
@@ -146,15 +153,18 @@ function bandpass_onechannel!{T}(gains::SubArray{T},
     # Refine the estimate of the gains
     iter = 0
     converged = false
+    #@show χ2(workspace)
     while !converged && iter < options.maxiter
         outerstep!(workspace,options)
-        if norm(workspace.newg-workspace.g,Inf)/norm(workspace.g,Inf) < options.tol
+        if vecnorm(workspace.newg-workspace.g)/vecnorm(workspace.g,Inf) < options.tol
             converged = true
         end
         workspace.g = workspace.newg
         iter += 1
+        #@show χ2(workspace)
     end
     #@show χ2(workspace)
+    #@show iter
 
     # Output
     idx = 1

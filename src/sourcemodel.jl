@@ -24,26 +24,40 @@ function getflux(source::Source,frequencies::Vector{Float64})
     [getflux(source,frequency) for frequency in frequencies]
 end
 
+function getazel(frame::ReferenceFrame,ra,dec)
+    dir  = Direction("J2000",ra,dec)
+    azel = measure(frame,dir,"AZEL")
+    az = azel.m[1].value
+    el = azel.m[2].value
+    az,el
+end
+getazel(frame::ReferenceFrame,source::Source) = getazel(frame,source.ra,source.dec)
+
+@doc """
+Convert a given RA and dec to the standard radio coordinate system.
+""" ->
+function getlm(frame::ReferenceFrame,ra,dec)
+    az,el = getazel(frame,ra,dec)
+    l = cos(el)*sin(az)
+    m = cos(el)*cos(az)
+    l,m
+end
+
 @doc """
 Returns true if the source is above the horizon, false if the source
-is below the horizon. The location of the observatory is hardcoded
-to the OVRO MMA, but the local time is read from the measurement set.
+is below the horizon.
 """ ->
-function isabovehorizon(ms::Table,source::Source)
-    frame = ReferenceFrame()
-    set!(frame,Epoch("UTC",Quantity(ms["TIME",1],"s")))
-    set!(frame,Measures.observatory(frame,"OVRO_MMA"))
+function isabovehorizon(frame::ReferenceFrame,source::Source)
     dir  = Direction("J2000",source.ra,source.dec)
-    azel = measure(frame,dir,"AZEL")
-    el   = azel.m[2]
-    ifelse(el.value > 0.,true,false)
+    az,el = getazel(frame,source)
+    ifelse(el > 0.,true,false)
 end
 
 @doc """
 Returns a list of sources that are above the horizon for the given
-measurement set.
+`ReferenceFrame`.
 """ ->
-function getsources(ms::Table)
+function getsources(frame::ReferenceFrame)
     # TODO: Make this significantly better
     sources = Source[]
     push!(sources,Source("Cyg A",q"19h59m17.24s",q"+40d44m23.35s",21850.24,47e6,[-0.51,-0.18]))
@@ -57,7 +71,7 @@ function getsources(ms::Table)
 
     sources_abovehorizon = Source[]
     for source in sources
-        if isabovehorizon(ms,source)
+        if isabovehorizon(frame,source)
             push!(sources_abovehorizon,source)
         end
     end
