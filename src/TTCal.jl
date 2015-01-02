@@ -4,6 +4,8 @@ import Base: show
 using CasaCore.Measures
 using CasaCore.Tables
 
+const c = 2.99792e+8 # m/s
+
 include("sourcemodel.jl")
 include("interferometer.jl")
 include("visibilities.jl")

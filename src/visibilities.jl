@@ -1,5 +1,3 @@
-const c = 2.99792e+8 # m/s
-
 # TODO
 # - incorporate polarization
 # - re-include the delay decorrelation
@@ -38,42 +36,58 @@ function visibilities(ms::Table,
     visibilities(frame,sources,u,v,w,ν)
 end
 
-function visibilities(frame::ReferenceFrame,sources::Vector{Source},
+function visibilities(frame::ReferenceFrame,
+                      source::Source,
                       u,v,w,ν)
-    Nbase   = length(u)
-    Nfreq   = length(ν)
-    model = zeros(Complex64,4,Nfreq,Nbase)
+    visibilities(frame,[source],u,v,w,ν)
+end
+
+function visibilities(frame::ReferenceFrame,
+                      sources::Vector{Source},
+                      u,v,w,ν)
+    model = zeros(Complex64,4,length(ν),length(u))
     visibilities!(model,frame,sources,u,v,w,ν)
     model
 end
 
 function visibilities!(model::Array{Complex64,3},
-                       frame::ReferenceFrame,sources::Vector{Source},
+                       frame::ReferenceFrame,
+                       sources::Vector{Source},
+                       u,v,w,ν)
+    for source in sources
+        visibilities!(model,frame,source,u,v,w,ν)
+    end
+end
+
+function visibilities!(model::Array{Complex64,3},
+                       frame::ReferenceFrame,
+                       source::Source,
                        u,v,w,ν)
     Δν = ν[2] - ν[1]
     Nbase  = length(u)
     Nfreq  = length(ν)
+
     fringe = Array(Complex64,Nfreq)
-    for source in sources
-        # Get the position and flux of the source
-        l,m = getlm(frame,source.ra,source.dec)
-        n = sqrt(1-l^2-m^2)
-        flux = getflux(source,ν)
 
-        for α = 1:Nbase
-            # Get the fringe pattern for the baseline
-            τ = 2π*(u[α]*l+v[α]*m+w[α]*n)/c
-            ϕ = τ*ν[1]
-            Δϕ = τ*Δν
-            fringepattern!(fringe,ϕ,Δϕ)
+    # Get the position and flux of the source
+    l,m = getlm(frame,source.ra,source.dec)
+    n = sqrt(1-l^2-m^2)
+    flux = getflux(source,ν)
 
-            # Calculate the contribution to the visibility
-            for β = 1:Nfreq
-                model[1,β,α] += 0.5*flux[β]*fringe[β] # xx
-                model[4,β,α] += 0.5*flux[β]*fringe[β] # yy
-            end
+    for α = 1:Nbase
+        # Get the fringe pattern for the baseline
+        τ = 2π*(u[α]*l+v[α]*m+w[α]*n)/c
+        ϕ = τ*ν[1]
+        Δϕ = τ*Δν
+        fringepattern!(fringe,ϕ,Δϕ)
+
+        # Calculate the contribution to the visibility
+        for β = 1:Nfreq
+            model[1,β,α] += 0.5*flux[β]*fringe[β] # xx
+            model[4,β,α] += 0.5*flux[β]*fringe[β] # yy
         end
     end
+    nothing
 end
 
 @doc """
