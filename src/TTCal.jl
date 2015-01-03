@@ -11,6 +11,7 @@ include("interferometer.jl")
 include("visibilities.jl")
 include("bandpass.jl")
 include("applycal.jl")
+include("selfcal.jl")
 
 function run(args)
     ms = [Table(ASCIIString(input)) for input in args["measurementsets"]]

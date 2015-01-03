@@ -11,7 +11,7 @@ srand(123)
 ϕ = linspace(1,10,100)
 fringe_naive = exp(1im*ϕ)
 fringe = TTCal.fringepattern(ϕ[1],ϕ[2]-ϕ[1],length(ϕ))
-@test vecnorm(fringe-fringe_naive)/vecnorm(fringe_naive) < 1e-14
+@test vecnorm(fringe-fringe_naive)/vecnorm(fringe_naive) < 10eps(Float32)
 
 # Define the interferometer
 const x = [  0.  10.  30.  70. 150.] # m

@@ -42,6 +42,7 @@ function getlm(frame::ReferenceFrame,ra,dec)
     m = cos(el)*cos(az)
     l,m
 end
+getlm(frame::ReferenceFrame,source::Source) = getlm(frame,source.ra,source.dec)
 
 @doc """
 Returns true if the source is above the horizon, false if the source

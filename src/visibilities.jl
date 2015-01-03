@@ -37,12 +37,6 @@ function visibilities(ms::Table,
 end
 
 function visibilities(frame::ReferenceFrame,
-                      source::Source,
-                      u,v,w,ν)
-    visibilities(frame,[source],u,v,w,ν)
-end
-
-function visibilities(frame::ReferenceFrame,
                       sources::Vector{Source},
                       u,v,w,ν)
     model = zeros(Complex64,4,length(ν),length(u))
@@ -59,21 +53,48 @@ function visibilities!(model::Array{Complex64,3},
     end
 end
 
+function visibilities(frame::ReferenceFrame,
+                      source::Source,
+                      u,v,w,ν)
+    model = zeros(Complex64,4,length(ν),length(u))
+    visibilities!(model,frame,source,u,v,w,ν)
+    model
+end
+
 function visibilities!(model::Array{Complex64,3},
                        frame::ReferenceFrame,
                        source::Source,
                        u,v,w,ν)
     Δν = ν[2] - ν[1]
-    Nbase  = length(u)
-    Nfreq  = length(ν)
-
-    fringe = Array(Complex64,Nfreq)
+    Nbase = length(u)
+    Nfreq = length(ν)
 
     # Get the position and flux of the source
     l,m = getlm(frame,source.ra,source.dec)
     n = sqrt(1-l^2-m^2)
     flux = getflux(source,ν)
 
+    fringe = fringepattern(l,m,u,v,w,ν)
+    for α = 1:Nbase, β = 1:Nfreq
+        model[1,β,α] += 0.5*flux[β]*fringe[β,α] # xx
+        model[4,β,α] += 0.5*flux[β]*fringe[β,α] # yy
+    end
+    nothing
+end
+
+function fringepattern(l,m,u,v,w,ν)
+    output = Array(Complex64,length(ν),length(u))
+    fringepattern!(output,l,m,u,v,w,ν)
+    output
+end
+
+function fringepattern!{T<:Complex}(output::Array{T,2},l,m,u,v,w,ν)
+    n = sqrt(1-l^2-m^2)
+    Δν = ν[2] - ν[1]
+    Nbase = length(u)
+    Nfreq = length(ν)
+
+    fringe = Array(Complex64,Nfreq)
     for α = 1:Nbase
         # Get the fringe pattern for the baseline
         τ = 2π*(u[α]*l+v[α]*m+w[α]*n)/c
@@ -83,11 +104,16 @@ function visibilities!(model::Array{Complex64,3},
 
         # Calculate the contribution to the visibility
         for β = 1:Nfreq
-            model[1,β,α] += 0.5*flux[β]*fringe[β] # xx
-            model[4,β,α] += 0.5*flux[β]*fringe[β] # yy
+            output[β,α] = fringe[β]
         end
     end
     nothing
+end
+
+function fringepattern(ϕ,Δϕ,N::Int)
+    output = Array(Complex64,N)
+    fringepattern!(output,ϕ,Δϕ)
+    output
 end
 
 @doc """
@@ -108,11 +134,5 @@ function fringepattern!{T<:Complex}(output::Array{T,1},ϕ,Δϕ)
                               imag(output[n])*cos_Δϕ + real(output[n])*sin_Δϕ)
     end
     nothing
-end
-
-function fringepattern(ϕ,Δϕ,N)
-    output = Array(Complex128,N)
-    fringepattern!(output,ϕ,Δϕ)
-    output
 end
 
