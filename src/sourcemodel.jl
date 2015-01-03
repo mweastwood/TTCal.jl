@@ -88,11 +88,3 @@ function show(io::IO,source::Source)
     nothing
 end
 
-function show(io::IO,sources::Vector{Source})
-    for (i,source) in enumerate(sources)
-        show(io,source)
-        i < length(sources) && print(io,'\n')
-    end
-    nothing
-end
-
