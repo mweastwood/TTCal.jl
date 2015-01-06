@@ -92,21 +92,21 @@ function fitsource(frame,name,ν,l,m,flux)
     lnew = mean(l)
     mnew = mean(m)
 
-    az = atan2(lnew,mnew)
-    el = acos(sqrt(lnew.^2+mnew.^2))
+    az = atan2(lnew,mnew)*Radian
+    el = acos(sqrt(lnew.^2+mnew.^2))*Radian
 
-    azel  = Direction("AZEL",Quantity(az,"rad"),Quantity(el,"rad"))
+    azel  = Direction("AZEL",az,el)
     j2000 = measure(frame,azel,"J2000")
 
     # Fit a 2-component spectrum to the source
-    reffreq = 47e6
-    x = log10(ν/reffreq)
+    reffreq = 47e6*Hertz
+    x = log10(stripunits(ν/reffreq))
     y = log10(flux)
     z = [ones(length(ν)) x x.^2]\y
     logflux   = z[1]
     index     = z[2:3]
     amplitude = 10.0.^logflux
 
-    Source(name,j2000.m[1],j2000.m[2],amplitude,reffreq,index)
+    Source(name,j2000,amplitude,reffreq,index)
 end
 

@@ -23,14 +23,14 @@ The MODEL_DATA column of the measurement set.
 function visibilities(ms::Table,
                       sources::Vector{Source})
     uvw = ms["UVW"]
-    u = uvw[1,:]
-    v = uvw[2,:]
-    w = uvw[3,:]
+    u = addunits(uvw[1,:],Meter)
+    v = addunits(uvw[2,:],Meter)
+    w = addunits(uvw[3,:],Meter)
     spw = Table(ms[kw"SPECTRAL_WINDOW"])
-    ν = spw["CHAN_FREQ",1]
+    ν = addunits(spw["CHAN_FREQ",1],Hertz)
 
     frame = ReferenceFrame()
-    set!(frame,Epoch("UTC",Quantity(ms["TIME",1],"s")))
+    set!(frame,Epoch("UTC",ms["TIME",1]*Second))
     set!(frame,Measures.observatory(frame,"OVRO_MMA"))
     
     visibilities(frame,sources,u,v,w,ν)
@@ -70,7 +70,7 @@ function visibilities!(model::Array{Complex64,3},
     Nfreq = length(ν)
 
     # Get the position and flux of the source
-    l,m = getlm(frame,source.ra,source.dec)
+    l,m = getlm(frame,source)
     n = sqrt(1-l^2-m^2)
     flux = getflux(source,ν)
 

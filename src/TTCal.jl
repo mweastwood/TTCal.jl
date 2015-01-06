@@ -3,9 +3,9 @@ module TTCal
 import Base: show
 using CasaCore.Measures
 using CasaCore.Tables
+using SIUnits
 
-const c = 2.99792e+8 # m/s
-
+include("units.jl")
 include("sourcemodel.jl")
 include("interferometer.jl")
 include("visibilities.jl")
@@ -28,7 +28,7 @@ function run(args)
         applycal(lwa,ms,gains)
     else
         frame = ReferenceFrame()
-        set!(frame,Epoch("UTC",Quantity(ms[1]["TIME",1],"s")))
+        set!(frame,Epoch("UTC",ms[1]["TIME",1]*Second))
         set!(frame,Measures.observatory(frame,"OVRO_MMA"))
         sources = getsources(frame)
         options = BandpassOptions(args["niter"],
