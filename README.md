@@ -7,11 +7,6 @@ TTCal is a bandpass calibration routine developed for the OVRO LWA. Its primary 
 
 ## Getting Started
 
-This package requires the (currently unregistered) `CasaCore` package. To install `CasaCore`, run:
-```julia
-Pkg.clone("https://github.com/mweastwood/CasaCore.jl.git")
-Pkg.build("CasaCore")
-```
 To install `TTCal`, run:
 ```julia
 Pkg.clone("https://github.com/mweastwood/CasaCore.jl.git")
