@@ -3,15 +3,15 @@ Fit the visibilities to a model of point sources. The input model needs
 to have the positions of the point sources relatively close, but the flux
 can be wildly off.
 """ ->
-function fitvisibilities(frame::ReferenceFrame,
-                         data::Array{Complex64,3},
-                         sources::Vector{Source},
-                         u,v,w,ν)
+function fitvis(frame::ReferenceFrame,
+                data::Array{Complex64,3},
+                sources::Vector{Source},
+                u,v,w,ν)
     # TODO: Sort sources by flux before doing this.
     # The idea is that small errors on bright sources (looking at you Cyg A)
     # will propagate as irrecoverable large errors on fainter sources.
     # Therefore we want to make sure we get the bright sources right first.
-    for i = 1:2
+    for i = 1:length(sources)
         sources_omitting_current = Source[]
         for j = 1:length(sources)
             i == j && continue
@@ -19,48 +19,111 @@ function fitvisibilities(frame::ReferenceFrame,
         end
         model = visibilities(frame,sources_omitting_current,u,v,w,ν)
         data_minus_model = data-model
-        newsource = fitvisibilities(frame,data_minus_model,
-                                    sources[i],u,v,w,ν)
-        sources[i] = newsource
+        sources[i] = fitvis(frame,data_minus_model,sources[i],u,v,w,ν)
     end
 end
 
-function fitvisibilities(frame::ReferenceFrame,
-                         data::Array{Complex64,3},
-                         source::Source,
-                         u,v,w,ν)
+function fitvis(frame::ReferenceFrame,
+                data::Array{Complex64,3},
+                source::Source,
+                u,v,w,ν)
+    args = fitvis_args(permutedims(data,(3,2,1)),u,v,w,ν)
+    params = [getlm(frame,source)..., getflux(source,ν)]
+
+    x  = params
+    x′ = similar(x)
+    k  = [similar(x) for i = 1:4]
+
+    maxiter = 30
+    tol  = 1e-5
+    iter = 0
+    converged = false
+    while !converged && iter < maxiter
+        xold = copy(x)
+        rkstep!(x,x′,k,args,fitvis_step,RK4)
+
+        # TODO: implement a better stopping criterion that
+        # considers the change in position (l,m) and change
+        # in flux separately (because these typically have
+        # two different orders of magnitude)
+        if vecnorm(x-xold)/vecnorm(xold) < tol
+            converged = true
+        end
+        iter += 1
+    end
+
+    l = x[1]
+    m = x[2]
+    flux = x[3:end]
+
+    az = atan2(l,m)*Radian
+    el = acos(sqrt(l.^2+m.^2))*Radian
+
+    azel  = Direction("AZEL",az,el)
+    j2000 = measure(frame,azel,"J2000")
+
+    # Fit a 2-component spectrum to the source
+    reffreq = 47e6*Hertz
+    x = log10(stripunits(ν/reffreq))
+    y = log10(flux)
+    z = [ones(length(ν)) x x.^2]\y
+    logflux   = z[1]
+    index     = z[2:3]
+    amplitude = 10.0.^logflux
+
+    Source(source.name,j2000,amplitude,reffreq,index)
+end
+
+type fitvis_args
+    data::Array{Complex64,3}
+    u::Vector{quantity(Float64,Meter)}
+    v::Vector{quantity(Float64,Meter)}
+    w::Vector{quantity(Float64,Meter)}
+    ν::Vector{quantity(Float64,Hertz)}
+end
+
+function fitvis_step!(output,input,args)
+    l = input[1]
+    m = input[2]
+    flux = input[3:end]
+
+    u = args.u
+    v = args.v
+    w = args.w
+    ν = args.ν
+    data = args.data
+    fringe = permutedims(fringepattern(l,m,u,v,w,ν),(2,1))
+
+    # fringe is ordered [baseline,frequency]
+    #   data is ordered [baseline,frequency,polarization] (from an earlier transpose)
+
     Nfreq = length(ν)
-    l,m = getlm(frame,source)
-    fringe = fringepattern(l,m,u,v,w,ν)
+    l_arr = Array(Float64,Nfreq)
+    m_arr = Array(Float64,Nfreq)
 
-    # Transpose the data and model arrays to improve
-    # the memory access pattern.
-    data   = permutedims(data, (3,2,1)) # now (baseline,frequency,polarization)
-    fringe = permutedims(fringe, (2,1)) # now (baseline,frequency)
-
-    # TODO: apply flags and baseline filtering
-
-    lfit = Array(Float64,Nfreq)
-    mfit = Array(Float64,Nfreq)
-    fluxfit = Array(Float64,Nfreq)
     for β = 1:Nfreq
-        flux = getflux(source,ν[β])
-        l_,m_,flux_ = fitvisibilities(slice(data,:,β,1),
-                                      slice(fringe,:,β),
-                                      flux,l,m,u,v,w,ν[β])
-        lfit[β] = l_
-        mfit[β] = m_
-        fluxfit[β] = flux_
+        l_arr[β],m_arr[β],flux[β] = fitvis_onechannel(slice(data,:,β,1),
+                                                      slice(fringe,:,β),
+                                                      flux[β],l,m,u,v,w,ν[β])
     end
-    fitsource(frame,source.name,ν,lfit,mfit,fluxfit)
-end
 
-function fitvisibilities(data,fringe,flux,l,m,u,v,w,ν)
+    # Weight the positions by ν^2 because resolution ~ 1/ν
+    weights = ν.^2
+    l = sum(weights .* l_arr) ./ sum(weights)
+    m = sum(weights .* m_arr) ./ sum(weights)
+
+    output[1] = l-input[1]
+    output[2] = m-input[2]
+    output[3:end] = flux-input[3:end]
+end
+const fitvis_step = RKInnerStep{:fitvis_step!}()
+
+function fitvis_onechannel(data,fringe,flux,l,m,u,v,w,ν)
     n = sqrt(1-l^2-m^2)
     λ = c/ν
 
     Nbase  = length(u)
-    fitmat = Array(Complex64,2Nbase,3)
+    fitmat = Array(Complex128,2Nbase,3)
     # Columns contain: [∂V/∂l ∂V/∂m ∂V/∂S]
     # Where V is the contribution to the visibility of a single point source,
     #       l and m specify the position of the point source, and
@@ -84,29 +147,5 @@ function fitvisibilities(data,fringe,flux,l,m,u,v,w,ν)
     m += Δparam[2]
     flux += Δparam[3]
     l,m,flux
-end
-
-function fitsource(frame,name,ν,l,m,flux)
-    # Get the average position of each source
-    # TODO: weight higher frequencies more (higher resolution)
-    lnew = mean(l)
-    mnew = mean(m)
-
-    az = atan2(lnew,mnew)*Radian
-    el = acos(sqrt(lnew.^2+mnew.^2))*Radian
-
-    azel  = Direction("AZEL",az,el)
-    j2000 = measure(frame,azel,"J2000")
-
-    # Fit a 2-component spectrum to the source
-    reffreq = 47e6*Hertz
-    x = log10(stripunits(ν/reffreq))
-    y = log10(flux)
-    z = [ones(length(ν)) x x.^2]\y
-    logflux   = z[1]
-    index     = z[2:3]
-    amplitude = 10.0.^logflux
-
-    Source(name,j2000,amplitude,reffreq,index)
 end
 

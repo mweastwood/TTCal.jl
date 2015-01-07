@@ -6,12 +6,13 @@ using CasaCore.Tables
 using SIUnits
 
 include("units.jl")
+include("rungekutta.jl")
 include("sourcemodel.jl")
 include("interferometer.jl")
 include("visibilities.jl")
 include("bandpass.jl")
-include("applycal.jl")
 include("selfcal.jl")
+include("applycal.jl")
 
 function run(args)
     ms = [Table(ASCIIString(input)) for input in args["measurementsets"]]
