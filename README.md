@@ -9,7 +9,7 @@ TTCal is a bandpass calibration routine developed for the OVRO LWA. Its primary 
 
 To install `TTCal`, run:
 ```julia
-Pkg.clone("https://github.com/mweastwood/CasaCore.jl.git")
+Pkg.clone("https://github.com/mweastwood/TTCal.jl.git")
 Pkg.test("TTCal")
 ```
 If all the tests pass, you are ready to begin using `TTCal`.
