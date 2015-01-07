@@ -156,7 +156,7 @@ function bandpass_onechannel!{T}(gains::SubArray{T},
     #@show χ2(workspace)
     while !converged && iter < options.maxiter
         outerstep!(workspace,options)
-        if vecnorm(workspace.newg-workspace.g)/vecnorm(workspace.g,Inf) < options.tol
+        if vecnorm(workspace.newg-workspace.g)/vecnorm(workspace.g) < options.tol
             converged = true
         end
         workspace.g = workspace.newg
@@ -249,27 +249,6 @@ function firstguess!(workspace::BandpassWorkspace)
     workspace.g = v*sqrt(λ)
     nothing
 end
-
-@doc """
-The Butcher tableau for the 2nd-order Runge-Kutta method.
-""" ->
-const RK2 = [1/2 0.0
-             0.0 1.0]
-
-@doc """
-The Butcher tableau for the 3rd-order Runge-Kutta method.
-""" ->
-const RK3 = [1/2 0.0 0.0;
-            -1.0 2.0 0.0;
-             1/6 2/3 1/6]
-
-@doc """
-The Butcher tableau for the 4th-order Runge-Kutta method.
-""" ->
-const RK4 = [1/2 0.0 0.0 0.0;
-             0.0 1/2 0.0 0.0;
-             0.0 0.0 1.0 0.0;
-             1/6 1/3 1/3 1/6]
 
 function outerstep!{RKn,_}(w::BandpassWorkspace,
                            options::BandpassOptions{RKn,_})
