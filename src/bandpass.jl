@@ -1,85 +1,17 @@
 @doc """
-This type is a container for the configuration options used in the bandpass
-routine.
-
-# Fields
-* `maxiter`:
-The maximum number of iterations to use in the calibration loop.
-* `tol`:
-The relative tolerance to use as a convergence criterion. The calibration is
-deemed to have converged when the gains change by less than `tol` from the
-previous iteration.
-
-# Type Parameters
-* `RKn`:
-The Runge-Kutta method to use. For example, 4 denotes the RK4 method.
-* `doubleprecision`:
-A true/false flag deciding whether the complex gains should be 32+32
-or 64+64 bit complex numbers.
-""" ->
-type BandpassOptions{RKn,doubleprecision}
-    maxiter::Int
-    tol::Float64
-end
-
-function BandpassOptions(maxiter::Int,
-                         tol::Float64,
-                         RKn::Int,
-                         doubleprecision::Bool)
-    # This is not type stable! Fix!
-    BandpassOptions{RKn,doubleprecision}(maxiter,tol)
-end
-
-@doc """
-This type contains fields for use (and re-use) in the inner calibration loop.
-The purpose of this type is to reduce the number of allocations made within
-the inner calibration loop by facilitating the re-use large arrays.
-""" ->
-type BandpassWorkspace{T}
-    # Visibilities
-    V::Matrix{Complex{T}} # Data
-    M::Matrix{Complex{T}} # Model
-
-    # Gains
-    g::Vector{Complex{T}}
-    newg::Vector{Complex{T}}   # (updated by outer steps)
-    trialg::Vector{Complex{T}} # (updated by inner steps)
-
-    # Matrices used in the calibration routine
-    normalization::Vector{T}
-    k::Matrix{Complex{T}}
-end
-
-function getworkspace{RKn,doubleprecision}(interferometer::Interferometer,
-                                           bandpass::BandpassOptions{RKn,doubleprecision})
-    N = interferometer.Nant - length(interferometer.flaggedantennas) # number of unflagged antennas
-    T = doubleprecision? Float64 : Float32
-
-    V  = Array(Complex{T},N,N)
-    M  = Array(Complex{T},N,N)
-    g  = Array(Complex{T},N)
-    newg = Array(Complex{T},N)
-    trialg = Array(Complex{T},N)
-    normalization = Array(T,N)
-    k = Array(Complex{T},N,RKn)
-
-    BandpassWorkspace(V,M,g,newg,trialg,normalization,k)
-end
-
-@doc """
 Calibrate the given measurement set!
 """ ->
-function bandpass{_,doubleprecision}(interferometer::Interferometer,
-                                     ms::Vector{Table},
-                                     sources::Vector{Source},
-                                     options::BandpassOptions{_,doubleprecision})
+function bandpass(interferometer::Interferometer,
+                  ms::Vector{Table},
+                  sources::Vector{Source},
+                  criteria::StoppingCriteria)
     Nms   = length(ms)
     Nfreq = interferometer.Nfreq
     Nant  = interferometer.Nant
-    gains = ones(doubleprecision? Complex128 : Complex64,Nant,2,Nms*Nfreq)
+    gains = ones(Complex64,Nant,2,Nms*Nfreq)
     for i = 1:length(ms)
         bandpass!(sub(gains,:,:,(i-1)*Nfreq+1:i*Nfreq),
-                  interferometer,ms[i],sources,options)
+                  interferometer,ms[i],sources,criteria)
     end
     gains
 end
@@ -88,47 +20,74 @@ function bandpass!(gains,
                    interferometer::Interferometer,
                    ms::Table,
                    sources::Vector{Source},
-                   options::BandpassOptions)
+                   criteria::StoppingCriteria)
     data  = ms["DATA"]
     model = visibilities(ms,sources)
     if Tables.checkColumnExists(ms,"MODEL_DATA")
         ms["MODEL_DATA"] = model
     end
-    bandpass!(gains,interferometer,data,model,options)
+    bandpass!(gains,data,model,interferometer,criteria)
 end
 
 function bandpass!(gains,
-                   interferometer::Interferometer,
                    data::Array{Complex64,3},
                    model::Array{Complex64,3},
-                   options::BandpassOptions)
-    # Transpose the data and model arrays to create a better
-    # memory access pattern
-    data  = permutedims(data, (3,2,1))
-    model = permutedims(model,(3,2,1))
+                   interferometer::Interferometer,
+                   criteria::StoppingCriteria)
+    # Transpose the data and model arrays to create a better memory access pattern
+    data  = permutedims(data, (3,1,2))
+    model = permutedims(model,(3,1,2))
 
-    workspace = getworkspace(interferometer,options)
-    # β = frequency channel index
+    workspace = Workspace(interferometer)
+
     for β = 1:interferometer.Nfreq
-        # TODO: A fully polarized calibration does not deal with the polarizations
-        # separately. Fix this!
-
         # Calibrate the X polarization
         bandpass_onechannel!(slice(gains,:,1,β),
-                             slice( data,:,β,1),
-                             slice(model,:,β,1),
+                             slice( data,:,1,β),
+                             slice(model,:,1,β),
                              interferometer,
-                             options,
-                             workspace)
+                             workspace,
+                             criteria)
         # Calibrate the Y polarization
         bandpass_onechannel!(slice(gains,:,2,β),
-                             slice( data,:,β,4),
-                             slice(model,:,β,4),
+                             slice( data,:,4,β),
+                             slice(model,:,4,β),
                              interferometer,
-                             options,
-                             workspace)
+                             workspace,
+                             criteria)
     end
     nothing
+end
+
+# Pre-allocate all the arrays needed by the calibration routine
+
+immutable InnerWorkspace
+    data::Matrix{Complex64}
+    model::Matrix{Complex64}
+    normalization::Vector{Float64}
+end
+
+immutable Workspace
+    # Square, Hermitian matrices!
+    data::Matrix{Complex64}
+    model::Matrix{Complex64}
+    gains::Vector{Complex64}
+    oldgains::Vector{Complex64}
+
+    rkworkspace::RKWorkspace{Complex64,4}
+    innerworkspace::InnerWorkspace
+end
+
+function Workspace(interferometer::Interferometer)
+    Nant = interferometer.Nant - length(interferometer.flaggedantennas)
+    data  = Array(Complex64,Nant,Nant)
+    model = Array(Complex64,Nant,Nant)
+    gains = Array(Complex64,Nant)
+    oldgains = Array(Complex64,Nant)
+    normalization = Array(Float64,Nant)
+    Workspace(data,model,gains,oldgains,
+              RKWorkspace(gains,4),
+              InnerWorkspace(data,model,normalization))
 end
 
 @doc """
@@ -137,15 +96,13 @@ Calibrate the complex gains from a single frequency channel using a two step pro
 1. Get an initial estimate of the gains.
 2. Iteratively improve that estimate.
 """ ->
-function bandpass_onechannel!{T}(gains::SubArray{T},
-                                 data::SubArray,
-                                 model::SubArray,
-                                 interferometer::Interferometer,
-                                 options::BandpassOptions,
-                                 workspace::BandpassWorkspace)
+function bandpass_onechannel!(gains, data, model,
+                              interferometer::Interferometer,
+                              workspace::Workspace,
+                              criteria::StoppingCriteria)
     # Pack the visibilities into square, Hermitian matrices
-    makesquare!(workspace.V, data,interferometer.flaggedantennas)
-    makesquare!(workspace.M,model,interferometer.flaggedantennas)
+    makesquare!(workspace.data,  data,interferometer.flaggedantennas)
+    makesquare!(workspace.model,model,interferometer.flaggedantennas)
 
     # Take a first guess at the complex gains
     firstguess!(workspace)
@@ -153,24 +110,20 @@ function bandpass_onechannel!{T}(gains::SubArray{T},
     # Refine the estimate of the gains
     iter = 0
     converged = false
-    #@show χ2(workspace)
-    while !converged && iter < options.maxiter
-        outerstep!(workspace,options)
-        if vecnorm(workspace.newg-workspace.g)/vecnorm(workspace.g) < options.tol
+    while !converged && iter < criteria.maxiter
+        @copy_to workspace.oldgains workspace.gains
+        rkstep!(workspace.gains,bandpass_step,workspace.innerworkspace,workspace.rkworkspace)
+        if vecnorm(workspace.gains-workspace.oldgains)/vecnorm(workspace.oldgains) < criteria.tolerance
             converged = true
         end
-        workspace.g = workspace.newg
         iter += 1
-        #@show χ2(workspace)
     end
-    #@show χ2(workspace)
-    #@show iter
 
     # Output
     idx = 1
     for ant = 1:interferometer.Nant
         ant in interferometer.flaggedantennas && continue
-        gains[ant] = workspace.g[idx]
+        gains[ant] = workspace.gains[idx]
         idx += 1
     end
 
@@ -243,44 +196,11 @@ reason, but there is no obvious way to exclude them in this case.
 Hence we use this as a first guess to an iterative method that
 refines the calibration.
 """ ->
-function firstguess!(workspace::BandpassWorkspace)
-    G = workspace.V./workspace.M
-    λ,v  = eigs(G,nev=1,which=:LM)
-    workspace.g = v*sqrt(λ)
-    nothing
-end
-
-function outerstep!{RKn,_}(w::BandpassWorkspace,
-                           options::BandpassOptions{RKn,_})
-    # Select the appropriate tableau
-    # (the compiler should eliminate the dead branches)
-    if     RKn == 2
-        tableau = RK2
-    elseif RKn == 3
-        tableau = RK3
-    elseif RKn == 4
-        tableau = RK4
-    else
-        error("Unimplemented Runge-Kutta method.")
-    end
-
-    # Take the Runge-Kutta step
-    innerstep!(sub(w.k,:,1), w.normalization, w.V, w.M, w.g)
-    for iter = 2:RKn
-        w.trialg = w.g
-        for j = 1:iter-1
-            tableau[iter-1,j] == 0.0 && continue
-            w.trialg += w.k[:,j] * tableau[iter-1,j]
-        end
-        innerstep!(sub(w.k,:,iter), w.normalization, w.V, w.M, w.trialg)
-    end
-
-    # Output
-    w.newg = w.g
-    for j = 1:RKn
-        w.newg += w.k[:,j] * tableau[end,j]
-    end
-    nothing
+function firstguess!(workspace::Workspace)
+    G = workspace.data./workspace.model
+    λ,v = eigs(G,nev=1,which=:LM)
+    w = sqrt(λ)
+    @copy_to workspace.gains v*w
 end
 
 @doc """
@@ -300,23 +220,24 @@ solution of V = g[i]*M*g', where V and M are vectors containing
 the measured and model visibilities where antenna i is the
 first antenna.
 """ ->
-function innerstep!(output,normalization,V,M,g)
-    N = length(g)
+function bandpass_step!(output,input,workspace)
+    N = length(input)
     for i = 1:N
         output[i] = complex(0.)
-        normalization[i] = 0.
+        workspace.normalization[i] = 0.
     end
     for j = 1:N, i = 1:N
         i == j && continue
-        z = conj(g[j])*M[i,j]
-        output[i] += conj(z)*V[i,j]
-        normalization[i] += abs2(z)
+        z = conj(input[j])*workspace.model[i,j]
+        output[i] += conj(z)*workspace.data[i,j]
+        workspace.normalization[i] += abs2(z)
     end
     for i = 1:N
-        output[i] = output[i]/normalization[i] - g[i]
+        output[i] = output[i]/workspace.normalization[i] - input[i]
     end
     nothing
 end
+const bandpass_step = RKInnerStep{:bandpass_step!}()
 
 @doc """
 Calculate the χ² value of the gain calibration.
@@ -329,7 +250,7 @@ function χ2(data::Matrix,model::Matrix,gains::Vector)
     out
 end
 
-function χ2(workspace::BandpassWorkspace)
-    χ2(workspace.V,workspace.M,workspace.g)
+function χ2(workspace::Workspace)
+    χ2(workspace.data,workspace.model,workspace.gains)
 end
 

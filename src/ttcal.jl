@@ -16,9 +16,6 @@ function parse()
         "--applycal", "-a"
             help = "Apply the given calibration without solving for a new calibration"
             action = :store_true
-        "--doubleprecision"
-            help = "Solve for 64+64 bit complex gains (instead of 32+32 bit complex gains)."
-            action = :store_true
         "--flags"
             help = "List of antennas to flag. Antennas are numbered starting from 1."
             arg_type = Int
@@ -31,10 +28,6 @@ function parse()
             help = "The reference antenna."
             arg_type = Int
             default = 1
-        "--RK"
-            help = "The order of the Runge-Kutta method to use in the inner calibration loop."
-            arg_type = Int
-            default = 4
         "--tol", "-t"
             help = "The desired relative tolerance to be used while checking for convergence."
             arg_type = Float64

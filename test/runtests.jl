@@ -3,6 +3,7 @@ using Base.Test
 using Base.Dates
 using CasaCore.Measures
 using CasaCore.Tables
+using SIUnits
 using NPZ
 
 srand(123)
@@ -14,20 +15,20 @@ fringe = TTCal.fringepattern(ϕ[1],ϕ[2]-ϕ[1],length(ϕ))
 @test vecnorm(fringe-fringe_naive)/vecnorm(fringe_naive) < 10eps(Float32)
 
 # Define the interferometer
-const x = [  0.  10.  30.  70. 150.] # m
-const y = [150.  70.  30.  10.   0.] # m
-const z = [  0.  -1.  +1.  -2.  +2.] # m
-const ν = linspace(40e6,60e6,3) # Hz
-const t = (2015.-1858.)*365.*24.*60.*60. # a rough, current Julian date
+const x = TTCal.addunits([  0.  10.  30.  70. 150.],Meter)
+const y = TTCal.addunits([150.  70.  30.  10.   0.],Meter)
+const z = TTCal.addunits([  0.  -1.  +1.  -2.  +2.],Meter)
+const ν = TTCal.addunits([40.0e6:10.0e6:60.0e6],Hertz)
+const t = (2015.-1858.)*365.*24.*60.*60. * Second # a rough, current Julian date
 
 const Nant  = length(x)
 const Nbase = div(Nant*(Nant-1),2) + Nant
 const Nfreq = length(ν)
 
 function xyz2uvw(x,y,z)
-    u = Array(Float64,Nbase)
-    v = Array(Float64,Nbase)
-    w = Array(Float64,Nbase)
+    u = Array(quantity(Float64,Meter),Nbase)
+    v = Array(quantity(Float64,Meter),Nbase)
+    w = Array(quantity(Float64,Meter),Nbase)
     α = 1
     for i = 1:Nant, j = i:Nant
         u[α] = x[j]-x[i]
@@ -58,15 +59,15 @@ function createms()
     subtable = Table("$name/SPECTRAL_WINDOW")
 
     Tables.addRows!(subtable,1)
-    subtable["CHAN_FREQ"] = reshape(ν,length(ν),1)
+    subtable["CHAN_FREQ"] = reshape(TTCal.stripunits(ν),length(ν),1)
     finalize(subtable)
 
     Tables.addRows!(table,Nbase)
     table[kw"SPECTRAL_WINDOW"] = "Table: $name/SPECTRAL_WINDOW"
     table["ANTENNA1"] = ant1
     table["ANTENNA2"] = ant2
-    table["UVW"] = [u v w]'
-    table["TIME"] = fill(t,Nbase)
+    table["UVW"] = TTCal.stripunits([u v w]')
+    table["TIME"] = fill(float(t),Nbase)
 
     name,table
 end
@@ -82,11 +83,11 @@ const args = Dict(      "gaintable" => gaintable,
                                "RK" => 4,
                               "tol" => 1e-6)
 
-const options = TTCal.BandpassOptions(100,1e-6,4,false)
+const criteria = TTCal.StoppingCriteria(100,1e-6)
 const interferometer = TTCal.Interferometer(Nant,Nfreq,1,Int[])
 
 const frame = ReferenceFrame()
-set!(frame,Epoch("UTC",Quantity(t,"s"))) # a rough, current Julian date
+set!(frame,Epoch("UTC",t))
 set!(frame,Measures.observatory(frame,"OVRO_MMA"))
 
 const sources = TTCal.getsources(frame)
@@ -96,7 +97,7 @@ end
 
 function test_bandpass(gains,data,model)
     mygains = similar(gains)
-    TTCal.bandpass!(mygains,interferometer,data,model,options)
+    TTCal.bandpass!(mygains,data,model,interferometer,criteria)
     @test vecnorm(mygains-gains)/vecnorm(gains) < 1e-5
 
     name,ms = createms()

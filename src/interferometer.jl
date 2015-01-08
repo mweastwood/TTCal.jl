@@ -23,11 +23,3 @@ type Interferometer
     flaggedantennas::Vector{Int}
 end
 
-@doc """
-Constructor for the Interferometer type that initializes fields to sensible
-defaults for the OVRO LWA.
-""" ->
-function LWA()
-    Interferometer(256,109,1,Int[])
-end
-

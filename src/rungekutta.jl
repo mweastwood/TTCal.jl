@@ -46,6 +46,12 @@ where `output` is overwritten with the next step to take given `input`.
 """ ->
 immutable RKInnerStep{func}; end
 
+immutable RKWorkspace{T,N}
+    x′::Vector{T}
+    k::Vector{Vector{T}}
+end
+RKWorkspace{T}(x::Vector{T},N::Int) = RKWorkspace{T,N}(similar(x),[similar(x) for i = 1:N])
+
 @doc """
 Take a Runge-Kutta step.
 
@@ -56,7 +62,7 @@ Take a Runge-Kutta step.
 
 The output is stored in `x`, but all three variables are overwritten.
 """ ->
-stagedfunction rkstep!{func!,N}(x,x′,k,args,::RKInnerStep{func!},::RK{N})
+stagedfunction rkstep!{func!,N}(x,::RKInnerStep{func!},args,x′,k,::RK{N})
     tableau    = symbol("RK$(N)_tableau")
 
     quote
@@ -82,6 +88,30 @@ stagedfunction rkstep!{func!,N}(x,x′,k,args,::RKInnerStep{func!},::RK{N})
             end
         end
         x
+    end
+end
+
+function rkstep!{T,N}(x,_::RKInnerStep,args,workspace::RKWorkspace{T,N})
+    rkstep!(x,_,args,workspace.x′,workspace.k,RK{N}())
+end
+
+immutable StoppingCriteria
+    maxiter::Int
+    tolerance::Float64
+end
+
+@doc """
+Use this macro to accomplish x = copy(y) without
+allocating any additional memory. This is useful
+for checking convergence (where you need to store
+the previous iteration to check against the current
+iteration).
+""" ->
+macro copy_to(x,y)
+    quote
+        for i = 1:length($(esc(x)))
+            $(esc(x))[i] = $(esc(y))[i]
+        end
     end
 end
 

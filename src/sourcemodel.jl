@@ -11,17 +11,6 @@ end
 
 Source(name,ra,dec,flux,reffreq,index::Float64) = Source(name,ra,dec,flux,reffreq,[index])
 
-@doc """
-Subtracting a source from another source is intended to be used
-as a means for checking convergence. Therefore it is currently
-only possible to subtract a source from a source with the same
-name.
-""" ->
-function -(lhs::Source,rhs::Source)
-    lhs.name == rhs.name || error("The two sources must have the same name.")
-    # TODO
-end
-
 function getflux(source::Source,frequency::quantity(Float64,Hertz))
     logflux = log10(source.flux)
     for (i,index) in enumerate(source.index)
@@ -83,14 +72,5 @@ function getsources(frame::ReferenceFrame)
         end
     end
     sources_abovehorizon
-end
-
-function show(io::IO,source::Source)
-    print(io,@sprintf("%20s    %15s    %15s    %10.2fJy    %5.2fMHz",
-                      source.name,source.ra,source.dec,source.flux,source.reffreq/1e6))
-    for index in source.index
-        print(io,@sprintf("    %+5.2f",index))
-    end
-    nothing
 end
 

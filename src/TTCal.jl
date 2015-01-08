@@ -1,14 +1,13 @@
 module TTCal
 
-import Base: show
+using SIUnits
 using CasaCore.Measures
 using CasaCore.Tables
-using SIUnits
 
 include("units.jl")
 include("rungekutta.jl")
-include("sourcemodel.jl")
 include("interferometer.jl")
+include("sourcemodel.jl")
 include("visibilities.jl")
 include("bandpass.jl")
 include("selfcal.jl")
@@ -31,12 +30,10 @@ function run(args)
         frame = ReferenceFrame()
         set!(frame,Epoch("UTC",ms[1]["TIME",1]*Second))
         set!(frame,Measures.observatory(frame,"OVRO_MMA"))
-        sources = getsources(frame)
-        options = BandpassOptions(args["niter"],
-                                  args["tol"],
-                                  args["RK"],
-                                  args["doubleprecision"])
-        gains = bandpass(lwa,ms,sources,options)
+        sources  = getsources(frame)
+        criteria = StoppingCriteria(args["niter"],
+                                    args["tol"])
+        gains = bandpass(lwa,ms,sources,criteria)
         save(args["gaintable"],gains)
     end
     nothing
