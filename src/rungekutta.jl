@@ -100,18 +100,3 @@ immutable StoppingCriteria
     tolerance::Float64
 end
 
-@doc """
-Use this macro to accomplish x = copy(y) without
-allocating any additional memory. This is useful
-for checking convergence (where you need to store
-the previous iteration to check against the current
-iteration).
-""" ->
-macro copy_to(x,y)
-    quote
-        for i = 1:length($(esc(x)))
-            $(esc(x))[i] = $(esc(y))[i]
-        end
-    end
-end
-

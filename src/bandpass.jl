@@ -38,7 +38,7 @@ function bandpass!(gains,
     data  = permutedims(data, (3,1,2))
     model = permutedims(model,(3,1,2))
 
-    workspace = Workspace(interferometer)
+    workspace = Workspace_bandpass(interferometer)
 
     for β = 1:interferometer.Nfreq
         # Calibrate the X polarization
@@ -61,33 +61,32 @@ end
 
 # Pre-allocate all the arrays needed by the calibration routine
 
-immutable InnerWorkspace
+immutable InnerWorkspace_bandpass
     data::Matrix{Complex64}
     model::Matrix{Complex64}
     normalization::Vector{Float64}
 end
 
-immutable Workspace
-    # Square, Hermitian matrices!
-    data::Matrix{Complex64}
-    model::Matrix{Complex64}
+immutable Workspace_bandpass
+    data::Matrix{Complex64}  # Hermitian matrix
+    model::Matrix{Complex64} # Hermitian matrix
     gains::Vector{Complex64}
     oldgains::Vector{Complex64}
 
     rkworkspace::RKWorkspace{Complex64,4}
-    innerworkspace::InnerWorkspace
+    innerworkspace::InnerWorkspace_bandpass
 end
 
-function Workspace(interferometer::Interferometer)
+function Workspace_bandpass(interferometer::Interferometer)
     Nant = interferometer.Nant - length(interferometer.flaggedantennas)
     data  = Array(Complex64,Nant,Nant)
     model = Array(Complex64,Nant,Nant)
     gains = Array(Complex64,Nant)
     oldgains = Array(Complex64,Nant)
     normalization = Array(Float64,Nant)
-    Workspace(data,model,gains,oldgains,
-              RKWorkspace(gains,4),
-              InnerWorkspace(data,model,normalization))
+    Workspace_bandpass(data,model,gains,oldgains,
+                       RKWorkspace(gains,4),
+                       InnerWorkspace_bandpass(data,model,normalization))
 end
 
 @doc """
@@ -98,7 +97,7 @@ Calibrate the complex gains from a single frequency channel using a two step pro
 """ ->
 function bandpass_onechannel!(gains, data, model,
                               interferometer::Interferometer,
-                              workspace::Workspace,
+                              workspace::Workspace_bandpass,
                               criteria::StoppingCriteria)
     # Pack the visibilities into square, Hermitian matrices
     makesquare!(workspace.data,  data,interferometer.flaggedantennas)
@@ -111,7 +110,7 @@ function bandpass_onechannel!(gains, data, model,
     iter = 0
     converged = false
     while !converged && iter < criteria.maxiter
-        @copy_to workspace.oldgains workspace.gains
+        workspace.oldgains[:] = workspace.gains
         rkstep!(workspace.gains,bandpass_step,workspace.innerworkspace,workspace.rkworkspace)
         if vecnorm(workspace.gains-workspace.oldgains)/vecnorm(workspace.oldgains) < criteria.tolerance
             converged = true
@@ -196,11 +195,11 @@ reason, but there is no obvious way to exclude them in this case.
 Hence we use this as a first guess to an iterative method that
 refines the calibration.
 """ ->
-function firstguess!(workspace::Workspace)
+function firstguess!(workspace::Workspace_bandpass)
     G = workspace.data./workspace.model
     λ,v = eigs(G,nev=1,which=:LM)
-    w = sqrt(λ)
-    @copy_to workspace.gains v*w
+    w = sqrt(λ[1])
+    @devec workspace.gains[:] = v.*w
 end
 
 @doc """
@@ -250,7 +249,7 @@ function χ2(data::Matrix,model::Matrix,gains::Vector)
     out
 end
 
-function χ2(workspace::Workspace)
+function χ2(workspace::Workspace_bandpass)
     χ2(workspace.data,workspace.model,workspace.gains)
 end
 

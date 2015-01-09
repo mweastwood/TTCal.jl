@@ -1,60 +1,153 @@
+################################################################################
+# Public Interface
+
 @doc """
 Fit the visibilities to a model of point sources. The input model needs
 to have the positions of the point sources relatively close, but the flux
 can be wildly off.
 """ ->
-function fitvis(frame::ReferenceFrame,
-                data::Array{Complex64,3},
+function fitvis(interferometer::Interferometer,
+                ms::Table,
                 sources::Vector{Source},
-                u,v,w,ν)
-    # TODO: Sort sources by flux before doing this.
-    # The idea is that small errors on bright sources (looking at you Cyg A)
-    # will propagate as irrecoverable large errors on fainter sources.
-    # Therefore we want to make sure we get the bright sources right first.
-    for i = 1:length(sources)
-        sources_omitting_current = Source[]
-        for j = 1:length(sources)
-            i == j && continue
-            push!(sources_omitting_current,sources[j])
-        end
-        model = visibilities(frame,sources_omitting_current,u,v,w,ν)
-        data_minus_model = data-model
-        sources[i] = fitvis(frame,data_minus_model,sources[i],u,v,w,ν)
-    end
+                criteria::StoppingCriteria)
+    # TODO
 end
 
 function fitvis(frame::ReferenceFrame,
                 data::Array{Complex64,3},
-                source::Source,
-                u,v,w,ν)
-    args = fitvis_args(permutedims(data,(3,2,1)),u,v,w,ν)
-    params = [getlm(frame,source)..., getflux(source,ν)]
+                u,v,w,ν,
+                sources::Vector{Source},
+                criteria::StoppingCriteria)
+    output = [source for source in sources]
+    workspace = Workspace_fitvis(frame,data,u,v,w,ν,output)
+    outer_fitvis(workspace,criteria)
+    output
+end
 
-    x  = params
-    x′ = similar(x)
-    k  = [similar(x) for i = 1:4]
+################################################################################
+# Workspace Definition
 
-    maxiter = 30
-    tol  = 1e-5
+type Workspace_fitvis
+    frame::ReferenceFrame
+    data::Array{Complex64,3}
+    u::Vector{quantity(Float64,Meter)}
+    v::Vector{quantity(Float64,Meter)}
+    w::Vector{quantity(Float64,Meter)}
+    ν::Vector{quantity(Float64,Hertz)}
+    sources::Vector{Source}
+
+    model::Array{Complex64,3}
+    data_minus_model::Array{Complex64,3}
+    data_minus_model_T::Array{Complex64,3}
+
+    params::Vector{Float64}
+    oldparams::Vector{Float64}
+
+    rkworkspace::RKWorkspace{Float64,4}
+end
+
+function Workspace_fitvis(frame,data,u,v,w,ν,sources)
+    model = similar(data)
+    data_minus_model = similar(data)
+    data_minus_model_T = permutedims(similar(data),(3,2,1))
+
+    Nparams = 2 + length(ν)
+    params = Array(Float64,Nparams)
+    oldparams = similar(params)
+
+    rkworkspace = RKWorkspace(similar(params),4)
+
+    Workspace_fitvis(frame,data,u,v,w,ν,sources,
+                     model,data_minus_model,data_minus_model_T,
+                     params,oldparams,
+                     rkworkspace)
+end
+
+################################################################################
+# Outer Methods (outside rkstep!)
+
+@doc """
+1. Sort the sources in order of decreasing flux.
+2. For each source, subtract all other sources.
+3. Fit for the source.
+""" ->
+function outer_fitvis(workspace,criteria)
+    sources = workspace.sources
+    data = workspace.data
+    data_minus_model = workspace.data_minus_model
+    data_minus_model_T = workspace.data_minus_model_T
+
+    # 1. Sort the sources in order of decreasing flux.
+    sort!(sources, by=source->source.flux, rev=true)
+    # 2. For each source, subtract all other sources.
+    for i = 1:length(sources)
+        data_minus_model[:] = data
+        for j = 1:length(sources)
+            i == j && continue
+            subtract_source!(workspace,sources[j])
+        end
+        data_minus_model_T[:] = permutedims(data_minus_model,(3,2,1))
+        # 3. Fit for the source.
+        sources[i] = outer_fitvis_singlesource(sources[i],workspace,criteria)
+    end
+end
+
+function subtract_source!(workspace,source)
+    frame = workspace.frame
+    model = workspace.model
+    data_minus_model = workspace.data_minus_model
+    u = workspace.u
+    v = workspace.v
+    w = workspace.w
+    ν = workspace.ν
+
+    model[:] = visibilities(frame,source,u,v,w,ν)
+    @devec data_minus_model[:] = data_minus_model-model
+end
+
+@doc """
+1. Pack all the fitting paramaters into a vector.
+2. Take a Runge-Kutta step until the parameters have converged.
+3. Get the J2000 position of the source.
+4. Fit a 2-component power law spectrum to the source.
+""" ->
+function outer_fitvis_singlesource(source,workspace,criteria)
+    frame = workspace.frame
+    ν = workspace.ν
+    params = workspace.params
+    oldparams = workspace.oldparams
+    rkworkspace = workspace.rkworkspace
+
+    # 1. Pack all the fitting paramaters into a vector.
+    l,m  = getlm(frame,source)
+    params[1] = l
+    params[2] = m
+    params[3:end] = getflux(source,ν)
+
+    # 2. Take a Runge-Kutta step until the parameters have converged.
     iter = 0
     converged = false
-    while !converged && iter < maxiter
-        xold = copy(x)
-        rkstep!(x,x′,k,args,fitvis_step,RK4)
+    while !converged && iter < criteria.maxiter
+        oldparams[:] = params
+        rkstep!(params,fitvis_step,workspace,rkworkspace)
 
-        # TODO: implement a better stopping criterion that
-        # considers the change in position (l,m) and change
-        # in flux separately (because these typically have
-        # two different orders of magnitude)
-        if vecnorm(x-xold)/vecnorm(xold) < tol
+        # The first two elements are (l,m), the position of the source. These will
+        # tend to be much smaller than the rest of the parameters, which is why I
+        # test their convergence separately.
+        # TODO: exclude (l,m) from the third check
+        if (params[1] - oldparams[1]) < criteria.tolerance &&
+           (params[2] - oldparams[2]) < criteria.tolerance &&
+           vecnorm(params-oldparams)/vecnorm(oldparams) < criteria.tolerance
             converged = true
         end
         iter += 1
     end
+    #error("stop")
 
-    l = x[1]
-    m = x[2]
-    flux = x[3:end]
+    # 3. Get the J2000 position of the source.
+    l = params[1]
+    m = params[2]
+    flux = sub(params,3:length(params))
 
     az = atan2(l,m)*Radian
     el = acos(sqrt(l.^2+m.^2))*Radian
@@ -62,7 +155,7 @@ function fitvis(frame::ReferenceFrame,
     azel  = Direction("AZEL",az,el)
     j2000 = measure(frame,azel,"J2000")
 
-    # Fit a 2-component spectrum to the source
+    # 4. Fit a 2-component power law spectrum to the source.
     reffreq = 47e6*Hertz
     x = log10(stripunits(ν/reffreq))
     y = log10(flux)
@@ -74,40 +167,44 @@ function fitvis(frame::ReferenceFrame,
     Source(source.name,j2000,amplitude,reffreq,index)
 end
 
-type fitvis_args
-    data::Array{Complex64,3}
-    u::Vector{quantity(Float64,Meter)}
-    v::Vector{quantity(Float64,Meter)}
-    w::Vector{quantity(Float64,Meter)}
-    ν::Vector{quantity(Float64,Hertz)}
-end
+################################################################################
+# Inner Methods (inside rkstep!)
 
-function fitvis_step!(output,input,args)
+@doc """
+1. Generate the fringe pattern for all baselines, frequencies.
+2. Fit for the position and flux of the source at each frequency.
+3. Get a single position for the source.
+""" ->
+function inner_fitvis(output,input,workspace)
+    u = workspace.u
+    v = workspace.v
+    w = workspace.w
+    ν = workspace.ν
+    data = workspace.data_minus_model_T
+
     l = input[1]
     m = input[2]
     flux = input[3:end]
 
-    u = args.u
-    v = args.v
-    w = args.w
-    ν = args.ν
-    data = args.data
+    # 1. Generate the fringe pattern for all baselines, frequencies.
     fringe = permutedims(fringepattern(l,m,u,v,w,ν),(2,1))
 
     # fringe is ordered [baseline,frequency]
     #   data is ordered [baseline,frequency,polarization] (from an earlier transpose)
 
+    # 2. Fit for the position and flux of the source at each frequency.
     Nfreq = length(ν)
     l_arr = Array(Float64,Nfreq)
     m_arr = Array(Float64,Nfreq)
 
     for β = 1:Nfreq
-        l_arr[β],m_arr[β],flux[β] = fitvis_onechannel(slice(data,:,β,1),
-                                                      slice(fringe,:,β),
-                                                      flux[β],l,m,u,v,w,ν[β])
+        l_arr[β],m_arr[β],flux[β] = inner_fitvis_onechannel(slice(data,:,β,1),
+                                                            slice(fringe,:,β),
+                                                            flux[β],l,m,u,v,w,ν[β])
     end
 
-    # Weight the positions by ν^2 because resolution ~ 1/ν
+    # 3. Get a single position for the source.
+    # (Weight the positions by ν^2 because resolution ~ 1/ν)
     weights = ν.^2
     l = sum(weights .* l_arr) ./ sum(weights)
     m = sum(weights .* m_arr) ./ sum(weights)
@@ -116,9 +213,9 @@ function fitvis_step!(output,input,args)
     output[2] = m-input[2]
     output[3:end] = flux-input[3:end]
 end
-const fitvis_step = RKInnerStep{:fitvis_step!}()
+const fitvis_step = RKInnerStep{:inner_fitvis}()
 
-function fitvis_onechannel(data,fringe,flux,l,m,u,v,w,ν)
+function inner_fitvis_onechannel(data,fringe,flux,l,m,u,v,w,ν)
     n = sqrt(1-l^2-m^2)
     λ = c/ν
 

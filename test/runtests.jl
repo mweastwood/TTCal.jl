@@ -148,3 +148,28 @@ function test_three()
 end
 test_three()
 
+function test_fitvisibilities()
+    data = TTCal.visibilities(frame,sources,u,v,w,ν)
+    @show sources[1] sources[2]
+    for i = 1:length(sources)
+        # Perturb each source position by about 0.1 degrees
+        dir = sources[i].dir
+        ra  = dir.m[1]
+        dec = dir.m[2]
+        Δra  = 0.1randn()*Degree
+        Δdec = 0.1randn()*Degree
+        sources[i].dir = Direction(dir.system,(ra+Δra,dec+Δdec))
+        # Perturb the flux by about 100 Jy, and the spectral index by about 0.1
+        sources[i].flux += 100randn()
+        sources[i].index += 0.1randn()
+    end
+    @show sources[1] sources[2]
+    newsources = TTCal.fitvis(frame,data,u,v,w,ν,sources,criteria)
+    @show newsources[1] newsources[2]
+    newsources = TTCal.fitvis(frame,data,u,v,w,ν,newsources,criteria)
+    @show newsources[1] newsources[2]
+    newsources = TTCal.fitvis(frame,data,u,v,w,ν,newsources,criteria)
+    @show newsources[1] newsources[2]
+end
+#test_fitvisibilities()
+

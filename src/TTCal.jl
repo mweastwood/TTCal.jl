@@ -1,5 +1,6 @@
 module TTCal
 
+using Devectorize
 using SIUnits
 using CasaCore.Measures
 using CasaCore.Tables
