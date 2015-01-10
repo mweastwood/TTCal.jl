@@ -1,3 +1,6 @@
+################################################################################
+# Public Interface
+
 @doc """
 Calibrate the given measurement set!
 """ ->
@@ -56,8 +59,11 @@ function bandpass!(gains,
                              workspace,
                              criteria)
     end
-    nothing
+    gains
 end
+
+################################################################################
+# Workspace Definition
 
 # Pre-allocate all the arrays needed by the calibration routine
 
@@ -89,24 +95,29 @@ function Workspace_bandpass(interferometer::Interferometer)
                        InnerWorkspace_bandpass(data,model,normalization))
 end
 
+################################################################################
+# Outer Methods (outside rkstep!)
+
 @doc """
 Calibrate the complex gains from a single frequency channel using a two step process:
 
-1. Get an initial estimate of the gains.
-2. Iteratively improve that estimate.
+1. Pack the visibilities into square, Hermitian matrices.
+2. Get an initial estimate of the complex gains.
+3. Iteratively improve that estimate.
+4. Fix the phase of the reference antenna.
 """ ->
 function bandpass_onechannel!(gains, data, model,
                               interferometer::Interferometer,
                               workspace::Workspace_bandpass,
                               criteria::StoppingCriteria)
-    # Pack the visibilities into square, Hermitian matrices
+    # 1. Pack the visibilities into square, Hermitian matrices.
     makesquare!(workspace.data,  data,interferometer.flaggedantennas)
     makesquare!(workspace.model,model,interferometer.flaggedantennas)
 
-    # Take a first guess at the complex gains
+    # 2. Get an initial estimate of the complex gains.
     firstguess!(workspace)
 
-    # Refine the estimate of the gains
+    # 3. Iteratively improve that estimate.
     iter = 0
     converged = false
     while !converged && iter < criteria.maxiter
@@ -126,7 +137,7 @@ function bandpass_onechannel!(gains, data, model,
         idx += 1
     end
 
-    # Fix the phase of the reference antenna
+    # 4. Fix the phase of the reference antenna.
     refant = interferometer.refant
     factor = conj(gains[refant])/abs(gains[refant])
     for ant = 1:interferometer.Nant
@@ -201,6 +212,9 @@ function firstguess!(workspace::Workspace_bandpass)
     w = sqrt(λ[1])
     @devec workspace.gains[:] = v.*w
 end
+
+################################################################################
+# Inner Methods (inside rkstep!)
 
 @doc """
 This function defines the step for an iterative method of
