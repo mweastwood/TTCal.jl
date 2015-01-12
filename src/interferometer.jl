@@ -23,3 +23,8 @@ type Interferometer
     flaggedantennas::Vector{Int}
 end
 
+antennas(i::Interferometer) = i.Nant
+baselines(i::Interferometer) = div(antennas(i)*(antennas(i)+1),2) # This counts auto-correlations as well.
+channels(i::Interferometer) = i.Nfreq
+flaggedantennas(i::Interferometer) = i.flaggedantennas
+

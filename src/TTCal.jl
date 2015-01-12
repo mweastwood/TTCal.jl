@@ -1,5 +1,11 @@
 module TTCal
 
+export Interferometer
+export flagdata!
+export bandpass
+export fitvis
+export applycal
+
 using Devectorize
 using SIUnits
 using CasaCore.Measures
@@ -10,6 +16,8 @@ include("rungekutta.jl")
 include("interferometer.jl")
 include("sourcemodel.jl")
 include("visibilities.jl")
+
+include("flagdata.jl")
 include("bandpass.jl")
 include("selfcal.jl")
 include("applycal.jl")
