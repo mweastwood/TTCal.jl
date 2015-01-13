@@ -1,6 +1,6 @@
 module TTCal
 
-export Interferometer
+export Interferometer, Source
 export flagdata!
 export bandpass
 export fitvis
