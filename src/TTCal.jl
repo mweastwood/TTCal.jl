@@ -7,6 +7,7 @@ export fitvis
 export applycal
 
 using Devectorize
+using JSON
 using SIUnits
 using CasaCore.Measures
 using CasaCore.Tables

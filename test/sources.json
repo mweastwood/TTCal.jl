@@ -1,0 +1,66 @@
+[
+    {
+        "ref": "Baars et al. 1977",
+        "name": "Cas A",
+        "ra": "23h23m24s",
+        "dec": "58d48m54s",
+        "flux": 555904.26,
+        "freq": 1.0e6,
+        "index": [-0.770]
+    },
+    {
+        "ref": "Baars et al. 1977",
+        "name": "Cyg A",
+        "ra": "19h59m28.35663s",
+        "dec": "+40d44m02.0970s",
+        "flux": 49545.02,
+        "freq": 1.0e6,
+        "index": [+0.085,-0.178]
+    },
+    {
+        "ref": "Baars et al. 1977",
+        "name": "Tau A",
+        "ra": "05h34m31.94s",
+        "dec": "+22d00m52.2s",
+        "flux": 8222.43,
+        "freq": 1.0e6,
+        "index": [-0.299]
+    },
+    {
+        "ref": "Baars et al. 1977",
+        "name": "Vir A",
+        "ra": "12h30m49.42338s",
+        "dec": "+12d23m28.0439s",
+        "flux": 105438.69,
+        "freq": 1.0e6,
+        "index": [-0.856]
+    },
+    {
+        "ref": "none",
+        "name": "Gem A",
+        "ra": "06h18m02.7s",
+        "dec": "+22d39m36s",
+        "flux": 1000.0,
+        "freq": 4.7e7,
+        "index": [-0.5]
+    },
+    {
+        "ref": "none",
+        "name": "Her A",
+        "ra": "16h51m08.2s",
+        "dec": "+04d59m33s",
+        "flux": 1000.0,
+        "freq": 4.7e7,
+        "index": [-0.5]
+    },
+    {
+        "ref": "none",
+        "name": "Hya A",
+        "ra": "09h18m05.651s",
+        "dec": "-12d05m43.99s",
+        "flux": 1000.0,
+        "freq": 4.7e7,
+        "index": [-0.5]
+    }
+]
+

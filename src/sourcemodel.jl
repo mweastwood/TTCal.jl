@@ -9,7 +9,7 @@ type Source
     index::Vector{Float64}
 end
 
-Source(name,ra,dec,flux,reffreq,index::Float64) = Source(name,ra,dec,flux,reffreq,[index])
+Source(name,dir,flux,reffreq,index::Float64) = Source(name,dir,flux,reffreq,[index])
 
 function getflux(source::Source,frequency::quantity(Float64,Hertz))
     logflux = log10(source.flux)
@@ -56,15 +56,10 @@ function isabovehorizon(frame::ReferenceFrame,source::Source)
 end
 
 @doc """
-Returns a list of sources that are above the horizon for the given
-`ReferenceFrame`.
+Filter the provided list of sources down to those that are above
+the horizon in the given reference frame.
 """ ->
-function getsources(frame::ReferenceFrame)
-    # TODO: Make this significantly better
-    sources = Source[]
-    push!(sources,Source("Cyg A",Direction("J2000",ra"19h59m17.24s",dec"+40d44m23.35s"),21850.24,47e6,[-0.51,-0.18]))
-    push!(sources,Source("Cas A",Direction("J2000",ra"23h23m45.55s",dec"+58d25m25.39s"), 8628.39,47e6,[-0.14,-1.51]))
-
+function abovehorizon(frame::ReferenceFrame,sources::Vector{Source})
     sources_abovehorizon = Source[]
     for source in sources
         if isabovehorizon(frame,source)
@@ -72,5 +67,21 @@ function getsources(frame::ReferenceFrame)
         end
     end
     sources_abovehorizon
+end
+
+function readsources(filename::AbstractString)
+    sources = TTCal.Source[]
+    parsed_sources = JSON.parsefile("sources.json")
+    for parsed_source in parsed_sources
+        name  = parsed_source["name"]
+        ra    = parsed_source["ra"]
+        dec   = parsed_source["dec"]
+        flux  = parsed_source["flux"]
+        freq  = parsed_source["freq"]
+        index = parsed_source["index"]
+        dir = Direction("J2000",ra_str(ra),dec_str(dec))
+        push!(sources,TTCal.Source(name,dir,flux,freq*Hertz,index))
+    end
+    sources
 end
 
