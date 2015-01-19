@@ -7,7 +7,7 @@ export fitvis
 export applycal
 
 using Devectorize
-using JSON
+using JSON, NPZ
 using SIUnits
 using CasaCore.Measures
 using CasaCore.Tables
@@ -23,6 +23,7 @@ include("bandpass.jl")
 include("selfcal.jl")
 include("applycal.jl")
 
+#=
 function run(args)
     ms = [Table(ASCIIString(input)) for input in args["measurementsets"]]
 
@@ -48,8 +49,8 @@ function run(args)
     end
     nothing
 end
+=#
 
-using NPZ
 @doc """
 Save the gains as a numpy array.
 """ ->
