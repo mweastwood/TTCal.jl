@@ -85,3 +85,22 @@ function readsources(filename::AbstractString)
     sources
 end
 
+function writesources(filename::AbstractString,sources::Vector{Source})
+    dicts = Dict{UTF8String,Any}[]
+    for source in sources
+        dict = Dict{UTF8String,Any}()
+        dict["ref"]   = "TTCal"
+        dict["name"]  = source.name
+        dict["ra"]    =  ra_str(source.dir.m[1])
+        dict["dec"]   = dec_str(source.dir.m[2])
+        dict["flux"]  = source.flux
+        dict["freq"]  = float(source.reffreq)
+        dict["index"] = source.index
+        push!(dicts,dict)
+    end
+    file = open(filename,"w")
+    JSON.print(file,dicts)
+    close(file)
+    nothing
+end
+
