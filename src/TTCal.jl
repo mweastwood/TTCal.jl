@@ -1,6 +1,9 @@
 module TTCal
 
-export Interferometer, Source
+export Interferometer
+export Source
+export visibilities
+
 export flagdata!
 export bandpass
 export fitvis
@@ -20,7 +23,7 @@ include("visibilities.jl")
 
 include("flagdata.jl")
 include("bandpass.jl")
-include("selfcal.jl")
+include("fitvis.jl")
 include("applycal.jl")
 
 #=
