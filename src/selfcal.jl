@@ -6,20 +6,33 @@ Fit the visibilities to a model of point sources. The input model needs
 to have the positions of the point sources relatively close, but the flux
 can be wildly off.
 """ ->
-function fitvis(interferometer::Interferometer,
-                ms::Table,
+function fitvis(ms::Table,
                 sources::Vector{Source},
                 criteria::StoppingCriteria)
-    # TODO
+    frame = ReferenceFrame()
+    set!(frame,Epoch("UTC",ms["TIME",1]*Second))
+    set!(frame,Measures.observatory(frame,"OVRO_MMA"))
+    data = ms["CORRECTED_DATA"]
+    flags = ms["FLAG"]
+    uvw  = ms["UVW"]
+    u = addunits(squeeze(uvw[1,:],1),Meter)
+    v = addunits(squeeze(uvw[2,:],1),Meter)
+    w = addunits(squeeze(uvw[3,:],1),Meter)
+
+    spw = Table(ms[kw"SPECTRAL_WINDOW"])
+    ν = addunits(spw["CHAN_FREQ",1],Hertz)
+
+    fitvis(frame,data,flags,u,v,w,ν,sources,criteria)
 end
 
 function fitvis(frame::ReferenceFrame,
                 data::Array{Complex64,3},
+                flags::Array{Bool,3},
                 u,v,w,ν,
                 sources::Vector{Source},
                 criteria::StoppingCriteria)
-    output = [source for source in sources]
-    workspace = Workspace_fitvis(frame,data,u,v,w,ν,output)
+    output = abovehorizon(frame,sources)
+    workspace = Workspace_fitvis(frame,data,flags,u,v,w,ν,output)
     outer_fitvis(workspace,criteria)
     output
 end
@@ -30,6 +43,7 @@ end
 type Workspace_fitvis
     frame::ReferenceFrame
     data::Array{Complex64,3}
+    flags_T::Array{Bool,3}
     u::Vector{quantity(Float64,Meter)}
     v::Vector{quantity(Float64,Meter)}
     w::Vector{quantity(Float64,Meter)}
@@ -44,9 +58,12 @@ type Workspace_fitvis
     oldparams::Vector{Float64}
 
     rkworkspace::RKWorkspace{Float64,4}
+
+    fitmat::Matrix{Complex128}
+    Δdata::Vector{Complex128}
 end
 
-function Workspace_fitvis(frame,data,u,v,w,ν,sources)
+function Workspace_fitvis(frame,data,flags,u,v,w,ν,sources)
     model = similar(data)
     data_minus_model = similar(data)
     data_minus_model_T = permutedims(similar(data),(3,2,1))
@@ -57,10 +74,15 @@ function Workspace_fitvis(frame,data,u,v,w,ν,sources)
 
     rkworkspace = RKWorkspace(similar(params),4)
 
-    Workspace_fitvis(frame,data,u,v,w,ν,sources,
+    Nbase = length(u)
+    fitmat = Array(Complex128,2Nbase,3)
+    Δdata  = Array(Complex128,2Nbase)
+
+    Workspace_fitvis(frame,data,permutedims(flags,(3,2,1)),u,v,w,ν,sources,
                      model,data_minus_model,data_minus_model_T,
                      params,oldparams,
-                     rkworkspace)
+                     rkworkspace,
+                     fitmat,Δdata)
 end
 
 ################################################################################
@@ -77,10 +99,13 @@ function outer_fitvis(workspace,criteria)
     data_minus_model = workspace.data_minus_model
     data_minus_model_T = workspace.data_minus_model_T
 
+    @show sources
+
     # 1. Sort the sources in order of decreasing flux.
     sort!(sources, by=source->source.flux, rev=true)
     # 2. For each source, subtract all other sources.
     for i = 1:length(sources)
+        @show i
         data_minus_model[:] = data
         for j = 1:length(sources)
             i == j && continue
@@ -129,8 +154,9 @@ function outer_fitvis_singlesource(source,workspace,criteria)
     converged = false
     while !converged && iter < criteria.maxiter
         oldparams[:] = params
-        rkstep!(params,fitvis_step,workspace,rkworkspace)
+        @time rkstep!(params,fitvis_step,workspace,rkworkspace)
 
+        @show (params[1] - oldparams[1]) (params[2] - oldparams[2]) vecnorm(params-oldparams)/vecnorm(oldparams)
         # The first two elements are (l,m), the position of the source. These will
         # tend to be much smaller than the rest of the parameters, which is why I
         # test their convergence separately.
@@ -142,7 +168,7 @@ function outer_fitvis_singlesource(source,workspace,criteria)
         end
         iter += 1
     end
-    #error("stop")
+    @show iter
 
     # 3. Get the J2000 position of the source.
     l = params[1]
@@ -181,6 +207,7 @@ function inner_fitvis(output,input,workspace)
     w = workspace.w
     ν = workspace.ν
     data = workspace.data_minus_model_T
+    flags = workspace.flags_T
 
     l = input[1]
     m = input[2]
@@ -197,10 +224,13 @@ function inner_fitvis(output,input,workspace)
     l_arr = Array(Float64,Nfreq)
     m_arr = Array(Float64,Nfreq)
 
-    for β = 1:Nfreq
+    @time for β = 1:Nfreq
         l_arr[β],m_arr[β],flux[β] = inner_fitvis_onechannel(slice(data,:,β,1),
+                                                            slice(flags,:,β,1),
                                                             slice(fringe,:,β),
-                                                            flux[β],l,m,u,v,w,ν[β])
+                                                            flux[β],l,m,u,v,w,ν[β],
+                                                            workspace.fitmat,
+                                                            workspace.Δdata)
     end
 
     # 3. Get a single position for the source.
@@ -215,31 +245,38 @@ function inner_fitvis(output,input,workspace)
 end
 const fitvis_step = RKInnerStep{:inner_fitvis}()
 
-function inner_fitvis_onechannel(data,fringe,flux,l,m,u,v,w,ν)
+function inner_fitvis_onechannel(data,flags,fringe,flux,l,m,u,v,w,ν,fitmat,Δdata)
     n = sqrt(1-l^2-m^2)
     λ = c/ν
 
-    Nbase  = length(u)
-    fitmat = Array(Complex128,2Nbase,3)
+    Nbase = length(u)
+    Nflag = sum(flags)
+    N = Nbase-Nflag
     # Columns contain: [∂V/∂l ∂V/∂m ∂V/∂S]
     # Where V is the contribution to the visibility of a single point source,
     #       l and m specify the position of the point source, and
     #       S is the flux of the point source
-    for α = 1:Nbase
+    idx = 1
+    @inbounds for α = 1:Nbase
+        flags[α] && continue
         # (note the factor of 0.5 accounts for the fact that we're only
         # considering a single polarization)
-        fitmat[α,1] = complex(0.,2.0π*(u[α]-w[α]*l/n)/λ) * 0.5flux * fringe[α]
-        fitmat[α,2] = complex(0.,2.0π*(v[α]-w[α]*m/n)/λ) * 0.5flux * fringe[α]
-        fitmat[α,3] = 0.5 * fringe[α]
+        model = 0.5*flux*fringe[α]
+        Δdata[idx] = data[α] - model
+        fitmat[idx,1] = complex(0.,2.0π*(u[α].val-w[α].val*l/n)/λ.val) * model
+        fitmat[idx,2] = complex(0.,2.0π*(v[α].val-w[α].val*m/n)/λ.val) * model
+        fitmat[idx,3] = 0.5 * fringe[α]
+
         # Constrain the complex conjugates as well
         # (this forces the parameters to be real)
-        fitmat[Nbase+α,1] = conj(fitmat[α,1])
-        fitmat[Nbase+α,2] = conj(fitmat[α,2])
-        fitmat[Nbase+α,3] = conj(fitmat[α,3])
+        Δdata[N+idx] = conj(Δdata[idx])
+        fitmat[N+idx,1] = conj(fitmat[idx,1])
+        fitmat[N+idx,2] = conj(fitmat[idx,2])
+        fitmat[N+idx,3] = conj(fitmat[idx,3])
+
+        idx += 1
     end
-    model  = 0.5*flux*fringe
-    Δdata  = vcat(data,conj(data)) - vcat(model,conj(model))
-    Δparam = real(fitmat\Δdata)
+    Δparam = real(sub(fitmat,1:2N,:)\sub(Δdata,1:2N,:))
     l += Δparam[1]
     m += Δparam[2]
     flux += Δparam[3]
