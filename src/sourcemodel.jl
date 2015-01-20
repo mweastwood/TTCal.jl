@@ -71,7 +71,7 @@ end
 
 function readsources(filename::AbstractString)
     sources = TTCal.Source[]
-    parsed_sources = JSON.parsefile("sources.json")
+    parsed_sources = JSON.parsefile(filename)
     for parsed_source in parsed_sources
         name  = parsed_source["name"]
         ra    = parsed_source["ra"]
