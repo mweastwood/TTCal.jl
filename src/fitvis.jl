@@ -94,18 +94,28 @@ end
 3. Fit for the source.
 """ ->
 function outer_fitvis(workspace,criteria)
+    u = workspace.u
+    v = workspace.v
+    w = workspace.w
+    ν = workspace.ν
+    flags = workspace.flags_T
+
+    # Flag short baselines
+    for α = 1:length(u)
+        if sqrt(u[α]^2+v[α]^2+w[α]^2) < 70Meter
+            flags[α,:,:] = true
+        end
+    end
+
     sources = workspace.sources
     data = workspace.data
     data_minus_model = workspace.data_minus_model
     data_minus_model_T = workspace.data_minus_model_T
 
-    @show sources
-
     # 1. Sort the sources in order of decreasing flux.
     sort!(sources, by=source->source.flux, rev=true)
     # 2. For each source, subtract all other sources.
     for i = 1:length(sources)
-        @show i
         data_minus_model[:] = data
         for j = 1:length(sources)
             i == j && continue
