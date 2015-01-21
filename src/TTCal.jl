@@ -6,8 +6,9 @@ export visibilities
 
 export flagdata!
 export bandpass
-export fitvis
 export applycal
+export fitvis
+export subsrc!
 
 using Devectorize
 using JSON, NPZ
@@ -23,8 +24,9 @@ include("visibilities.jl")
 
 include("flagdata.jl")
 include("bandpass.jl")
-include("fitvis.jl")
 include("applycal.jl")
+include("fitvis.jl")
+include("subsrc.jl")
 
 #=
 function run(args)
