@@ -22,17 +22,9 @@ The MODEL_DATA column of the measurement set.
 """ ->
 function visibilities(ms::Table,
                       sources::Vector{Source})
-    uvw = ms["UVW"]
-    u = addunits(uvw[1,:],Meter)
-    v = addunits(uvw[2,:],Meter)
-    w = addunits(uvw[3,:],Meter)
-    spw = Table(ms[kw"SPECTRAL_WINDOW"])
-    ν = addunits(spw["CHAN_FREQ",1],Hertz)
-
-    frame = ReferenceFrame()
-    set!(frame,Epoch("UTC",ms["TIME",1]*Second))
-    set!(frame,Measures.observatory(frame,"OVRO_MMA"))
-    
+    u,v,w = uvw(ms)
+    ν = freq(ms)
+    frame = reference_frame(ms)
     visibilities(frame,sources,u,v,w,ν)
 end
 

@@ -17,6 +17,7 @@ using CasaCore.Measures
 using CasaCore.Tables
 
 include("units.jl")
+include("ms.jl")
 include("rungekutta.jl")
 include("interferometer.jl")
 include("sourcemodel.jl")
