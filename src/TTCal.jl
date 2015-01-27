@@ -27,6 +27,7 @@ include("flagdata.jl")
 include("bandpass.jl")
 include("applycal.jl")
 include("fitvis.jl")
+include("getspec.jl")
 include("subsrc.jl")
 
 #=

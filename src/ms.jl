@@ -1,10 +1,10 @@
 # These are helper routines for interfacing with measurement sets
 
 function uvw(ms::Table)
-    uvw = ms["UVW"]
-    u = addunits(uvw[1,:],Meter)
-    v = addunits(uvw[2,:],Meter)
-    w = addunits(uvw[3,:],Meter)
+    uvw_arr = ms["UVW"]
+    u = addunits(squeeze(uvw_arr[1,:],1),Meter)
+    v = addunits(squeeze(uvw_arr[2,:],1),Meter)
+    w = addunits(squeeze(uvw_arr[3,:],1),Meter)
     u,v,w
 end
 
@@ -19,5 +19,11 @@ function reference_frame(ms::Table)
     set!(frame,Epoch("UTC",ms["TIME",1]*Second))
     set!(frame,Measures.observatory(frame,"OVRO_MMA"))
     frame
+end
+
+function ants(ms::Table)
+    ant1 = ms["ANTENNA1"]
+    ant2 = ms["ANTENNA2"]
+    ant1+1,ant2+1
 end
 
