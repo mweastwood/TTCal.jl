@@ -1,7 +1,22 @@
-# The source flux is modeled as follows:
-#     log(S) = log(flux) + index[1]*log(ν/reffreq)
-#                        + index[2]*log²(ν/reffreq) + ...
-type Source
+################################################################################
+# Source Definitions
+
+abstract AbstractSource
+
+@doc """
+These sources have a multi-component power-law spectrum
+such that:
+
+    log(S) = log(flux) + index[1]*log(ν/reffreq)
+                       + index[2]*log²(ν/reffreq) + ...
+""" ->
+abstract PowerLawSource
+
+@doc """
+These are generic, run-of-the-mill sources that receive
+a J2000 position and a power-law spectrum.
+""" ->
+type Source <: PowerLawSource
     name::ASCIIString
     dir::Direction
     flux::Float64
@@ -11,17 +26,58 @@ end
 
 Source(name,dir,flux,reffreq,index::Float64) = Source(name,dir,flux,reffreq,[index])
 
-function getflux(source::Source,frequency::quantity(Float64,Hertz))
+function Source(frame::ReferenceFrame,source::SolarSystemSource)
+    dir = measure(frame,Direction(source.name),"J2000")
+    Source(source.name,dir,source.flux,source.reffreq,source.index)
+end
+
+@doc """
+Solar system objects move through the sky and hence their
+J2000 position must be calculated for the given epoch.
+""" ->
+type SolarSystemSource <: PowerLawSource
+    name::ASCIIString
+    flux::Float64
+    reffreq::quantity(Float64,Hertz)
+    index::Vector{Float64}
+end
+
+@doc """
+RFI usually has an unsmooth spectrum and does not rotate
+with the sky. Hence these sources are allowed to have any
+arbitrary spectrum, and receive an AZEL position.
+""" ->
+type RFISource <: AbstractSource
+    name::ASCIIString
+    dir::Direction
+    flux::Vector{Float64}
+    freq::Vector{quantity(Float64,Hertz)}
+end
+
+function RFISource(source::PowerLawSource,frequencies::Vector{quantity(Float64,Hertz)})
+    flux = getflux(source,frequencies)
+    dir  = measure(frame,source.dir,"AZEL")
+    RFISource(source.name,dir,flux,frequencies)
+end
+
+################################################################################
+# Flux
+
+function getflux(source::PowerLawSource,frequency::quantity(Float64,Hertz))
     logflux = log10(source.flux)
+    logfreq = log10(frequency/source.reffreq)
     for (i,index) in enumerate(source.index)
-        logflux += index*log10(frequency/source.reffreq).^i
+        logflux += index*logfreq.^i
     end
     10.0.^logflux
 end
 
-function getflux(source::Source,frequencies::Vector{quantity(Float64,Hertz)})
+function getflux(source::AbstractSource,frequencies::Vector{quantity(Float64,Hertz)})
     [getflux(source,frequency) for frequency in frequencies]
 end
+
+################################################################################
+# Position
 
 function getazel(frame::ReferenceFrame,dir::Direction)
     if dir.system != "AZEL"
@@ -68,6 +124,9 @@ function abovehorizon(frame::ReferenceFrame,sources::Vector{Source})
     end
     sources_abovehorizon
 end
+
+################################################################################
+# I/O
 
 function readsources(filename::AbstractString)
     sources = TTCal.Source[]
