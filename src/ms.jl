@@ -24,6 +24,7 @@ end
 function ants(ms::Table)
     ant1 = ms["ANTENNA1"]
     ant2 = ms["ANTENNA2"]
+    # (the +1 converts to a 1-based indexing scheme)
     ant1+1,ant2+1
 end
 
