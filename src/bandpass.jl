@@ -4,99 +4,67 @@
 @doc """
 Calibrate the given measurement set!
 """ ->
-function bandpass(interferometer::Interferometer,
-                  ms::Vector{Table},
+function bandpass(ms::Table,
                   sources::Vector{Source},
-                  criteria::StoppingCriteria)
-    Nms   = length(ms)
-    Nfreq = interferometer.Nfreq
-    Nant  = interferometer.Nant
-    gains = ones(Complex64,Nant,2,Nms*Nfreq)
-    for i = 1:length(ms)
-        bandpass!(sub(gains,:,:,(i-1)*Nfreq+1:i*Nfreq),
-                  interferometer,ms[i],sources,criteria)
-    end
-    gains
-end
+                  criteria::StoppingCriteria;
+                  force_imaging_columns::Bool = false,
+                  reference_antenna::Int = 1)
+    frame = reference_frame(ms)
+    u,v,w = uvw(ms)
+    ν = freq(ms)
+    ant1,ant2 = ants(ms)
 
-function bandpass!(gains,
-                   interferometer::Interferometer,
-                   ms::Table,
-                   sources::Vector{Source},
-                   criteria::StoppingCriteria)
+    Nfreq = length(ν)
+    Nant  = numrows(Table(ms[kw"ANTENNA"]))
+
     data  = ms["DATA"]
-    model = visibilities(ms,sources)
-    if Tables.checkColumnExists(ms,"MODEL_DATA")
+    model = genvis(frame,sources,u,v,w,ν)
+    flags = ms["FLAG"]
+    gains = ones(Complex64,Nant,2,Nfreq)
+
+    if force_imaging_columns || Tables.checkColumnExists(ms,"MODEL_DATA")
         ms["MODEL_DATA"] = model
     end
-    bandpass!(gains,data,model,interferometer,criteria)
+
+    bandpass!(gains,data,model,flags,ant1,ant2,criteria,reference_antenna)
 end
 
-function bandpass!(gains,
+################################################################################
+# Internal Interface
+
+function bandpass!(gains::Array{Complex64,3},
                    data::Array{Complex64,3},
                    model::Array{Complex64,3},
-                   interferometer::Interferometer,
-                   criteria::StoppingCriteria)
+                   flags::Array{Bool,3},
+                   ant1::Vector{Int32},
+                   ant2::Vector{Int32},
+                   criteria::StoppingCriteria,
+                   reference_antenna::Int)
     # Transpose the data and model arrays to create a better memory access pattern
-    data  = permutedims(data, (3,1,2))
-    model = permutedims(model,(3,1,2))
+    @time data  = permutedims(data, (3,1,2))
+    @time model = permutedims(model,(3,1,2))
+    @time flags = permutedims(flags,(3,1,2))
 
-    workspace = Workspace_bandpass(interferometer)
-
-    for β = 1:interferometer.Nfreq
+    Nfreq = size(gains,3)
+    @time for β = 1:Nfreq
         # Calibrate the X polarization
         bandpass_onechannel!(slice(gains,:,1,β),
                              slice( data,:,1,β),
                              slice(model,:,1,β),
-                             interferometer,
-                             workspace,
-                             criteria)
+                             slice(flags,:,1,β),
+                             ant1, ant2,
+                             criteria,
+                             reference_antenna)
         # Calibrate the Y polarization
         bandpass_onechannel!(slice(gains,:,2,β),
                              slice( data,:,4,β),
                              slice(model,:,4,β),
-                             interferometer,
-                             workspace,
-                             criteria)
+                             slice(flags,:,1,β),
+                             ant1, ant2,
+                             criteria,
+                             reference_antenna)
     end
-    gains
 end
-
-################################################################################
-# Workspace Definition
-
-# Pre-allocate all the arrays needed by the calibration routine
-
-immutable InnerWorkspace_bandpass
-    data::Matrix{Complex64}
-    model::Matrix{Complex64}
-    normalization::Vector{Float64}
-end
-
-immutable Workspace_bandpass
-    data::Matrix{Complex64}  # Hermitian matrix
-    model::Matrix{Complex64} # Hermitian matrix
-    gains::Vector{Complex64}
-    oldgains::Vector{Complex64}
-
-    rkworkspace::RKWorkspace{Complex64,4}
-    innerworkspace::InnerWorkspace_bandpass
-end
-
-function Workspace_bandpass(interferometer::Interferometer)
-    Nant = interferometer.Nant - length(interferometer.flaggedantennas)
-    data  = Array(Complex64,Nant,Nant)
-    model = Array(Complex64,Nant,Nant)
-    gains = Array(Complex64,Nant)
-    oldgains = Array(Complex64,Nant)
-    normalization = Array(Float64,Nant)
-    Workspace_bandpass(data,model,gains,oldgains,
-                       RKWorkspace(gains,4),
-                       InnerWorkspace_bandpass(data,model,normalization))
-end
-
-################################################################################
-# Outer Methods (outside rkstep!)
 
 @doc """
 Calibrate the complex gains from a single frequency channel using a two step process:
@@ -106,88 +74,79 @@ Calibrate the complex gains from a single frequency channel using a two step pro
 3. Iteratively improve that estimate.
 4. Fix the phase of the reference antenna.
 """ ->
-function bandpass_onechannel!(gains, data, model,
-                              interferometer::Interferometer,
-                              workspace::Workspace_bandpass,
-                              criteria::StoppingCriteria)
+function bandpass_onechannel!(gains, data, model, flags,
+                              ant1::Vector{Int32},
+                              ant2::Vector{Int32},
+                              criteria::StoppingCriteria,
+                              reference_antenna::Int)
     # 1. Pack the visibilities into square, Hermitian matrices.
-    makesquare!(workspace.data,  data,interferometer.flaggedantennas)
-    makesquare!(workspace.model,model,interferometer.flaggedantennas)
+    square_data  = makesquare(data, ant1,ant2)
+    square_model = makesquare(model,ant1,ant2)
+    square_flags = makesquare(flags,ant1,ant2)
+
+    # 2. Flag the auto-correlations.
+    for i = 1:size(square_flags,1)
+        square_flags[i,i] = true
+    end
 
     # 2. Get an initial estimate of the complex gains.
-    firstguess!(workspace)
+    # (note that the model data is flagged after taking this
+    # initial estimate to prevent a divide-by-zero error)
+    square_data  = square_data  .* !square_flags
+    gains[:] = firstguess(square_data,square_model)
+    square_model = square_model .* !square_flags
+
+    # Elaborating a little bit more on the application of flags:
+    #
+    # Notice that firstguess(...) makes use of the matrix
+    # square_data./square_model. This means that is enough to
+    # zero-out the flagged entries of square_data.
+    #
+    # However, bandpass_inner(...) separately uses the elements
+    # of square_data and square_model. Therefore we need
+    # both matrices to have their flagged elements zeroed.
+
+    oldgains = similar(gains)
+    workspace = RKWorkspace(oldgains,4)
 
     # 3. Iteratively improve that estimate.
     iter = 0
     converged = false
     while !converged && iter < criteria.maxiter
-        workspace.oldgains[:] = workspace.gains
-        rkstep!(workspace.gains,bandpass_step,workspace.innerworkspace,workspace.rkworkspace)
-        if vecnorm(workspace.gains-workspace.oldgains)/vecnorm(workspace.oldgains) < criteria.tolerance
+        oldgains[:] = gains
+        rkstep!(gains,workspace,bandpass_step!,square_data,square_model)
+        if vecnorm(gains-oldgains)/vecnorm(oldgains) < criteria.tolerance
             converged = true
         end
         iter += 1
     end
 
-    # Output
-    idx = 1
-    for ant = 1:interferometer.Nant
-        ant in interferometer.flaggedantennas && continue
-        gains[ant] = workspace.gains[idx]
-        idx += 1
-    end
-
     # 4. Fix the phase of the reference antenna.
-    refant = interferometer.refant
-    factor = conj(gains[refant])/abs(gains[refant])
-    for ant = 1:interferometer.Nant
-        ant in interferometer.flaggedantennas && continue
+    factor = conj(gains[reference_antenna])/abs(gains[reference_antenna])
+    for ant = 1:length(gains)
         gains[ant] = gains[ant]*factor
     end
     nothing
 end
 
 @doc """
-Pack the visibilities into a square matrix under the
-assumption that the visibilities are ordered as follows
-
-    11, 12, 13, ..., 22, 23, ..., 33, ...
-
-An optional list of rows/columns to flag can be provided.
+Pack the data into a square Hermitian matrix.
+This method assumes that the data set has no baselines
+with missing data.
 """ ->
-function makesquare!(output::Matrix,input,flags = Int[])
+function makesquare(input,ant1::Vector{Int32},ant2::Vector{Int32})
     N = length(input)
-    # Number of rows/columns
     M = round(Integer,div(sqrt(1+8N)-1,2))
-    # Number of rows/columns after flagging
-    M_ = M - length(flags)
-    count   = 1 # current index for input
-    i_ = j_ = 1 # current indices for output
-    for i = 1:M
-        if i in flags
-            # Skip a whole row
-            count += M+1-i
-            continue
+    output = zeros(eltype(input),M,M)
+    for α = 1:length(input)
+        if ant1[α] == ant2[α]
+            output[ant1[α],ant1[α]] = input[α]
+        else
+            output[ant1[α],ant2[α]] = input[α]
+            output[ant2[α],ant1[α]] = conj(input[α])
         end
-        # Do the diagonal
-        output[i_,i_] = input[count]
-        count += 1
-        # Fill out the remainder of the row
-        j_ = i_+1
-        for j = i+1:M
-            if j in flags
-                # Skip a column
-                count += 1
-                continue
-            end
-            output[i_,j_] =      input[count]
-            output[j_,i_] = conj(input[count])
-            count += 1
-            j_ += 1
-        end
-        i_ += 1
     end
-    nothing
+    output
 end
 
 @doc """
@@ -206,15 +165,12 @@ reason, but there is no obvious way to exclude them in this case.
 Hence we use this as a first guess to an iterative method that
 refines the calibration.
 """ ->
-function firstguess!(workspace::Workspace_bandpass)
-    G = workspace.data./workspace.model
+function firstguess(V,M)
+    G = V./M
     λ,v = eigs(G,nev=1,which=:LM)
     w = sqrt(λ[1])
-    @devec workspace.gains[:] = v.*w
+    v.*w
 end
-
-################################################################################
-# Inner Methods (inside rkstep!)
 
 @doc """
 This function defines the step for an iterative method of
@@ -233,37 +189,20 @@ solution of V = g[i]*M*g', where V and M are vectors containing
 the measured and model visibilities where antenna i is the
 first antenna.
 """ ->
-function bandpass_step!(output,input,workspace)
+function bandpass_inner!(output,input,V,M)
     N = length(input)
-    for i = 1:N
-        output[i] = complex(0.)
-        workspace.normalization[i] = 0.
+    output[:] = complex(0.)
+    normalization = zeros(Float32,N)
+    @inbounds for j = 1:N, i = 1:N
+        z = conj(input[j])*M[i,j]
+        output[i] += conj(z)*V[i,j]
+        normalization[i] += abs2(z)
     end
-    for j = 1:N, i = 1:N
-        i == j && continue
-        z = conj(input[j])*workspace.model[i,j]
-        output[i] += conj(z)*workspace.data[i,j]
-        workspace.normalization[i] += abs2(z)
-    end
-    for i = 1:N
-        output[i] = output[i]/workspace.normalization[i] - input[i]
+    @inbounds for i = 1:N
+        normalization[i] == 0. && continue
+        output[i] = output[i]/normalization[i] - input[i]
     end
     nothing
 end
-const bandpass_step = RKInnerStep{:bandpass_step!}()
-
-@doc """
-Calculate the χ² value of the gain calibration.
-""" ->
-function χ2(data::Matrix,model::Matrix,gains::Vector)
-    out = 0.
-    for i = 1:length(gains), j = i+1:length(gains)
-        out += abs2(data[j,i] - gains[j]*conj(gains[i])*model[j,i])
-    end
-    out
-end
-
-function χ2(workspace::Workspace_bandpass)
-    χ2(workspace.data,workspace.model,workspace.gains)
-end
+const bandpass_step! = RKInnerStep{:bandpass_inner!}()
 
