@@ -1,6 +1,8 @@
 language: julia
 julia:
     - nightly
+notifications:
+    email: false
 before_install:
     - sudo add-apt-repository ppa:ska-sa/main -y
     - sudo apt-get update -qq -y
