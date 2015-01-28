@@ -10,7 +10,7 @@ such that:
     log(S) = log(flux) + index[1]*log(ν/reffreq)
                        + index[2]*log²(ν/reffreq) + ...
 """ ->
-abstract PowerLawSource
+abstract PowerLawSource <: AbstractSource
 
 @doc """
 These are generic, run-of-the-mill sources that receive
@@ -22,13 +22,6 @@ type Source <: PowerLawSource
     flux::Float64
     reffreq::quantity(Float64,Hertz)
     index::Vector{Float64}
-end
-
-Source(name,dir,flux,reffreq,index::Float64) = Source(name,dir,flux,reffreq,[index])
-
-function Source(frame::ReferenceFrame,source::SolarSystemSource)
-    dir = measure(frame,Direction(source.name),"J2000")
-    Source(source.name,dir,source.flux,source.reffreq,source.index)
 end
 
 @doc """
@@ -54,16 +47,18 @@ type RFISource <: AbstractSource
     freq::Vector{quantity(Float64,Hertz)}
 end
 
-function RFISource(source::PowerLawSource,frequencies::Vector{quantity(Float64,Hertz)})
-    flux = getflux(source,frequencies)
-    dir  = measure(frame,source.dir,"AZEL")
-    RFISource(source.name,dir,flux,frequencies)
+function RFISource(frame::ReferenceFrame,
+                   source::Source,
+                   frequencies::Vector{quantity(Float64,Hertz)})
+    dir = measure(frame,source.dir,"AZEL")
+    S = flux(source,frequencies)
+    RFISource(source.name,dir,S,frequencies)
 end
 
 ################################################################################
 # Flux
 
-function getflux(source::PowerLawSource,frequency::quantity(Float64,Hertz))
+function flux(source::PowerLawSource,frequency::quantity(Float64,Hertz))
     logflux = log10(source.flux)
     logfreq = log10(frequency/source.reffreq)
     for (i,index) in enumerate(source.index)
@@ -72,57 +67,64 @@ function getflux(source::PowerLawSource,frequency::quantity(Float64,Hertz))
     10.0.^logflux
 end
 
-function getflux(source::AbstractSource,frequencies::Vector{quantity(Float64,Hertz)})
-    [getflux(source,frequency) for frequency in frequencies]
+function flux(source::RFISource,frequencies::Vector{quantity(Float64,Hertz)})
+    frequencies == source.freq || error("Provided list of frequencies does not match.")
+    source.flux
+end
+
+flux(source::RFISource) = source.flux
+
+function flux(source::PowerLawSource,frequencies::Vector{quantity(Float64,Hertz)})
+    [flux(source,frequency) for frequency in frequencies]
 end
 
 ################################################################################
 # Position
 
-function getazel(frame::ReferenceFrame,dir::Direction)
-    if dir.system != "AZEL"
-        dir = measure(frame,dir,"AZEL")
-    end
+direction(source::Source) = source.dir
+direction(source::SolarSystemSource) = Direction(source.name)
+direction(source::RFISource) = source.dir
+
+@doc """
+Convert the direction into an azimuth and elevation.
+""" ->
+function dir2azel(frame::ReferenceFrame,dir::Direction)
+    dir = measure(frame,dir,"AZEL")
     az = dir.m[1]
     el = dir.m[2]
     az,el
 end
-getazel(frame::ReferenceFrame,ra,dec) = getazel(frame,Direction("J2000",ra,dec))
-getazel(frame::ReferenceFrame,source::Source) = getazel(frame,source.dir)
 
 @doc """
-Convert a given RA and dec to the standard radio coordinate system.
+Convert the direction into the standard radio coordinate system.
 """ ->
-function getlm(frame::ReferenceFrame,dir::Direction)
-    az,el = getazel(frame,dir)
+function dir2lm(frame::ReferenceFrame,dir::Direction)
+    az,el = dir2azel(frame,dir)
+    azel2lm(az,el)
+end
+
+function azel2lm(az,el)
     l = cos(el)*sin(az)
     m = cos(el)*cos(az)
     l,m
 end
-getlm(frame::ReferenceFrame,ra,dec) = getlm(frame,Direction("J2000",ra,dec))
-getlm(frame::ReferenceFrame,source::Source) = getlm(frame,source.dir)
+
+function lm2azel(l,m)
+    az = atan2(l,m)*Radian
+    el = acos(sqrt(l^2+m^2))*Radian
+    az,el
+end
+
+azel(frame::ReferenceFrame,source::AbstractSource) = dir2azel(frame,direction(source))
+lm(frame::ReferenceFrame,source::AbstractSource) = dir2lm(frame,direction(source))
 
 @doc """
 Returns true if the source is above the horizon, false if the source
 is below the horizon.
 """ ->
 function isabovehorizon(frame::ReferenceFrame,source::Source)
-    az,el = getazel(frame,source)
+    az,el = azel(frame,source)
     ifelse(el > 0.0Radian,true,false)
-end
-
-@doc """
-Filter the provided list of sources down to those that are above
-the horizon in the given reference frame.
-""" ->
-function abovehorizon(frame::ReferenceFrame,sources::Vector{Source})
-    sources_abovehorizon = Source[]
-    for source in sources
-        if isabovehorizon(frame,source)
-            push!(sources_abovehorizon,source)
-        end
-    end
-    sources_abovehorizon
 end
 
 ################################################################################

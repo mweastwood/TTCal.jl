@@ -10,26 +10,29 @@ in a given direction (if all baselines are weighted equally).
 """ ->
 function getspec(ms::Table,
                  dir::Direction)
-    data = ms["CORRECTED_DATA"]
+    data  = ms["CORRECTED_DATA"]
+    flags = ms["FLAG"]
     frame = reference_frame(ms)
-    l,m = getlm(frame,dir)
+    l,m = lm(frame,dir)
     u,v,w = uvw(ms)
     ν = freq(ms)
     ant1,ant2 = ants(ms)
-    flags = ms["FLAG"]
-    getspec(data,l,m,u,v,w,ν,ant1,ant2,flags)
+    getspec_internal(data,flags,l,m,u,v,w,ν,ant1,ant2)
 end
 
-function getspec{T<:Complex}(data::Array{T,3},
-                             l::Float64,
-                             m::Float64,
-                             u::Vector{quantity(Float64,Meter)},
-                             v::Vector{quantity(Float64,Meter)},
-                             w::Vector{quantity(Float64,Meter)},
-                             ν::Vector{quantity(Float64,Hertz)},
-                             ant1::Vector{Int32},
-                             ant2::Vector{Int32},
-                             flags::Array{Bool,3})
+################################################################################
+# Internal Interface
+
+function getspec_internal(data::Array{Complex64,3},
+                          flags::Array{Bool,3},
+                          l::Float64,
+                          m::Float64,
+                          u::Vector{quantity(Float64,Meter)},
+                          v::Vector{quantity(Float64,Meter)},
+                          w::Vector{quantity(Float64,Meter)},
+                          ν::Vector{quantity(Float64,Hertz)},
+                          ant1::Vector{Int32},
+                          ant2::Vector{Int32})
     fringe = fringepattern(l,m,u,v,w,ν)
     spec   = zeros(Float64,4,length(ν))
     count  = zeros(Int,1,length(ν)) # The number of baselines used in the calculation

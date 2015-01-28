@@ -17,7 +17,7 @@ end
 function reference_frame(ms::Table)
     frame = ReferenceFrame()
     set!(frame,Epoch("UTC",ms["TIME",1]*Second))
-    set!(frame,Measures.observatory(frame,"OVRO_MMA"))
+    set!(frame,observatory(frame,"OVRO_MMA"))
     frame
 end
 

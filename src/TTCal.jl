@@ -2,15 +2,15 @@ module TTCal
 
 export Interferometer
 export Source
-export visibilities
+
+export genvis
+export fitvis
+export subsrc!
 
 export flagdata!
 export bandpass
 export applycal
-export fitvis
-export subsrc!
 
-using Devectorize
 using JSON, NPZ
 using SIUnits
 using CasaCore.Measures
@@ -20,15 +20,17 @@ include("units.jl")
 include("ms.jl")
 include("rungekutta.jl")
 include("interferometer.jl")
+
 include("sourcemodel.jl")
-include("visibilities.jl")
+include("fringepattern.jl")
+include("genvis.jl")
+include("getspec.jl")
+include("fitvis.jl")
+include("subsrc.jl")
 
 include("flagdata.jl")
 include("bandpass.jl")
 include("applycal.jl")
-include("fitvis.jl")
-include("getspec.jl")
-include("subsrc.jl")
 
 #=
 function run(args)

@@ -1,28 +1,33 @@
 ################################################################################
 # Public Interface
 
-#using PyPlot
-function subsrc!{T<:Union(Source,Vector{Source})}(ms::Table,sources::T)
-    frame = ReferenceFrame()
-    set!(frame,Epoch("UTC",ms["TIME",1]*Second))
-    set!(frame,Measures.observatory(frame,"OVRO_MMA"))
-
-    uvw  = ms["UVW"]
-    u = addunits(squeeze(uvw[1,:],1),Meter)
-    v = addunits(squeeze(uvw[2,:],1),Meter)
-    w = addunits(squeeze(uvw[3,:],1),Meter)
-
-    spw = Table(ms[kw"SPECTRAL_WINDOW"])
-    ν = addunits(spw["CHAN_FREQ",1],Hertz)
-
-    model = visibilities(frame,sources,u,v,w,ν)
+function subsrc!{T<:AbstractSource}(ms::Table,sources::Vector{T})
+    frame = reference_frame(ms)
+    u,v,w = uvw(ms)
+    ν     = freq(ms)
     data  = ms["CORRECTED_DATA"]
 
-    #figure(1); clf()
-    #b = stripunits(sqrt(u.^2+v.^2+w.^2))
-    #plot(b,squeeze(data[1,1,:],(1,2)),"ro")
-    #plot(b,squeeze(model[1,1,:],(1,2)),"bo")
+    subtracted = subsrc(frame,data,u,v,w,ν,sources)
+    ms["CORRECTED_DATA"] = subtracted
+    subtracted
+end
 
-    ms["CORRECTED_DATA"] = data - model
+################################################################################
+# Internal Interface
+
+function subsrc{T<:AbstractSource}(frame::ReferenceFrame,
+                                   data::Array{Complex64,3},
+                                   u::Vector{quantity(Float64,Meter)},
+                                   v::Vector{quantity(Float64,Meter)},
+                                   w::Vector{quantity(Float64,Meter)},
+                                   ν::Vector{quantity(Float64,Hertz)},
+                                   sources::Vector{T})
+    model = genvis(frame,sources,u,v,w,ν)
+    # Re-use the space allocated for the model visibilities
+    # to store the model subtracted visibilities.
+    for i = 1:length(model)
+        model[i] = data[i]-model[i]
+    end
+    model
 end
 

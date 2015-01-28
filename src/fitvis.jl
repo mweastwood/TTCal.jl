@@ -9,287 +9,222 @@ can be wildly off.
 function fitvis(ms::Table,
                 sources::Vector{Source},
                 criteria::StoppingCriteria)
-    frame = ReferenceFrame()
-    set!(frame,Epoch("UTC",ms["TIME",1]*Second))
-    set!(frame,Measures.observatory(frame,"OVRO_MMA"))
-    data = ms["CORRECTED_DATA"]
+    frame = reference_frame(ms)
+    data  = ms["CORRECTED_DATA"]
     flags = ms["FLAG"]
-    uvw  = ms["UVW"]
-    u = addunits(squeeze(uvw[1,:],1),Meter)
-    v = addunits(squeeze(uvw[2,:],1),Meter)
-    w = addunits(squeeze(uvw[3,:],1),Meter)
+    u,v,w = uvw(ms)
+    ν = freq(ms)
+    ant1,ant2 = ants(ms)
 
-    spw = Table(ms[kw"SPECTRAL_WINDOW"])
-    ν = addunits(spw["CHAN_FREQ",1],Hertz)
-
-    fitvis(frame,data,flags,u,v,w,ν,sources,criteria)
-end
-
-function fitvis(frame::ReferenceFrame,
-                data::Array{Complex64,3},
-                flags::Array{Bool,3},
-                u,v,w,ν,
-                sources::Vector{Source},
-                criteria::StoppingCriteria)
-    output = abovehorizon(frame,sources)
-    workspace = Workspace_fitvis(frame,data,flags,u,v,w,ν,output)
-    outer_fitvis(workspace,criteria)
-    output
+    fitvis(frame,data,flags,u,v,w,ν,ant1,ant2,sources,criteria)
 end
 
 ################################################################################
-# Workspace Definition
-
-type Workspace_fitvis
-    frame::ReferenceFrame
-    data::Array{Complex64,3}
-    flags_T::Array{Bool,3}
-    u::Vector{quantity(Float64,Meter)}
-    v::Vector{quantity(Float64,Meter)}
-    w::Vector{quantity(Float64,Meter)}
-    ν::Vector{quantity(Float64,Hertz)}
-    sources::Vector{Source}
-
-    model::Array{Complex64,3}
-    data_minus_model::Array{Complex64,3}
-    data_minus_model_T::Array{Complex64,3}
-
-    params::Vector{Float64}
-    oldparams::Vector{Float64}
-
-    rkworkspace::RKWorkspace{Float64,4}
-
-    fitmat::Matrix{Complex128}
-    Δdata::Vector{Complex128}
-end
-
-function Workspace_fitvis(frame,data,flags,u,v,w,ν,sources)
-    model = similar(data)
-    data_minus_model = similar(data)
-    data_minus_model_T = permutedims(similar(data),(3,2,1))
-
-    Nparams = 2 + length(ν)
-    params = Array(Float64,Nparams)
-    oldparams = similar(params)
-
-    rkworkspace = RKWorkspace(similar(params),4)
-
-    Nbase = length(u)
-    fitmat = Array(Complex128,2Nbase,3)
-    Δdata  = Array(Complex128,2Nbase)
-
-    Workspace_fitvis(frame,data,permutedims(flags,(3,2,1)),u,v,w,ν,sources,
-                     model,data_minus_model,data_minus_model_T,
-                     params,oldparams,
-                     rkworkspace,
-                     fitmat,Δdata)
-end
-
-################################################################################
-# Outer Methods (outside rkstep!)
+# Internal Interface
 
 @doc """
 1. Sort the sources in order of decreasing flux.
 2. For each source, subtract all other sources.
 3. Fit for the source.
 """ ->
-function outer_fitvis(workspace,criteria)
-    u = workspace.u
-    v = workspace.v
-    w = workspace.w
-    ν = workspace.ν
-    flags = workspace.flags_T
-
-    # Flag short baselines
+function fitvis(frame::ReferenceFrame,
+                data::Array{Complex64,3},
+                flags::Array{Bool,3},
+                u::Vector{quantity(Float64,Meter)},
+                v::Vector{quantity(Float64,Meter)},
+                w::Vector{quantity(Float64,Meter)},
+                ν::Vector{quantity(Float64,Hertz)},
+                ant1::Vector{Int32},
+                ant2::Vector{Int32},
+                sources::Vector{Source},
+                criteria::StoppingCriteria)
+    # Flag short baselines?
     for α = 1:length(u)
-        if sqrt(u[α]^2+v[α]^2+w[α]^2) < 70Meter
-            flags[α,:,:] = true
+        if sqrt(u[α]^2+v[α]^2+w[α]^2) < 50Meter
+            flags[:,:,α] = true
         end
     end
 
-    sources = workspace.sources
-    data = workspace.data
-    data_minus_model = workspace.data_minus_model
-    data_minus_model_T = workspace.data_minus_model_T
+    # 1. Discard sources that are below the horizon.
+    sources = filter(sources) do source
+        isabovehorizon(frame,source)
+    end
+    @show sources
 
-    # 1. Sort the sources in order of decreasing flux.
+    # 2. Sort the sources in order of decreasing flux.
     sort!(sources, by=source->source.flux, rev=true)
-    # 2. For each source, subtract all other sources.
-    for i = 1:length(sources)
-        data_minus_model[:] = data
-        for j = 1:length(sources)
+    @show sources
+
+    # 3. Convert all the sources to `RFISources`
+    # (this removes the spectral smoothness constraint)
+    output_sources = [RFISource(frame,source,ν) for source in sources]
+    @show output_sources
+
+    # 3. For each source:
+    for i = 1:length(output_sources)
+        @show i
+        # a) Subtract all other sources.
+        other_sources = RFISource[]
+        for j = 1:length(output_sources)
             i == j && continue
-            subtract_source!(workspace,sources[j])
+            push!(other_sources,output_sources[j])
         end
-        data_minus_model_T[:] = permutedims(data_minus_model,(3,2,1))
-        # 3. Fit for the source.
-        sources[i] = outer_fitvis_singlesource(sources[i],workspace,criteria)
+        subtracted = subsrc(frame,data,u,v,w,ν,other_sources)
+
+        # b) Obtain the source's spectrum.
+        l,m = lm(frame,output_sources[i])
+        @time spectrum = getspec_internal(subtracted,flags,l,m,u,v,w,ν,ant1,ant2)
+        xx = squeeze(spectrum[1,:],1)
+        yy = squeeze(spectrum[4,:],1)
+        I = 0.5*(xx + yy)
+
+        # c) Fit for the source's position.
+        @time l,m = fitvis_outer(subtracted,flags,l,m,u,v,w,ν,ant1,ant2,spectrum,criteria)
+        az,el = lm2azel(l,m)
+        azel  = Direction("AZEL",az,el)
+
+        # d) Update the source.
+        output_sources[i] = RFISource(output_sources[i].name,azel,I,ν)
     end
-end
-
-function subtract_source!(workspace,source)
-    frame = workspace.frame
-    model = workspace.model
-    data_minus_model = workspace.data_minus_model
-    u = workspace.u
-    v = workspace.v
-    w = workspace.w
-    ν = workspace.ν
-
-    model[:] = visibilities(frame,source,u,v,w,ν)
-    @devec data_minus_model[:] = data_minus_model-model
+    output_sources
 end
 
 @doc """
-1. Pack all the fitting paramaters into a vector.
-2. Take a Runge-Kutta step until the parameters have converged.
-3. Get the J2000 position of the source.
-4. Fit a 2-component power law spectrum to the source.
+Take Runge-Kutta steps until the position converges.
 """ ->
-function outer_fitvis_singlesource(source,workspace,criteria)
-    frame = workspace.frame
-    ν = workspace.ν
-    params = workspace.params
-    oldparams = workspace.oldparams
-    rkworkspace = workspace.rkworkspace
+function fitvis_outer(data::Array{Complex64,3},
+                      flags::Array{Bool,3},
+                      l::Float64,
+                      m::Float64,
+                      u::Vector{quantity(Float64,Meter)},
+                      v::Vector{quantity(Float64,Meter)},
+                      w::Vector{quantity(Float64,Meter)},
+                      ν::Vector{quantity(Float64,Hertz)},
+                      ant1::Vector{Int32},
+                      ant2::Vector{Int32},
+                      spectrum::Array{Float64,2},
+                      criteria::StoppingCriteria)
+    position = [l,m]
+    oldposition = copy(position)
+    workspace = RKWorkspace(position,2)
 
-    # 1. Pack all the fitting paramaters into a vector.
-    l,m  = getlm(frame,source)
-    params[1] = l
-    params[2] = m
-    params[3:end] = getflux(source,ν)
-
-    # 2. Take a Runge-Kutta step until the parameters have converged.
+    # Take Runge-Kutta steps until the position converges.
     iter = 0
     converged = false
     while !converged && iter < criteria.maxiter
-        oldparams[:] = params
-        @time rkstep!(params,fitvis_step,workspace,rkworkspace)
+        oldposition[:] = position
+        @time rkstep!(position,workspace,fitvis_step!,data,flags,u,v,w,ν,ant1,ant2,spectrum)
 
-        @show (params[1] - oldparams[1]) (params[2] - oldparams[2]) vecnorm(params-oldparams)/vecnorm(oldparams)
-        # The first two elements are (l,m), the position of the source. These will
-        # tend to be much smaller than the rest of the parameters, which is why I
-        # test their convergence separately.
-        # TODO: exclude (l,m) from the third check
-        if (params[1] - oldparams[1]) < criteria.tolerance &&
-           (params[2] - oldparams[2]) < criteria.tolerance &&
-           vecnorm(params-oldparams)/vecnorm(oldparams) < criteria.tolerance
+        @show (position[1] - oldposition[1]) (position[2] - oldposition[2])
+        if abs(position[1] - oldposition[1]) < criteria.tolerance &&
+           abs(position[2] - oldposition[2]) < criteria.tolerance
             converged = true
         end
         iter += 1
     end
-    @show iter
 
-    # 3. Get the J2000 position of the source.
-    l = params[1]
-    m = params[2]
-    flux = sub(params,3:length(params))
-
-    az = atan2(l,m)*Radian
-    el = acos(sqrt(l.^2+m.^2))*Radian
-
-    azel  = Direction("AZEL",az,el)
-    j2000 = measure(frame,azel,"J2000")
-
-    # 4. Fit a 2-component power law spectrum to the source.
-    reffreq = 47e6*Hertz
-    x = log10(stripunits(ν/reffreq))
-    y = log10(flux)
-    z = [ones(length(ν)) x x.^2]\y
-    logflux   = z[1]
-    index     = z[2:3]
-    amplitude = 10.0.^logflux
-
-    Source(source.name,j2000,amplitude,reffreq,index)
+    l = position[1]
+    m = position[2]
+    l,m
 end
-
-################################################################################
-# Inner Methods (inside rkstep!)
 
 @doc """
-1. Generate the fringe pattern for all baselines, frequencies.
-2. Fit for the position and flux of the source at each frequency.
-3. Get a single position for the source.
+1. Fit for the position and flux of the source at each frequency.
+2. Get a single position for the source.
 """ ->
-function inner_fitvis(output,input,workspace)
-    u = workspace.u
-    v = workspace.v
-    w = workspace.w
-    ν = workspace.ν
-    data = workspace.data_minus_model_T
-    flags = workspace.flags_T
-
+function fitvis_inner!(output::Vector{Float64},
+                       input::Vector{Float64},
+                       data::Array{Complex64,3},
+                       flags::Array{Bool,3},
+                       u::Vector{quantity(Float64,Meter)},
+                       v::Vector{quantity(Float64,Meter)},
+                       w::Vector{quantity(Float64,Meter)},
+                       ν::Vector{quantity(Float64,Hertz)},
+                       ant1::Vector{Int32},
+                       ant2::Vector{Int32},
+                       spectrum::Array{Float64,2})
     l = input[1]
     m = input[2]
-    flux = input[3:end]
-
-    # 1. Generate the fringe pattern for all baselines, frequencies.
-    fringe = permutedims(fringepattern(l,m,u,v,w,ν),(2,1))
-
-    # fringe is ordered [baseline,frequency]
-    #   data is ordered [baseline,frequency,polarization] (from an earlier transpose)
-
-    # 2. Fit for the position and flux of the source at each frequency.
+    n = sqrt(1-l^2-m^2)
+    Nbase = length(u)
     Nfreq = length(ν)
-    l_arr = Array(Float64,Nfreq)
-    m_arr = Array(Float64,Nfreq)
 
-    @time for β = 1:Nfreq
-        l_arr[β],m_arr[β],flux[β] = inner_fitvis_onechannel(slice(data,:,β,1),
-                                                            slice(flags,:,β,1),
-                                                            slice(fringe,:,β),
-                                                            flux[β],l,m,u,v,w,ν[β],
-                                                            workspace.fitmat,
-                                                            workspace.Δdata)
+    fringe = fringepattern(l,m,u,v,w,ν)
+    delta  = zeros(Complex64,4Nbase)
+    # Columns contain: [∂V/∂l ∂V/∂m]
+    # Where V is the contribution to the visibility of a single point source,
+    #       and l and m specify the position of the point source.
+    matrix = Array(Complex64,4Nbase,2)
+    δl = Array(Float64,Nfreq)
+    δm = Array(Float64,Nfreq)
+
+    # 1. Fit for the position of the source at each frequency.
+    @inbounds for β = 1:Nfreq
+        λ = c/ν[β]
+        count = 0 # The number of unflagged visibilities
+        for α = 1:length(u)
+            ant1[α] == ant2[α] && continue
+            (flags[1,β,α] || flags[2,β,α] || flags[3,β,α] || flags[4,β,α]) && continue
+
+            # Note: constraining the complex conjugates as well forces l and m
+            # to be real-valued.
+
+            model_xx = 0.5*spectrum[1,β]*fringe[β,α]
+            model_yy = 0.5*spectrum[4,β]*fringe[β,α]
+
+            dfringe_l = 2.0im*π*(u[α].val-w[α].val*l/n)/λ.val
+            dfringe_m = 2.0im*π*(v[α].val-w[α].val*m/n)/λ.val
+
+            delta[4count+1] = data[1,β,α] - model_xx
+            delta[4count+2] = data[4,β,α] - model_yy
+            delta[4count+3] = conj(delta[4count+1])
+            delta[4count+4] = conj(delta[4count+2])
+
+            matrix[4count+1,1] = dfringe_l * model_xx
+            matrix[4count+2,1] = dfringe_l * model_yy
+            matrix[4count+3,1] = conj(matrix[4count+1,1])
+            matrix[4count+4,1] = conj(matrix[4count+2,1])
+
+            matrix[4count+1,2] = dfringe_m * model_xx
+            matrix[4count+2,2] = dfringe_m * model_yy
+            matrix[4count+3,2] = conj(matrix[4count+1,2])
+            matrix[4count+4,2] = conj(matrix[4count+2,2])
+
+            count += 1
+        end
+        params = sub(matrix,1:4count,:)\sub(delta,1:4count)
+        δl[β] = real(params[1])
+        δm[β] = real(params[2])
     end
 
-    # 3. Get a single position for the source.
+    # 2. Get a single position for the source.
     # (Weight the positions by ν^2 because resolution ~ 1/ν)
     weights = ν.^2
-    l = sum(weights .* l_arr) ./ sum(weights)
-    m = sum(weights .* m_arr) ./ sum(weights)
+    ΔL = sum(weights .* δl) ./ sum(weights)
+    ΔM = sum(weights .* δm) ./ sum(weights)
+    @show ΔL ΔM
 
-    output[1] = l-input[1]
-    output[2] = m-input[2]
-    output[3:end] = flux-input[3:end]
+    output[1] = ΔL
+    output[2] = ΔM
+    nothing
 end
-const fitvis_step = RKInnerStep{:inner_fitvis}()
 
-function inner_fitvis_onechannel(data,flags,fringe,flux,l,m,u,v,w,ν,fitmat,Δdata)
-    n = sqrt(1-l^2-m^2)
-    λ = c/ν
+const fitvis_step! = RKInnerStep{:fitvis_inner!}()
 
-    Nbase = length(u)
-    Nflag = sum(flags)
-    N = Nbase-Nflag
-    # Columns contain: [∂V/∂l ∂V/∂m ∂V/∂S]
-    # Where V is the contribution to the visibility of a single point source,
-    #       l and m specify the position of the point source, and
-    #       S is the flux of the point source
-    idx = 1
-    @inbounds for α = 1:Nbase
-        flags[α] && continue
-        # (note the factor of 0.5 accounts for the fact that we're only
-        # considering a single polarization)
-        model = 0.5*flux*fringe[α]
-        Δdata[idx] = data[α] - model
-        fitmat[idx,1] = complex(0.,2.0π*(u[α].val-w[α].val*l/n)/λ.val) * model
-        fitmat[idx,2] = complex(0.,2.0π*(v[α].val-w[α].val*m/n)/λ.val) * model
-        fitmat[idx,3] = 0.5 * fringe[α]
-
-        # Constrain the complex conjugates as well
-        # (this forces the parameters to be real)
-        Δdata[N+idx] = conj(Δdata[idx])
-        fitmat[N+idx,1] = conj(fitmat[idx,1])
-        fitmat[N+idx,2] = conj(fitmat[idx,2])
-        fitmat[N+idx,3] = conj(fitmat[idx,3])
-
-        idx += 1
+@doc """
+This function forces l and m to be above the horizon.
+Although this is a nasty hack, it is necessary for fitting
+some sources that are near the horizon.
+""" ->
+function force_to_horizon(l,m)
+    # (check to make sure we're still above the horizon)
+    r2 = l^2+m^2
+    if r2 > 1
+        # (move l and m back inside the horizon)
+        θ = atan2(l,m)
+        l = (1.0-1e-12)*sin(θ)
+        m = (1.0-1e-12)*cos(θ)
     end
-    Δparam = real(sub(fitmat,1:2N,:)\sub(Δdata,1:2N,:))
-    l += Δparam[1]
-    m += Δparam[2]
-    flux += Δparam[3]
-    l,m,flux
+    l,m
 end
 

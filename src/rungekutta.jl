@@ -62,12 +62,12 @@ Take a Runge-Kutta step.
 
 The output is stored in `x`, but all three variables are overwritten.
 """ ->
-stagedfunction rkstep!{func!,N}(x,::RKInnerStep{func!},args,x′,k,::RK{N})
-    tableau    = symbol("RK$(N)_tableau")
+stagedfunction rkstep!{func!,N}(x,x′,k,::RKInnerStep{func!},::RK{N},args...)
+    tableau = symbol("RK$(N)_tableau")
 
     quote
         # Take the Runge-Kutta step
-        $func!(k[1],x,args)
+        $func!(k[1],x,args...)
         for row = 1:N-1
             for i = 1:length(x)
                 x′[i] = x[i]
@@ -78,7 +78,7 @@ stagedfunction rkstep!{func!,N}(x,::RKInnerStep{func!},args,x′,k,::RK{N})
                     x′[i] += k[col][i]*$tableau[row,col]
                 end
             end
-            $func!(k[row+1],x′,args)
+            $func!(k[row+1],x′,args...)
         end
 
         # Output
@@ -91,8 +91,8 @@ stagedfunction rkstep!{func!,N}(x,::RKInnerStep{func!},args,x′,k,::RK{N})
     end
 end
 
-function rkstep!{T,N}(x,_::RKInnerStep,args,workspace::RKWorkspace{T,N})
-    rkstep!(x,_,args,workspace.x′,workspace.k,RK{N}())
+function rkstep!{T,N}(x,workspace::RKWorkspace{T,N},_::RKInnerStep,args...)
+    rkstep!(x,workspace.x′,workspace.k,_,RK{N}(),args...)
 end
 
 immutable StoppingCriteria
