@@ -8,7 +8,7 @@ export subsrc!
 
 export flagdata!
 export bandpass
-export applycal
+export applycal!
 
 using JSON, NPZ
 using SIUnits
