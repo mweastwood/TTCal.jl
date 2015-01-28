@@ -27,6 +27,7 @@ function bandpass(ms::Table,
     end
 
     bandpass!(gains,data,model,flags,ant1,ant2,criteria,reference_antenna)
+    gains
 end
 
 ################################################################################
@@ -41,12 +42,12 @@ function bandpass!(gains::Array{Complex64,3},
                    criteria::StoppingCriteria,
                    reference_antenna::Int)
     # Transpose the data and model arrays to create a better memory access pattern
-    @time data  = permutedims(data, (3,1,2))
-    @time model = permutedims(model,(3,1,2))
-    @time flags = permutedims(flags,(3,1,2))
+    data  = permutedims(data, (3,1,2))
+    model = permutedims(model,(3,1,2))
+    flags = permutedims(flags,(3,1,2))
 
     Nfreq = size(gains,3)
-    @time for β = 1:Nfreq
+    for β = 1:Nfreq
         # Calibrate the X polarization
         bandpass_onechannel!(slice(gains,:,1,β),
                              slice( data,:,1,β),
