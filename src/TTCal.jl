@@ -7,6 +7,7 @@ export subsrc!
 
 export flagdata!
 export bandpass
+export polcal
 export applycal!
 
 using JSON, NPZ
@@ -27,6 +28,7 @@ include("subsrc.jl")
 
 include("flagdata.jl")
 include("bandpass.jl")
+include("polcal.jl")
 include("applycal.jl")
 
 end

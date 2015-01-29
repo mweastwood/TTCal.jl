@@ -139,7 +139,7 @@ function makesquare(input,ant1::Vector{Int32},ant2::Vector{Int32})
     N = length(input)
     M = round(Integer,div(sqrt(1+8N)-1,2))
     output = zeros(eltype(input),M,M)
-    for α = 1:length(input)
+    for α = 1:N
         if ant1[α] == ant2[α]
             output[ant1[α],ant1[α]] = input[α]
         else
