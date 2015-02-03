@@ -16,10 +16,16 @@ If all the tests pass, you are ready to begin using `TTCal`.
 
 ## Unpolarized Bandpass Calibration
 ### Algorithm
+Given a set of measured visibilities `V_ij` and model visibilities `M_ij`, the relationship between `V_ij` and `M_ij` is simply:
+```
+V_ij = g_i conj(g_j) M_ij
+```
+where `g_i` is the complex gain associated with antenna `i`. Using the identity `conj(V_ij) = V_ji`, TTCal packs the measured and model visibilities into square Hermitian matrices. In the absence of noise, the principle eigenvector of `V_ij/M_ij` is the complex gain for each antenna. TTCal uses this principle eigenvector as the starting point for an iterative solver.
+
+TTCal's iterative solver is inspired by Stefcal.
 
 ## Polarized Bandpass Calibration
-
-Not yet implemented.
+### Algorithm
 
 ## Direction-Dependent Calibration
 
