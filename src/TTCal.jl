@@ -5,7 +5,7 @@ export genvis
 export fitvis
 export subsrc!
 
-export flagdata!
+export clearflags!,flagdata!
 export bandpass
 export polcal
 export applycal!
