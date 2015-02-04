@@ -90,7 +90,7 @@ function polcal_onechannel!(gains, data, model, flags,
     # current definition of RKWorkspace
     #workspace = RKWorkspace(gains,4)
     x′ = similar(gains)
-    k  = [similar(gains) for i = 1:2]
+    k  = [similar(gains) for i = 1:4]
     oldgains = similar(gains)
 
     # Iterate!
@@ -98,12 +98,13 @@ function polcal_onechannel!(gains, data, model, flags,
     converged = false
     while !converged && iter < criteria.maxiter
         oldgains[:] = gains
-        rkstep!(gains,x′,k,polcal_step!,RK2,square_data,square_model)
+        rkstep!(gains,x′,k,polcal_step!,RK4,square_data,square_model)
         if vecnorm(gains-oldgains)/vecnorm(oldgains) < criteria.tolerance
             converged = true
         end
         iter += 1
     end
+    @show iter
 
     # Should fix the phase to something....
 end
@@ -115,8 +116,8 @@ function makesquare_polarized(input,ant1::Vector{Int32},ant2::Vector{Int32})
     for α = 1:N
         if ant1[α] == ant2[α]
             output[2ant1[α]-1,2ant1[α]-1] = input[1,α] # xx
-            output[2ant1[α]-1,2ant1[α]-0] = input[2,α] # xy
-            output[2ant1[α]-0,2ant1[α]-1] = input[3,α] # yx
+            output[2ant1[α]-0,2ant1[α]-1] = input[2,α] # xy
+            output[2ant1[α]-1,2ant1[α]-0] = input[3,α] # yx
             output[2ant1[α]-0,2ant1[α]-0] = input[4,α] # yy
         else
             output[2ant2[α]-1,2ant1[α]-1] = input[1,α] # x₁x₂
