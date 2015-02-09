@@ -1,5 +1,5 @@
 function applycal!(ms::Table,
-                   gains::Array{Complex64,3};
+                   gains::Array{Complex64};
                    apply_to_corrected::Bool = false,
                    force_imaging_columns::Bool = false)
     ant1,ant2 = ants(ms)
