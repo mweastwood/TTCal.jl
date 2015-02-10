@@ -33,14 +33,14 @@ include("applycal.jl")
 
 function run_flagdata(args)
     for input in args["--input"]
-        ms = Table(input)
+        ms = Table(ascii(input))
         flagdata!(ms,args["--antennas"])
     end
     nothing
 end
 
 function run_bandpass(args)
-    ms = Table(args["--input"])
+    ms = Table(ascii(args["--input"]))
     sources = readsources(args["--sources"])
     criteria = StoppingCriteria(20,1e-4)
     gains = bandpass(ms,sources,criteria)
@@ -51,7 +51,7 @@ end
 function run_applycal(args)
     gains = npzread(args["--calibration"])
     for input in args["--input"]
-        ms = Table(input)
+        ms = Table(ascii(input))
         applycal!(ms,gains)
     end
     nothing
