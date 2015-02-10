@@ -12,7 +12,7 @@ before_install:
     - julia -e "Pkg.build(\"CasaCore\")"
 script:
     - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-    - julia --check-bounds=yes -e "Pkg.clone(pwd()); Pkg.test(\"TTCal\"; coverage=true)"
+    - julia --check-bounds=yes -e "Pkg.clone(\"SIUnits\"); Pkg.clone(pwd()); Pkg.test(\"TTCal\"; coverage=true)"
 after_success:
     - julia -e "cd(Pkg.dir(\"TTCal\")); Pkg.add(\"Coverage\"); using Coverage; Coveralls.submit(Coveralls.process_folder())"
 
