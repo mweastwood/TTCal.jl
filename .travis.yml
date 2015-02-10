@@ -8,11 +8,12 @@ before_install:
     - sudo apt-get update -qq -y
     - sudo apt-get install libcasacore-dev -y
     - sudo apt-get install casacore-data -y
+    - julia -e "Pkg.clone(\"SIUnits\")"
     - julia -e "Pkg.clone(\"https://github.com/mweastwood/CasaCore.jl.git\")"
     - julia -e "Pkg.build(\"CasaCore\")"
 script:
     - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-    - julia --check-bounds=yes -e "Pkg.clone(\"SIUnits\"); Pkg.clone(pwd()); Pkg.test(\"TTCal\"; coverage=true)"
+    - julia --check-bounds=yes -e "Pkg.clone(pwd()); Pkg.test(\"TTCal\"; coverage=true)"
 after_success:
     - julia -e "cd(Pkg.dir(\"TTCal\")); Pkg.add(\"Coverage\"); using Coverage; Coveralls.submit(Coveralls.process_folder())"
 
