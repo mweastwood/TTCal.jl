@@ -60,7 +60,14 @@ options["bandpass"] = [
         UTF8String,true,1,1),
     Option("--sources","""
         A JSON file describing the sources to be used for the sky model.""",
-        UTF8String,true,1,1)]
+        UTF8String,true,1,1),
+    Option("--maxiter","""
+        Set the maximum number of Stefcal iterations to take on each
+        frequency channel.""",
+        Int,false,1,1),
+    Option("--tolerance","""
+        Set the relative tolerance used to determine convergence."""
+        Float64,false,1,1)]
 options["applycal"] = [
     Option("--input","""
         The list of measurement sets that the calibration will be applied to.""",
@@ -113,6 +120,7 @@ end
 
 parse_option_helper(::Type{UTF8String},arg) = utf8(arg)
 parse_option_helper(::Type{Int},arg) = int(arg)
+parse_option_helper(::Type{Float64},arg) = float64(arg)
 
 looks_like_flag(str) = startswith(str,"--")
 

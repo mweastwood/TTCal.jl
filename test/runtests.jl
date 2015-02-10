@@ -18,7 +18,7 @@ fringe = TTCal.fringepattern(ϕ[1],ϕ[2]-ϕ[1],length(ϕ))
 const x = TTCal.addunits([  0.  10.  30.  70. 150.],Meter)
 const y = TTCal.addunits([150.  70.  30.  10.   0.],Meter)
 const z = TTCal.addunits([  0.  -1.  +1.  -2.  +2.],Meter)
-const ν = TTCal.addunits([40.0e6:10.0e6:60.0e6],Hertz)
+const ν = TTCal.addunits([40.0e6:10.0e6:60.0e6;],Hertz)
 const t = (2015.-1858.)*365.*24.*60.*60. * Second # a rough, current Julian date
 
 const Nant  = length(x)
@@ -56,16 +56,21 @@ const ant1,ant2 = getant1ant2()
 function createms()
     name  = tempname()*".ms"
     table = Table(name)
-    subtable = Table("$name/SPECTRAL_WINDOW")
 
+    subtable = Table("$name/SPECTRAL_WINDOW")
     Tables.addRows!(subtable,1)
     subtable["CHAN_FREQ"] = reshape(TTCal.stripunits(ν),length(ν),1)
     finalize(subtable)
 
+    subtable = Table("$name/ANTENNA")
+    Tables.addRows!(subtable,Nant)
+    finalize(subtable)
+
     Tables.addRows!(table,Nbase)
     table[kw"SPECTRAL_WINDOW"] = "Table: $name/SPECTRAL_WINDOW"
-    table["ANTENNA1"] = ant1
-    table["ANTENNA2"] = ant2
+    table[kw"ANTENNA"] = "Table: $name/ANTENNA"
+    table["ANTENNA1"] = ant1-1
+    table["ANTENNA2"] = ant2-1
     table["UVW"] = TTCal.stripunits([u v w]')
     table["TIME"] = fill(float(t),Nbase)
 
@@ -73,48 +78,42 @@ function createms()
 end
 
 const gaintable = tempname()*".npy"
-const args = Dict(      "gaintable" => gaintable,
-                  "measurementsets" => [""],
-                         "applycal" => false,
-                  "doubleprecision" => false,
-                            "flags" => Int[],
-                            "niter" => 100,
-                           "refant" => 1,
-                               "RK" => 4,
-                              "tol" => 1e-6)
+const bandpass_args = Dict("--input"     => "",
+                           "--output"    => gaintable,
+                           "--sources"   => "sources.json",
+                           "--maxiter"   => 100,
+                           "--tolerance" => 1e-6)
 
 const criteria = TTCal.StoppingCriteria(100,1e-6)
-const interferometer = TTCal.Interferometer(Nant,Nfreq,1,Int[])
 
 const frame = ReferenceFrame()
 set!(frame,Epoch("UTC",t))
 set!(frame,Measures.observatory(frame,"OVRO_MMA"))
 
-const sources = TTCal.getsources(frame)
-for source in sources
-    @test TTCal.isabovehorizon(frame,source) == true
-end
+const sources = TTCal.readsources("sources.json")
 
 function test_bandpass(gains,data,model)
     mygains = similar(gains)
-    TTCal.bandpass!(mygains,data,model,interferometer,criteria)
-    @test vecnorm(mygains-gains)/vecnorm(gains) < 1e-5
+    flags   = zeros(Bool,size(data))
+    TTCal.bandpass!(mygains,data,model,flags,ant1,ant2,criteria,1)
+    @test vecnorm(mygains-gains)/vecnorm(gains) < 1e-4
 
     name,ms = createms()
-    args["measurementsets"] = [name]
+    bandpass_args["--input"] = name
     ms["DATA"] = data
+    ms["FLAG"] = flags
     finalize(ms)
 
-    TTCal.run(args)
+    TTCal.run_bandpass(bandpass_args)
     mygains = npzread(gaintable)
-    @test vecnorm(mygains-gains)/vecnorm(gains) < 1e-5
+    @test vecnorm(mygains-gains)/vecnorm(gains) < 1e-4
 end
 
 # Unity gains
 function test_one()
     println("1")
     gains = ones(Complex64,Nant,2,Nfreq)
-    model = TTCal.visibilities(frame,sources,u,v,w,ν)
+    model = genvis(frame,sources,u,v,w,ν)
     data  = copy(model)
     test_bandpass(gains,data,model)
 end
@@ -123,10 +122,11 @@ test_one()
 # Random gains
 function test_two()
     println("2")
-    gains = rand(Complex64,interferometer.Nant,2,interferometer.Nfreq)
+    gains = rand(Complex64,Nant,2,Nfreq)
     gains = gains .* conj(gains[1,:,:]) ./ abs(gains[1,:,:])
-    model = TTCal.visibilities(frame,sources,u,v,w,ν)
-    data  = TTCal.applycal(model,1./gains)
+    model = genvis(frame,sources,u,v,w,ν)
+    data  = copy(model)
+    applycal!(data,1./gains,ant1,ant2)
     test_bandpass(gains,data,model)
 end
 test_two()
@@ -135,10 +135,11 @@ test_two()
 # Corrupted autocorrelations
 function test_three()
     println("3")
-    gains = rand(Complex64,interferometer.Nant,2,interferometer.Nfreq)
+    gains = rand(Complex64,Nant,2,Nfreq)
     gains = gains .* conj(gains[1,:,:]) ./ abs(gains[1,:,:])
-    model = TTCal.visibilities(frame,sources,u,v,w,ν)
-    data  = TTCal.applycal(model,1./gains)
+    model = genvis(frame,sources,u,v,w,ν)
+    data  = copy(model)
+    applycal!(data,1./gains,ant1,ant2)
     α = 1
     for ant = 1:Nant
         data[:,:,α] = rand(4,Nfreq)
@@ -148,6 +149,7 @@ function test_three()
 end
 test_three()
 
+#=
 function test_fitvisibilities()
     data = TTCal.visibilities(frame,sources,u,v,w,ν)
     @show sources[1] sources[2]
@@ -172,4 +174,5 @@ function test_fitvisibilities()
     @show newsources[1] newsources[2]
 end
 #test_fitvisibilities()
+=#
 

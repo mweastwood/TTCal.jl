@@ -42,7 +42,9 @@ end
 function run_bandpass(args)
     ms = Table(ascii(args["--input"]))
     sources = readsources(args["--sources"])
-    criteria = StoppingCriteria(20,1e-4)
+    maxiter = haskey(args,"--maxiter")? args["--maxiter"] : 20
+    tol = haskey(args,"--tolerance")? args["--tolerance"] : 1e-4
+    criteria = StoppingCriteria(maxiter,tol)
     gains = bandpass(ms,sources,criteria)
     npzwrite(args["--output"],gains)
     nothing
