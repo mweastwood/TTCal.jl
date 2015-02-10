@@ -66,7 +66,7 @@ options["bandpass"] = [
         frequency channel.""",
         Int,false,1,1),
     Option("--tolerance","""
-        Set the relative tolerance used to determine convergence."""
+        Set the relative tolerance used to determine convergence.""",
         Float64,false,1,1)]
 options["applycal"] = [
     Option("--input","""
