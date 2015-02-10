@@ -14,6 +14,8 @@ function bandpass(ms::Table,
     ν = freq(ms)
     ant1,ant2 = ants(ms)
 
+    sources = filter(source -> isabovehorizon(frame,source),sources)
+
     Nfreq = length(ν)
     Nant  = numrows(Table(ms[kw"ANTENNA"]))
 
