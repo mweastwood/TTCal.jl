@@ -1,7 +1,7 @@
 # TTCal
 
 [![Build Status](https://travis-ci.org/mweastwood/TTCal.jl.svg?branch=master)](https://travis-ci.org/mweastwood/TTCal.jl)
-[![Coverage Status](https://img.shields.io/coveralls/mweastwood/TTCal.jl.svg?style=flat)](https://coveralls.io/r/mweastwood/TTCal.jl?branch=master)
+[![Coverage Status](https://coveralls.io/repos/mweastwood/TTCal.jl/badge.svg?branch=master)](https://coveralls.io/r/mweastwood/TTCal.jl?branch=master)
 
 TTCal is a bandpass calibration routine developed for the OVRO LWA. Its primary advantage is that it is faster and simpler than Casa's equivalent bandpass task.
 
