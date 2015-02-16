@@ -32,3 +32,41 @@ TTCal's iterative solver is inspired by Stefcal.
 Not yet implemented.
 
 ## Self-Calibration
+
+## Command Line Interface
+
+    $ ttcal.jl flagdata --input test.ms --antennas 8 16 24
+
+This will flag all the baselines containing antennas 8, 16, and 24 (where antenna 1 is the first antenna).
+
+    $ ttcal.jl bandpass --input test.ms --output gains.npy --sources sources.json
+
+This will derive gains for the given measurement set using a model sky specified by the point sources in sources.json. The gains are stored as numpy arrays, which should make it easy to read and manipulate these gains from within python. An example JSON file specifying the sky model is included at the bottom of this email.
+
+    $ ttcal.jl applycal --input test.ms --calibration gains.npy
+
+This will apply the calibration derived from the previous example. At the moment, if a CORRECTED_DATA column exists, it will be used, otherwise the DATA column will be overwritten with the corrected visibilities.
+
+
+```
+[
+    {
+        "ref": "Baars et al. 1977",
+        "name": "Cas A",
+        "ra": "23h23m24s",
+        "dec": "58d48m54s",
+        "flux": 555904.26,
+        "freq": 1.0e6,
+        "index": [-0.770]
+    }, 
+    {
+        "ref": "Baars et al. 1977",
+        "name": "Cyg A",
+        "ra": "19h59m28.35663s",
+        "dec": "+40d44m02.0970s",
+        "flux": 49545.02,
+        "freq": 1.0e6,
+        "index": [+0.085,-0.178]
+    }
+]
+```
