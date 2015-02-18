@@ -13,7 +13,7 @@ function getspec(ms::Table,
     data  = ms["CORRECTED_DATA"]
     flags = ms["FLAG"]
     frame = reference_frame(ms)
-    l,m = lm(frame,dir)
+    l,m = dir2lm(frame,dir)
     u,v,w = uvw(ms)
     ν = freq(ms)
     ant1,ant2 = ants(ms)
