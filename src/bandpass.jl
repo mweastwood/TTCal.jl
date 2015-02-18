@@ -1,3 +1,18 @@
+# Copyright (c) 2015 Michael Eastwood
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
 ################################################################################
 # Public Interface
 
@@ -208,4 +223,12 @@ function bandpass_inner!(output,input,V,M)
     nothing
 end
 const bandpass_step! = RKInnerStep{:bandpass_inner!}()
+
+function χ2(data,model,flags,gains)
+    output = 0.0
+    for i = 1:length(gains), j = 1:i-1
+        output += (1-flags[i,j])*abs2(data[i,j] - gains[i]*conj(gains[j])*model[i,j])
+    end
+    output
+end
 
