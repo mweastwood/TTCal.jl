@@ -209,3 +209,11 @@ function bandpass_inner!(output,input,V,M)
 end
 const bandpass_step! = RKInnerStep{:bandpass_inner!}()
 
+function χ2(data,model,flags,gains)
+    output = 0.0
+    for i = 1:length(gains), j = 1:i-1
+        output += (1-flags[i,j])*abs2(data[i,j] - gains[i]*conj(gains[j])*model[i,j])
+    end
+    output
+end
+
