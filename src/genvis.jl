@@ -48,7 +48,7 @@ function genvis!(model::Array{Complex64,3},
                  w::Vector{quantity(Float64,Meter)},
                  ν::Vector{quantity(Float64,Hertz)})
     l,m = lm(frame,source)
-    S = flux(source,ν)
+    S = flux(source,ν) * sqrt(1-l^2-m^2)^1.9
     genvis!(model,S,l,m,u,v,w,ν)
 end
 
