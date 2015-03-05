@@ -102,6 +102,7 @@ function test_bandpass(gains,data,model)
     bandpass_args["--input"] = name
     ms["DATA"] = data
     ms["FLAG"] = flags
+    ms["FLAG_ROW"] = zeros(Bool,Nbase)
     finalize(ms)
 
     TTCal.run_bandpass(bandpass_args)
