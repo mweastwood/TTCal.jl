@@ -34,10 +34,16 @@ function bandpass(ms::Table,
     Nfreq = length(ν)
     Nant  = numrows(Table(ms[kw"ANTENNA"]))
 
+    gains = ones(Complex64,Nant,2,Nfreq)
     data  = ms["DATA"]
     model = genvis(frame,sources,u,v,w,ν)
     flags = ms["FLAG"]
-    gains = ones(Complex64,Nant,2,Nfreq)
+    row_flags = ms["FLAG_ROW"]
+    for α = 1:length(row_flags)
+        if row_flags[α]
+            flags[:,:,α] = true
+        end
+    end
 
     if force_imaging_columns || Tables.checkColumnExists(ms,"MODEL_DATA")
         ms["MODEL_DATA"] = model
