@@ -171,6 +171,7 @@ function bandpass_onechannel!(gains, gain_flags,
 
     # 7. Flag the antennas with no unflagged data.
     bad_ants = squeeze(all(square_flags,1),1)
+    gains[bad_ants] = 1.0
     gain_flags[bad_ants] = true
 
     nothing
