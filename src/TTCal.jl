@@ -25,7 +25,7 @@ export bandpass
 export polcal
 export applycal!
 
-using JSON, NPZ
+using JSON
 using SIUnits
 using CasaCore.Measures
 using CasaCore.Tables
@@ -61,12 +61,25 @@ function run_bandpass(args)
     tol = haskey(args,"--tolerance")? args["--tolerance"] : 1e-4
     criteria = StoppingCriteria(maxiter,tol)
     gains = bandpass(ms,sources,criteria)
-    npzwrite(args["--output"],gains)
-    nothing
+
+    # Write the gains to a CASA .bcal table
+    Nant,Npol,Nchan = size(gains)
+    bcal = Table(ascii(args["--output"]))
+    Nrows = numrows(bcal)
+    if Nrows < Nant
+        Tables.addRows!(bcal,Nant-Nrows)
+    elseif Nrows > Nant
+        Tables.removeRows!(bcal,[Nant+1:Nrows...])
+    end
+    bcal["ANTENNA1"] = Cint[1:Nant...]
+    bcal["CPARAM"] = permutedims(gains,(2,3,1))
+    bcal["FLAG"] = zeros(Bool,Npol,Nchan,Nant)
+    gains
 end
 
 function run_applycal(args)
-    gains = npzread(args["--calibration"])
+    bcal = Table(ascii(args["--calibration"]))
+    gains = bcal["CPARAM"]
     for input in args["--input"]
         ms = Table(ascii(input))
         applycal!(ms,gains)
