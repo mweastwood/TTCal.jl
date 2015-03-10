@@ -79,7 +79,7 @@ end
 
 function run_applycal(args)
     bcal = Table(ascii(args["--calibration"]))
-    gains = bcal["CPARAM"]
+    gains = permutedims(bcal["CPARAM"],(3,1,2))
     for input in args["--input"]
         ms = Table(ascii(input))
         applycal!(ms,gains)

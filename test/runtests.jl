@@ -158,6 +158,30 @@ function test_three()
 end
 test_three()
 
+function test_applycal()
+    g = 2
+    gains = 2*ones(Complex64,Nant,2,Nfreq)
+    data  = rand(Complex64,4,Nfreq,Nbase)
+
+    name,ms = createms()
+    ms["DATA"] = data
+    finalize(ms)
+
+    bcal_name = tempname()
+    bcal = Table(bcal_name)
+    Tables.addRows!(bcal,Nant)
+    bcal["CPARAM"] = permutedims(gains,(2,3,1))
+    finalize(bcal)
+
+    args = Dict("--input" => [name],
+                "--calibration" => bcal_name)
+    TTCal.run_applycal(args)
+
+    calibrated_ms = Table(name)
+    @test calibrated_ms["DATA"] == data / (g*conj(g))
+end
+test_applycal()
+
 #=
 function test_fitvisibilities()
     data = TTCal.visibilities(frame,sources,u,v,w,ν)
