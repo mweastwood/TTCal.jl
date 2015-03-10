@@ -60,7 +60,7 @@ function run_bandpass(args)
     maxiter = haskey(args,"--maxiter")? args["--maxiter"] : 20
     tol = haskey(args,"--tolerance")? args["--tolerance"] : 1e-4
     criteria = StoppingCriteria(maxiter,tol)
-    gains = bandpass(ms,sources,criteria)
+    gains,gain_flags = bandpass(ms,sources,criteria)
 
     # Write the gains to a CASA .bcal table
     Nant,Npol,Nchan = size(gains)
@@ -73,16 +73,17 @@ function run_bandpass(args)
     end
     bcal["ANTENNA1"] = Cint[1:Nant...]
     bcal["CPARAM"] = permutedims(gains,(2,3,1))
-    bcal["FLAG"] = zeros(Bool,Npol,Nchan,Nant)
+    bcal["FLAG"] = permutedims(gain_flags,(2,3,1))
     gains
 end
 
 function run_applycal(args)
     bcal = Table(ascii(args["--calibration"]))
     gains = permutedims(bcal["CPARAM"],(3,1,2))
+    gain_flags = permutedims(bcal["FLAG"],(3,1,2))
     for input in args["--input"]
         ms = Table(ascii(input))
-        applycal!(ms,gains)
+        applycal!(ms,gains,gain_flags)
     end
     nothing
 end
