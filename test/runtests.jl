@@ -4,7 +4,6 @@ using Base.Dates
 using CasaCore.Measures
 using CasaCore.Tables
 using SIUnits
-using NPZ
 
 srand(123)
 
@@ -77,7 +76,7 @@ function createms()
     name,table
 end
 
-const gaintable = tempname()*".npy"
+const gaintable = tempname()*".bcal"
 const bandpass_args = Dict("--input"     => "",
                            "--output"    => gaintable,
                            "--sources"   => "sources.json",
@@ -106,12 +105,16 @@ function test_bandpass(gains,data,model)
     finalize(ms)
 
     TTCal.run_bandpass(bandpass_args)
-    mygains = npzread(gaintable)
+    gc() # Forces the bcal table to be written to disk
+    bcal = Table(gaintable)
+    mygains = permutedims(bcal["CPARAM"],(3,1,2))
     @test vecnorm(mygains-gains)/vecnorm(gains) < 1e-4
+    finalize(bcal)
 
-    rm(gaintable)
+    rm(gaintable,recursive=true)
     run(`julia ../src/ttcal.jl bandpass --input $name --output $gaintable --sources sources.json --maxiter 100 --tolerance 1e-6`)
-    mygains = npzread(gaintable)
+    bcal = Table(gaintable)
+    mygains = permutedims(bcal["CPARAM"],(3,1,2))
     @test vecnorm(mygains-gains)/vecnorm(gains) < 1e-4
 end
 
