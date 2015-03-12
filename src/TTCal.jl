@@ -20,7 +20,6 @@ export genvis
 export fitvis
 export subsrc!
 
-export clearflags!,flagdata!
 export bandpass
 export polcal
 export applycal!
@@ -41,18 +40,9 @@ include("getspec.jl")
 include("fitvis.jl")
 include("subsrc.jl")
 
-include("flagdata.jl")
 include("bandpass.jl")
 include("polcal.jl")
 include("applycal.jl")
-
-function run_flagdata(args)
-    for input in args["--input"]
-        ms = Table(ascii(input))
-        flagdata!(ms,args["--antennas"])
-    end
-    nothing
-end
 
 function run_bandpass(args)
     ms = Table(ascii(args["--input"]))
