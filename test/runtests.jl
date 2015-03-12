@@ -93,14 +93,17 @@ const sources = filter(source -> TTCal.isabovehorizon(frame,source),TTCal.readso
 
 function test_bandpass(gains,data,model)
     mygains = similar(gains)
-    flags   = zeros(Bool,size(data))
-    TTCal.bandpass!(mygains,data,model,flags,ant1,ant2,criteria,1)
+    gain_flags = zeros(Bool,size(gains))
+    data_flags = zeros(Bool,size(data))
+    TTCal.bandpass!(mygains,gain_flags,
+                    data,model,data_flags,
+                    ant1,ant2,criteria,1)
     @test vecnorm(mygains-gains)/vecnorm(gains) < 1e-4
 
     name,ms = createms()
     bandpass_args["--input"] = name
     ms["DATA"] = data
-    ms["FLAG"] = flags
+    ms["FLAG"] = data_flags
     ms["FLAG_ROW"] = zeros(Bool,Nbase)
     finalize(ms)
 
@@ -135,7 +138,9 @@ function test_two()
     gains = gains .* conj(gains[1,:,:]) ./ abs(gains[1,:,:])
     model = genvis(frame,sources,u,v,w,ν)
     data  = copy(model)
-    applycal!(data,1./gains,ant1,ant2)
+    data_flags = zeros(Bool,size(data))
+    gain_flags = zeros(Bool,size(gains))
+    applycal!(data,data_flags,1./gains,gain_flags,ant1,ant2)
     test_bandpass(gains,data,model)
 end
 test_two()
@@ -148,7 +153,9 @@ function test_three()
     gains = gains .* conj(gains[1,:,:]) ./ abs(gains[1,:,:])
     model = genvis(frame,sources,u,v,w,ν)
     data  = copy(model)
-    applycal!(data,1./gains,ant1,ant2)
+    data_flags = zeros(Bool,size(data))
+    gain_flags = zeros(Bool,size(gains))
+    applycal!(data,data_flags,1./gains,gain_flags,ant1,ant2)
     α = 1
     for ant = 1:Nant
         data[:,:,α] = rand(4,Nfreq)
@@ -162,15 +169,19 @@ function test_applycal()
     g = 2
     gains = 2*ones(Complex64,Nant,2,Nfreq)
     data  = rand(Complex64,4,Nfreq,Nbase)
+    gain_flags = zeros(Bool,size(gains))
+    data_flags = zeros(Bool,size(data))
 
     name,ms = createms()
     ms["DATA"] = data
+    ms["FLAG"] = data_flags
     finalize(ms)
 
     bcal_name = tempname()
     bcal = Table(bcal_name)
     Tables.addRows!(bcal,Nant)
     bcal["CPARAM"] = permutedims(gains,(2,3,1))
+    bcal["FLAG"] = permutedims(gain_flags,(2,3,1))
     finalize(bcal)
 
     args = Dict("--input" => [name],
