@@ -49,13 +49,13 @@ function getspec_internal(data::Array{Complex64,3},
                           ant1::Vector{Int32},
                           ant2::Vector{Int32})
     fringe = fringepattern(l,m,u,v,w,ν)
-    spec   = zeros(Float64,4,length(ν))
+    xx = zeros(Float64,length(ν))
+    xy = zeros(Complex128,length(ν))
+    yy = zeros(Float64,length(ν))
     count  = zeros(Int,1,length(ν)) # The number of baselines used in the calculation
     for α = 1:length(u)
         # Don't use auto-correlations
         ant1[α] == ant2[α] && continue
-        # Don't use short baselines
-        #sqrt(u[α]^2+v[α]^2+w[α]^2) > 10Meter && continue
         for β = 1:length(ν)
             any(flags[:,β,α]) && continue
             # Taking the real part of A is equivalent to
@@ -64,14 +64,23 @@ function getspec_internal(data::Array{Complex64,3},
             # opposite direction. Including this information
             # constrains the spectrum to be real.
             z = conj(fringe[β,α])
-            spec[1,β] += real(data[1,β,α]*z)
-            spec[2,β] += real(data[2,β,α]*z)
-            spec[3,β] += real(data[3,β,α]*z)
-            spec[4,β] += real(data[4,β,α]*z)
+            xx[β] += real(data[1,β,α]*z) # xx
+            xy[β] += 0.5*(data[2,β,α]*z + conj(data[3,β,α]*z)) # xy
+            yy[β] += real(data[4,β,α]*z) # yy
             count[β] += 1
         end
     end
-    spec = spec./count
-    spec
+    xx = xx ./ count
+    xy = xy ./ count
+    yy = yy ./ count
+    xx,xy,yy
+end
+
+function xy2stokes(xx,xy,yy)
+    I = 0.5*(xx+yy)
+    Q = 0.5*(yy-xx)
+    U = real(xy)
+    V = -imag(xy)
+    I,Q,U,V
 end
 
