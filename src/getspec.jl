@@ -35,6 +35,8 @@ function getspec(ms::Table,
     getspec_internal(data,flags,l,m,u,v,w,ν,ant1,ant2)
 end
 
+getspec(ms::Table,source::PointSource) = getspec(ms,direction(source))
+
 ################################################################################
 # Internal Interface
 

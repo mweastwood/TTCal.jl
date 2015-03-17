@@ -20,7 +20,7 @@
 Calibrate the given measurement set!
 """ ->
 function bandpass(ms::Table,
-                  sources::Vector{Source},
+                  sources::Vector{PointSource},
                   criteria::StoppingCriteria;
                   force_imaging_columns::Bool = false,
                   reference_antenna::Int = 1)

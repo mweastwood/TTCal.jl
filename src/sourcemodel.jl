@@ -16,89 +16,59 @@
 ################################################################################
 # Source Definitions
 
-abstract AbstractSource
-
 @doc """
 These sources have a multi-component power-law spectrum
 such that:
 
-    log(S) = log(flux) + index[1]*log(ν/reffreq)
+    log(flux) = log(I) + index[1]*log(ν/reffreq)
                        + index[2]*log²(ν/reffreq) + ...
-""" ->
-abstract PowerLawSource <: AbstractSource
 
-@doc """
-These are generic, run-of-the-mill sources that receive
-a J2000 position and a power-law spectrum.
+Polarized fluxes are obtained in a similar manner by
+substituting Q/U/V for I in the above expression.
 """ ->
-type Source <: PowerLawSource
+type PointSource
     name::ASCIIString
     dir::Direction
-    flux::Float64
+    I::Float64
+    Q::Float64
+    U::Float64
+    V::Float64
     reffreq::quantity(Float64,Hertz)
     index::Vector{Float64}
 end
 
-@doc """
-Solar system objects move through the sky and hence their
-J2000 position must be calculated for the given epoch.
-""" ->
-type SolarSystemSource <: PowerLawSource
-    name::ASCIIString
-    flux::Float64
-    reffreq::quantity(Float64,Hertz)
-    index::Vector{Float64}
-end
-
-@doc """
-RFI usually has an unsmooth spectrum and does not rotate
-with the sky. Hence these sources are allowed to have any
-arbitrary spectrum, and receive an AZEL position.
-""" ->
-type RFISource <: AbstractSource
-    name::ASCIIString
-    dir::Direction
-    flux::Vector{Float64}
-    freq::Vector{quantity(Float64,Hertz)}
-end
-
-function RFISource(frame::ReferenceFrame,
-                   source::Source,
-                   frequencies::Vector{quantity(Float64,Hertz)})
-    dir = measure(frame,source.dir,"AZEL")
-    S = flux(source,frequencies)
-    RFISource(source.name,dir,S,frequencies)
-end
+Base.show(io::IO,source::PointSource) = print(io,source.name)
 
 ################################################################################
 # Flux
 
-function flux(source::PowerLawSource,frequency::quantity(Float64,Hertz))
-    logflux = log10(source.flux)
-    logfreq = log10(frequency/source.reffreq)
-    for (i,index) in enumerate(source.index)
-        logflux += index*logfreq.^i
+function getflux(reference_flux,index,reference_frequency,frequency)
+    s = sign(reference_flux)
+    logflux = log10(abs(reference_flux))
+    logfreq = log10(frequency/reference_frequency)
+    for (i,α) in enumerate(index)
+        logflux += α*logfreq.^i
     end
-    10.0.^logflux
+    s*10.0.^logflux
 end
 
-function flux(source::RFISource,frequencies::Vector{quantity(Float64,Hertz)})
-    frequencies == source.freq || error("Provided list of frequencies does not match.")
-    source.flux
+for param in (:I,:Q,:U,:V)
+    name = symbol("getstokes",param)
+    @eval function $name{T<:FloatingPoint}(source::PointSource,frequency::quantity(T,Hertz))
+        getflux(source.$param,source.index,source.reffreq,frequency)
+    end
+    @eval function $name{T<:FloatingPoint}(source::PointSource,frequencies::Vector{quantity(T,Hertz)})
+        [$name(source,frequency) for frequency in frequencies]
+    end
 end
 
-flux(source::RFISource) = source.flux
-
-function flux(source::PowerLawSource,frequencies::Vector{quantity(Float64,Hertz)})
-    [flux(source,frequency) for frequency in frequencies]
-end
+getflux{T<:FloatingPoint}(source::PointSource,frequency::quantity(T,Hertz)) = getstokesI(source,frequency)
+getflux{T<:FloatingPoint}(source::PointSource,frequencies::Vector{quantity(T,Hertz)}) = getstokesI(source,frequencies)
 
 ################################################################################
 # Position
 
-direction(source::Source) = source.dir
-direction(source::SolarSystemSource) = Direction(source.name)
-direction(source::RFISource) = source.dir
+direction(source::PointSource) = source.dir
 
 @doc """
 Convert the direction into an azimuth and elevation.
@@ -130,15 +100,15 @@ function lm2azel(l,m)
     az,el
 end
 
-azel(frame::ReferenceFrame,source::AbstractSource) = dir2azel(frame,direction(source))
-lm(frame::ReferenceFrame,source::AbstractSource) = dir2lm(frame,direction(source))
+getazel(frame::ReferenceFrame,source::PointSource) = dir2azel(frame,direction(source))
+getlm(frame::ReferenceFrame,source::PointSource) = dir2lm(frame,direction(source))
 
 @doc """
 Returns true if the source is above the horizon, false if the source
 is below the horizon.
 """ ->
-function isabovehorizon(frame::ReferenceFrame,source::Source)
-    az,el = azel(frame,source)
+function isabovehorizon(frame::ReferenceFrame,source::PointSource)
+    az,el = getazel(frame,source)
     ifelse(el > 0.0Radian,true,false)
 end
 
@@ -146,22 +116,25 @@ end
 # I/O
 
 function readsources(filename::AbstractString)
-    sources = TTCal.Source[]
+    sources = PointSource[]
     parsed_sources = JSON.parsefile(filename)
     for parsed_source in parsed_sources
         name  = parsed_source["name"]
         ra    = parsed_source["ra"]
         dec   = parsed_source["dec"]
-        flux  = parsed_source["flux"]
-        freq  = parsed_source["freq"]
+        I     = parsed_source["I"]
+        Q     = parsed_source["Q"]
+        U     = parsed_source["U"]
+        V     = parsed_source["V"]
+        freq  = parsed_source["freq"]*Hertz
         index = parsed_source["index"]
         dir = Direction("J2000",ra_str(ra),dec_str(dec))
-        push!(sources,TTCal.Source(name,dir,flux,freq*Hertz,index))
+        push!(sources,PointSource(name,dir,I,Q,U,V,freq,index))
     end
     sources
 end
 
-function writesources(filename::AbstractString,sources::Vector{Source})
+function writesources(filename::AbstractString,sources::Vector{PointSource})
     dicts = Dict{UTF8String,Any}[]
     for source in sources
         dict = Dict{UTF8String,Any}()
@@ -169,7 +142,10 @@ function writesources(filename::AbstractString,sources::Vector{Source})
         dict["name"]  = source.name
         dict["ra"]    =  ra_str(source.dir.m[1])
         dict["dec"]   = dec_str(source.dir.m[2])
-        dict["flux"]  = source.flux
+        dict["I"]     = source.I
+        dict["Q"]     = source.Q
+        dict["U"]     = source.U
+        dict["V"]     = source.V
         dict["freq"]  = float(source.reffreq)
         dict["index"] = source.index
         push!(dicts,dict)

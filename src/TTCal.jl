@@ -15,8 +15,11 @@
 
 module TTCal
 
-export Source
+export PointSource
+export readsources, writesources
+
 export genvis
+export getspec
 export fitvis
 export subsrc!
 

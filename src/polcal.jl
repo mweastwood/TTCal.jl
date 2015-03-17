@@ -17,7 +17,7 @@
 # Public Interface
 
 function polcal(ms::Table,
-                sources::Vector{Source},
+                sources::Vector{PointSource},
                 criteria::StoppingCriteria;
                 force_imaging_columns::Bool = false,
                 reference_antenna::Int = 1)
