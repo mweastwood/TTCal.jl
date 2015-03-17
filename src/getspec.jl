@@ -54,7 +54,7 @@ function getspec_internal(data::Array{Complex64,3},
     xx = zeros(Float64,length(ν))
     xy = zeros(Complex128,length(ν))
     yy = zeros(Float64,length(ν))
-    count  = zeros(Int,1,length(ν)) # The number of baselines used in the calculation
+    count  = zeros(Int,length(ν)) # The number of baselines used in the calculation
     for α = 1:length(u)
         # Don't use auto-correlations
         ant1[α] == ant2[α] && continue
