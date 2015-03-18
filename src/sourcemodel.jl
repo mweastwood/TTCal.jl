@@ -107,8 +107,10 @@ getlm(frame::ReferenceFrame,source::PointSource) = dir2lm(frame,direction(source
 Returns true if the source is above the horizon, false if the source
 is below the horizon.
 """ ->
-function isabovehorizon(frame::ReferenceFrame,source::PointSource)
-    az,el = getazel(frame,source)
+isabovehorizon(frame::ReferenceFrame,source::PointSource) = isabovehorizon(frame,direction(source))
+
+function isabovehorizon(frame::ReferenceFrame,dir::Direction)
+    az,el = dir2azel(frame,dir)
     ifelse(el > 0.0Radian,true,false)
 end
 

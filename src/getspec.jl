@@ -25,12 +25,18 @@ in a given direction (if all baselines are weighted equally).
 """ ->
 function getspec(ms::Table,
                  dir::Direction)
+    frame = reference_frame(ms)
+    ν = freq(ms)
+
+    # Return a sensible default value if the source is below the horizon
+    if !isabovehorizon(frame,dir)
+        return zeros(length(ν)),zeros(length(ν)),zeros(length(ν)),zeros(length(ν))
+    end
+
     data  = ms["CORRECTED_DATA"]
     flags = ms["FLAG"]
-    frame = reference_frame(ms)
     l,m = dir2lm(frame,dir)
     u,v,w = uvw(ms)
-    ν = freq(ms)
     ant1,ant2 = ants(ms)
     getspec_internal(data,flags,l,m,u,v,w,ν,ant1,ant2)
 end
@@ -51,9 +57,9 @@ function getspec_internal(data::Array{Complex64,3},
                           ant1::Vector{Int32},
                           ant2::Vector{Int32})
     fringe = fringepattern(l,m,u,v,w,ν)
-    xx = zeros(Float64,length(ν))
+    xx = zeros(length(ν))
     xy = zeros(Complex128,length(ν))
-    yy = zeros(Float64,length(ν))
+    yy = zeros(length(ν))
     count  = zeros(Int,length(ν)) # The number of baselines used in the calculation
     for α = 1:length(u)
         # Don't use auto-correlations
@@ -75,7 +81,7 @@ function getspec_internal(data::Array{Complex64,3},
     xx = xx ./ count
     xy = xy ./ count
     yy = yy ./ count
-    xx,xy,yy
+    xy2stokes(xx,xy,yy)
 end
 
 function xy2stokes(xx,xy,yy)
