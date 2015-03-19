@@ -89,7 +89,7 @@ const frame = ReferenceFrame()
 set!(frame,Epoch("UTC",t))
 set!(frame,Measures.observatory(frame,"OVRO_MMA"))
 
-const sources = filter(source -> TTCal.isabovehorizon(frame,source),TTCal.readsources("sources.json"))
+const sources = filter(source -> TTCal.isabovehorizon(frame,source),readsources("sources.json"))
 
 function test_bandpass(gains,data,model)
     mygains = similar(gains)
