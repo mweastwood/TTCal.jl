@@ -108,16 +108,12 @@ function test_bandpass(gains,data,model)
     finalize(ms)
 
     TTCal.run_bandpass(bandpass_args)
-    gc() # Forces the bcal table to be written to disk
-    bcal = Table(gaintable)
-    mygains = permutedims(bcal["CPARAM"],(3,1,2))
+    mygains,_ = TTCal.read_gains(gaintable)
     @test vecnorm(mygains-gains)/vecnorm(gains) < 1e-4
-    finalize(bcal)
 
-    rm(gaintable,recursive=true)
+    rm(gaintable)
     run(`julia ../src/ttcal.jl bandpass --input $name --output $gaintable --sources sources.json --maxiter 100 --tolerance 1e-6`)
-    bcal = Table(gaintable)
-    mygains = permutedims(bcal["CPARAM"],(3,1,2))
+    mygains,_ = TTCal.read_gains(gaintable)
     @test vecnorm(mygains-gains)/vecnorm(gains) < 1e-4
 end
 
@@ -178,11 +174,7 @@ function test_applycal()
     finalize(ms)
 
     bcal_name = tempname()
-    bcal = Table(bcal_name)
-    Tables.addRows!(bcal,Nant)
-    bcal["CPARAM"] = permutedims(gains,(2,3,1))
-    bcal["FLAG"] = permutedims(gain_flags,(2,3,1))
-    finalize(bcal)
+    TTCal.write_gains(bcal_name,gains,gain_flags)
 
     args = Dict("--input" => [name],
                 "--calibration" => bcal_name)
