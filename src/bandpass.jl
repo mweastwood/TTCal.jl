@@ -20,7 +20,7 @@
 Calibrate the given measurement set!
 """ ->
 function bandpass(ms::Table,
-                  sources::Vector{Source},
+                  sources::Vector{PointSource},
                   criteria::StoppingCriteria;
                   force_imaging_columns::Bool = false,
                   reference_antenna::Int = 1)
@@ -40,7 +40,7 @@ function bandpass(ms::Table,
     data  = ms["DATA"]
     model = genvis(frame,sources,u,v,w,ν)
     data_flags = ms["FLAG"]
-    row_flags = ms["FLAG_ROW"]
+    row_flags  = ms["FLAG_ROW"]
     for α = 1:length(row_flags)
         if row_flags[α]
             data_flags[:,:,α] = true

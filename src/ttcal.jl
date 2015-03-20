@@ -27,18 +27,10 @@ CLI.set_banner("""
 
 CLI.print_banner()
 
-push!(CLI.commands,Command("flagdata","Flag antennas within a measurement set."))
 push!(CLI.commands,Command("bandpass","Solve for a bandpass calibration."))
+push!(CLI.commands,Command("polcal","Solve for a polarization calibration."))
 push!(CLI.commands,Command("applycal","Apply a calibration."))
 
-CLI.options["flagdata"] = [
-    Option("--input","""
-        The list of measurement sets to flag.""",
-        UTF8String,true,1,Inf)
-    Option("--antennas","""
-        The list of antennas that will be flagged within the supllied
-        list of measurement sets. The first antenna is number one.""",
-        Int,true,1,Inf)]
 CLI.options["bandpass"] = [
     Option("--input","""
         The measurement set used to solve for a bandpass calibration.""",
@@ -57,24 +49,52 @@ CLI.options["bandpass"] = [
     Option("--tolerance","""
         Set the relative tolerance used to determine convergence.""",
         Float64,false,1,1)]
+CLI.options["polcal"] = [
+    Option("--input","""
+        The measurement set used to solve for a polarization calibration.""",
+        UTF8String,true,1,1),
+    Option("--output","""
+        The output file to which the polarization calibration will be written.
+        This output file will be overwritten if it already exists.""",
+        UTF8String,true,1,1),
+    Option("--sources","""
+        A JSON file describing the sources to be used for the sky model.""",
+        UTF8String,true,1,1),
+    Option("--maxiter","""
+        Set the maximum number of Stefcal iterations to take on each
+        frequency channel.""",
+        Int,false,1,1),
+    Option("--tolerance","""
+        Set the relative tolerance used to determine convergence.""",
+        Float64,false,1,1)]
 CLI.options["applycal"] = [
     Option("--input","""
         The list of measurement sets that the calibration will be applied to.""",
         UTF8String,true,1,Inf),
     Option("--calibration","""
         The file containing the calibration solution.""",
-        UTF8String,true,1,1)]
+        UTF8String,true,1,1),
+    Option("--force-imaging","""
+        Write the calibrated visibilities to the CORRECTED_DATA column
+        regardless of whether or not the measurement set already has
+        this column (it will be created if it doesn't exist).""",
+        Nothing,false,0,0),
+    Option("--corrected","""
+        Apply the calibration to the CORRECTED_DATA column instead
+        of the DATA column.""",
+        Nothing,false,0,0)]
 
 import TTCal
 
 # Catch exceptions to hide the verbose Julia output that is
 # not especially helpful to users.
+# (comment out the try/catch block for debugging)
 try
     command,args = CLI.parse_args(ARGS)
-    if     command == "flagdata"
-        TTCal.run_flagdata(args)
-    elseif command == "bandpass"
+    if     command == "bandpass"
         TTCal.run_bandpass(args)
+    elseif command == "polcal"
+        TTCal.run_polcal(args)
     elseif command == "applycal"
         TTCal.run_applycal(args)
     end

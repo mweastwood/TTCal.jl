@@ -15,12 +15,14 @@
 
 module TTCal
 
-export Source
+export PointSource
+export readsources, writesources
+
 export genvis
+export getspec
 export fitvis
 export subsrc!
 
-export clearflags!,flagdata!
 export bandpass
 export polcal
 export applycal!
@@ -41,18 +43,10 @@ include("getspec.jl")
 include("fitvis.jl")
 include("subsrc.jl")
 
-include("flagdata.jl")
+include("io.jl")
 include("bandpass.jl")
 include("polcal.jl")
 include("applycal.jl")
-
-function run_flagdata(args)
-    for input in args["--input"]
-        ms = Table(ascii(input))
-        flagdata!(ms,args["--antennas"])
-    end
-    nothing
-end
 
 function run_bandpass(args)
     ms = Table(ascii(args["--input"]))
@@ -61,29 +55,30 @@ function run_bandpass(args)
     tol = haskey(args,"--tolerance")? args["--tolerance"] : 1e-4
     criteria = StoppingCriteria(maxiter,tol)
     gains,gain_flags = bandpass(ms,sources,criteria)
+    write_gains(args["--output"],gains,gain_flags)
+    gains, gain_flags
+end
 
-    # Write the gains to a CASA .bcal table
-    Nant,Npol,Nchan = size(gains)
-    bcal = Table(ascii(args["--output"]))
-    Nrows = numrows(bcal)
-    if Nrows < Nant
-        Tables.addRows!(bcal,Nant-Nrows)
-    elseif Nrows > Nant
-        Tables.removeRows!(bcal,[Nant+1:Nrows...])
-    end
-    bcal["ANTENNA1"] = Cint[1:Nant...]
-    bcal["CPARAM"] = permutedims(gains,(2,3,1))
-    bcal["FLAG"] = permutedims(gain_flags,(2,3,1))
-    gains
+function run_polcal(args)
+    ms = Table(ascii(args["--input"]))
+    sources = readsources(args["--sources"])
+    maxiter = haskey(args,"--maxiter")? args["--maxiter"] : 20
+    tol = haskey(args,"--tolerance")? args["--tolerance"] : 1e-4
+    criteria = StoppingCriteria(maxiter,tol)
+    gains,gain_flags = polcal(ms,sources,criteria)
+    write_gains(args["--output"],gains,gain_flags)
+    gains, gain_flags
 end
 
 function run_applycal(args)
-    bcal = Table(ascii(args["--calibration"]))
-    gains = permutedims(bcal["CPARAM"],(3,1,2))
-    gain_flags = permutedims(bcal["FLAG"],(3,1,2))
+    gains,gain_flags = read_gains(args["--calibration"])
+    force_imaging_columns = haskey(args,"--force-imaging")
+    apply_to_corrected = haskey(args,"--corrected")
     for input in args["--input"]
         ms = Table(ascii(input))
-        applycal!(ms,gains,gain_flags)
+        applycal!(ms,gains,gain_flags,
+                  force_imaging_columns=force_imaging_columns,
+                  apply_to_corrected=apply_to_corrected)
     end
     nothing
 end

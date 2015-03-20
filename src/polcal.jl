@@ -17,7 +17,7 @@
 # Public Interface
 
 function polcal(ms::Table,
-                sources::Vector{Source},
+                sources::Vector{PointSource},
                 criteria::StoppingCriteria;
                 force_imaging_columns::Bool = false,
                 reference_antenna::Int = 1)
@@ -26,30 +26,41 @@ function polcal(ms::Table,
     ν = freq(ms)
     ant1,ant2 = ants(ms)
 
+    sources = filter(source -> isabovehorizon(frame,source),sources)
+
     Nfreq = length(ν)
     Nant  = numrows(Table(ms[kw"ANTENNA"]))
 
-    #data  = ms["DATA"]
-    data  = ms["CORRECTED_DATA"] # We want data that is mostly right already
-    model = genvis(frame,sources,u,v,w,ν)
-    flags = ms["FLAG"]
     gains = ones(Complex64,2,2,Nant,Nfreq)
+    gain_flags = zeros(Bool,Nant,Nfreq)
+
+    data  = Tables.checkColumnExists(ms,"CORRECTED_DATA")? ms["CORRECTED_DATA"] : ms["DATA"]
+    model = genvis(frame,sources,u,v,w,ν)
+    data_flags = ms["FLAG"]
+    row_flags  = ms["FLAG_ROW"]
+    for α = 1:length(row_flags)
+        if row_flags[α]
+            data_flags[:,:,α] = true
+        end
+    end
 
     if force_imaging_columns || Tables.checkColumnExists(ms,"MODEL_DATA")
         ms["MODEL_DATA"] = model
     end
 
-    polcal!(gains,data,model,flags,ant1,ant2,criteria,reference_antenna)
-    gains
+    polcal!(gains,gain_flags,data,model,data_flags,
+            ant1,ant2,criteria,reference_antenna)
+    gains,gain_flags
 end
 
 ################################################################################
 # Internal Interface
 
 function polcal!(gains::Array{Complex64,4},
+                 gain_flags::Array{Bool,2},
                  data::Array{Complex64,3},
                  model::Array{Complex64,3},
-                 flags::Array{Bool,3},
+                 data_flags::Array{Bool,3},
                  ant1::Vector{Int32},
                  ant2::Vector{Int32},
                  criteria::StoppingCriteria,
@@ -57,48 +68,56 @@ function polcal!(gains::Array{Complex64,4},
     # Transpose the data and model arrays to create a better memory access pattern
     data  = permutedims(data, (1,3,2))
     model = permutedims(model,(1,3,2))
-    flags = permutedims(flags,(1,3,2))
+    data_flags = permutedims(data_flags,(1,3,2))
 
     Nfreq = size(gains,4)
     for β = 1:Nfreq
         polcal_onechannel!(slice(gains,:,:,:,β),
+                           slice(gain_flags,:,β),
                            slice( data,:,:,β),
                            slice(model,:,:,β),
-                           slice(flags,:,:,β),
+                           slice(data_flags,:,:,β),
                            ant1, ant2,
                            criteria,
                            reference_antenna)
     end
 end
 
-function polcal_onechannel!(gains, data, model, flags,
+function polcal_onechannel!(gains, gain_flags,
+                            data, model, data_flags,
                             ant1::Vector{Int32},
                             ant2::Vector{Int32},
                             criteria::StoppingCriteria,
                             reference_antenna::Int)
-    Nant = size(gains,3)
+    # 1. If the entire channel is flagged, don't bother calibrating.
+    #    Just flag the solutions and move on.
+    if all(data_flags)
+        gain_flags[:] = true
+        return
+    end
 
+    # 2. Pack the visibilities into square, Hermitian matrices.
     square_data  = makesquare_polarized(data, ant1,ant2)
     square_model = makesquare_polarized(model,ant1,ant2)
-    square_flags = makesquare_polarized(flags,ant1,ant2)
+    square_flags = makesquare_polarized(data_flags,ant1,ant2)
 
-    # 2. Flag the auto-correlations.
+    # 3. Flag the auto-correlations.
     for i = 1:size(square_flags,1)
         square_flags[i,i] = true
     end
 
-    # Start the gains off at something sensible.
+    # 4. Start the gains off at something sensible.
+    square_data  = square_data  .* !square_flags
+    square_model = square_model .* !square_flags
     # This is an especially good approximation if we've
     # already applied a bandpass calibration.
+    Nant = size(gains,3)
     for i = 1:Nant
         gains[:,:,i] = [1 0;
                         0 1]
     end
 
-    square_data  = square_data  .* !square_flags
-    square_model = square_model .* !square_flags
-
-    output = similar(gains)
+    # 5. Iteratively improve that estimate.
 
     # Create rkstep! workspace variables.
     # Because "gains" is not a vector, it isn't serviced by the
@@ -108,7 +127,6 @@ function polcal_onechannel!(gains, data, model, flags,
     k  = [similar(gains) for i = 1:4]
     oldgains = similar(gains)
 
-    # Iterate!
     iter = 0
     converged = false
     while !converged && iter < criteria.maxiter
@@ -119,9 +137,21 @@ function polcal_onechannel!(gains, data, model, flags,
         end
         iter += 1
     end
-    @show iter
 
-    # Should fix the phase to something....
+    # 6. Fix the phase of the reference antenna.
+    # TODO
+
+    # 7. Flag the antennas with no unflagged data.
+    bad_pols = squeeze(all(square_flags,1),1)
+    bad_ants = zeros(Bool,Nant)
+    for ant = 1:Nant
+        if bad_pols[2ant-1] && bad_pols[2ant]
+            bad_ants[ant] = true
+        end
+    end
+    gain_flags[bad_ants] = true
+
+    nothing
 end
 
 function makesquare_polarized(input,ant1::Vector{Int32},ant2::Vector{Int32})

@@ -22,7 +22,7 @@ to have the positions of the point sources relatively close, but the flux
 can be wildly off.
 """ ->
 function fitvis(ms::Table,
-                sources::Vector{Source},
+                sources::Vector{PointSource},
                 criteria::StoppingCriteria)
     frame = reference_frame(ms)
     data  = ms["CORRECTED_DATA"]
@@ -51,7 +51,7 @@ function fitvis(frame::ReferenceFrame,
                 ν::Vector{quantity(Float64,Hertz)},
                 ant1::Vector{Int32},
                 ant2::Vector{Int32},
-                sources::Vector{Source},
+                sources::Vector{PointSource},
                 criteria::StoppingCriteria)
     # Flag short baselines?
     for α = 1:length(u)
