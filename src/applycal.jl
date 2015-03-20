@@ -67,7 +67,7 @@ end
 function applycal!(data::Array{Complex64,3},
                    data_flags::Array{Bool,3},
                    gains::Array{Complex64,4},
-                   gain_flags::Array{Bool,4},
+                   gain_flags::Array{Bool,2},
                    ant1::Vector{Int32},
                    ant2::Vector{Int32})
     # gains are from polcal(...)
@@ -75,14 +75,13 @@ function applycal!(data::Array{Complex64,3},
     Nbase = length(ant1)
     Nfreq = size(gains,4)
     for α = 1:Nbase, β = 1:Nfreq
-        if any(gain_flags[:,:,ant1[α],β]) || any(gain_flags[:,:,ant2[α],β])
+        if gain_flags[ant1[α],β] || gain_flags[ant2[α],β]
             data_flags[:,β,α] = true
         else
             V = [data[1,β,α] data[3,β,α]
                  data[2,β,α] data[4,β,α]]
             G1 = gains[:,:,ant1[α],β]
             G2 = gains[:,:,ant2[α],β]
-            #@show G1 G2
             V = G2'\(V/G1)
             data[1,β,α] = V[1,1]
             data[2,β,α] = V[2,1]

@@ -55,29 +55,68 @@ function run_bandpass(args)
     criteria = StoppingCriteria(maxiter,tol)
     gains,gain_flags = bandpass(ms,sources,criteria)
 
-    # Write the gains to a CASA .bcal table
+    # Write the gains to a file
     Nant,Npol,Nchan = size(gains)
-    bcal = Table(ascii(args["--output"]))
-    Nrows = numrows(bcal)
-    if Nrows < Nant
-        Tables.addRows!(bcal,Nant-Nrows)
-    elseif Nrows > Nant
-        Tables.removeRows!(bcal,[Nant+1:Nrows...])
+    open(args["--output"],"w") do f
+        write(f,'B')
+        write(f,Int32(Nant))
+        write(f,Int32(Nchan))
+        write(f,permutedims(gain_flags,(2,3,1)))
+        write(f,permutedims(gains,(2,3,1)))
     end
-    bcal["ANTENNA1"] = Cint[1:Nant...]
-    bcal["CPARAM"] = permutedims(gains,(2,3,1))
-    bcal["FLAG"] = permutedims(gain_flags,(2,3,1))
-    gains
+
+    gains, gain_flags
+end
+
+function run_polcal(args)
+    ms = Table(ascii(args["--input"]))
+    sources = readsources(args["--sources"])
+    maxiter = haskey(args,"--maxiter")? args["--maxiter"] : 20
+    tol = haskey(args,"--tolerance")? args["--tolerance"] : 1e-4
+    criteria = StoppingCriteria(maxiter,tol)
+    gains,gain_flags = polcal(ms,sources,criteria)
+
+    # Write the gains to a file
+    Npol1,Npol2,Nant,Nchan = size(gains)
+    open(args["--output"],"w") do f
+        write(f,'J')
+        write(f,Int32(Nant))
+        write(f,Int32(Nchan))
+        write(f,permutedims(gain_flags,(2,1)))
+        write(f,permutedims(gains,(1,2,4,3)))
+    end
+
+    gains, gain_flags
 end
 
 function run_applycal(args)
-    bcal = Table(ascii(args["--calibration"]))
-    gains = permutedims(bcal["CPARAM"],(3,1,2))
-    gain_flags = permutedims(bcal["FLAG"],(3,1,2))
+    local T, Nant, Nchan, gain_flags, gains
+
+    # Read in the gains
+    open(args["--calibration"],"r") do f
+        T = read(f,Char)
+        Nant = Int(read(f,Int32))
+        Nchan = Int(read(f,Int32))
+        if T == 'B'
+            gain_flags = permutedims(read(f,Bool,(2,Nchan,Nant)),(3,1,2))
+            gains = permutedims(read(f,Complex64,(2,Nchan,Nant)),(3,1,2))
+        elseif T == 'J'
+            gain_flags = permutedims(read(f,Bool,(Nchan,Nant)),(2,1))
+            gains = permutedims(read(f,Complex64,(2,2,Nchan,Nant)),(1,2,4,3))
+        else
+            error("Unknown calibration type.")
+        end
+    end
+
+    force_imaging_columns = haskey(args,"--force-imaging")
+    apply_to_corrected = haskey(args,"--corrected")
     for input in args["--input"]
         ms = Table(ascii(input))
-        applycal!(ms,gains,gain_flags)
+        applycal!(ms,gains,gain_flags,
+                  force_imaging_columns=force_imaging_columns,
+                  apply_to_corrected=apply_to_corrected)
     end
+
     nothing
 end
 

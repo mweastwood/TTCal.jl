@@ -32,7 +32,7 @@ function polcal(ms::Table,
     Nant  = numrows(Table(ms[kw"ANTENNA"]))
 
     gains = ones(Complex64,2,2,Nant,Nfreq)
-    gain_flags = zeros(Bool,2,2,Nant,Nfreq)
+    gain_flags = zeros(Bool,Nant,Nfreq)
 
     data  = Tables.checkColumnExists(ms,"CORRECTED_DATA")? ms["CORRECTED_DATA"] : ms["DATA"]
     model = genvis(frame,sources,u,v,w,ν)
@@ -57,7 +57,7 @@ end
 # Internal Interface
 
 function polcal!(gains::Array{Complex64,4},
-                 gain_flags::Array{Bool,4},
+                 gain_flags::Array{Bool,2},
                  data::Array{Complex64,3},
                  model::Array{Complex64,3},
                  data_flags::Array{Bool,3},
@@ -73,7 +73,7 @@ function polcal!(gains::Array{Complex64,4},
     Nfreq = size(gains,4)
     for β = 1:Nfreq
         polcal_onechannel!(slice(gains,:,:,:,β),
-                           slice(gain_flags,:,:,:,β),
+                           slice(gain_flags,:,β),
                            slice( data,:,:,β),
                            slice(model,:,:,β),
                            slice(data_flags,:,:,β),
@@ -149,7 +149,7 @@ function polcal_onechannel!(gains, gain_flags,
             bad_ants[ant] = true
         end
     end
-    gain_flags[:,:,bad_ants] = true
+    gain_flags[bad_ants] = true
 
     nothing
 end
