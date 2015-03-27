@@ -28,7 +28,7 @@ end
 function write_gains(filename,gains::Array{Complex64,4},gain_flags::Array{Bool,2})
     # gains are from polcal(...)
     Npol1,Npol2,Nant,Nchan = size(gains)
-    open(args["--output"],"w") do f
+    open(filename,"w") do f
         write(f,'J')
         write(f,Int32(Nant))
         write(f,Int32(Nchan))
