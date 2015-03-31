@@ -48,7 +48,18 @@ CLI.options["bandpass"] = [
         Int,false,1,1),
     Option("--tolerance","""
         Set the relative tolerance used to determine convergence.""",
-        Float64,false,1,1)]
+        Float64,false,1,1),
+    Option("--force-imaging","""
+        Create and use the MODEL_DATA and CORRECTED_DATA columns even if
+        they do not already exist in the measurement set.""",
+        Nothing,false,0,0),
+    Option("--model-present","""
+        Use this flag to indicate that there is already a set of model
+        visibilities present in the MODEL_DATA column of the measurement
+        set. TTCal will use these model visibilities in place of the
+        source model specified by the --sources flag (for now --sources
+        is still mandatory even though it is effectively ignored).""",
+        Nothing,false,0,0)]
 CLI.options["polcal"] = [
     Option("--input","""
         The measurement set used to solve for a polarization calibration.""",

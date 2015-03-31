@@ -54,7 +54,11 @@ function run_bandpass(args)
     maxiter = haskey(args,"--maxiter")? args["--maxiter"] : 20
     tol = haskey(args,"--tolerance")? args["--tolerance"] : 1e-4
     criteria = StoppingCriteria(maxiter,tol)
-    gains,gain_flags = bandpass(ms,sources,criteria)
+    force_imaging_columns = haskey(args,"--force-imaging")
+    model_already_present = haskey(args,"--model-present")
+    gains,gain_flags = bandpass(ms,sources,criteria,
+                                force_imaging_columns=force_imaging_columns,
+                                model_already_present=model_already_present)
     write_gains(args["--output"],gains,gain_flags)
     gains, gain_flags
 end
