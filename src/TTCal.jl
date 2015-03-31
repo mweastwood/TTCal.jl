@@ -50,12 +50,12 @@ include("applycal.jl")
 
 function run_bandpass(args)
     ms = Table(ascii(args["--input"]))
-    sources = readsources(args["--sources"])
+    sources = haskey(args,"--sources")? readsources(args["--sources"]) : Source[]
     maxiter = haskey(args,"--maxiter")? args["--maxiter"] : 20
     tol = haskey(args,"--tolerance")? args["--tolerance"] : 1e-4
     criteria = StoppingCriteria(maxiter,tol)
     force_imaging_columns = haskey(args,"--force-imaging")
-    model_already_present = haskey(args,"--model-present")
+    model_already_present = !haskey(args,"--sources")
     gains,gain_flags = bandpass(ms,sources,criteria,
                                 force_imaging_columns=force_imaging_columns,
                                 model_already_present=model_already_present)
@@ -65,11 +65,15 @@ end
 
 function run_polcal(args)
     ms = Table(ascii(args["--input"]))
-    sources = readsources(args["--sources"])
+    sources = haskey(args,"--sources")? readsources(args["--sources"]) : Source[]
     maxiter = haskey(args,"--maxiter")? args["--maxiter"] : 20
     tol = haskey(args,"--tolerance")? args["--tolerance"] : 1e-4
     criteria = StoppingCriteria(maxiter,tol)
-    gains,gain_flags = polcal(ms,sources,criteria)
+    force_imaging_columns = haskey(args,"--force-imaging")
+    model_already_present = !haskey(args,"--sources")
+    gains,gain_flags = polcal(ms,sources,criteria,
+                              force_imaging_columns=force_imaging_columns,
+                              model_already_present=model_already_present)
     write_gains(args["--output"],gains,gain_flags)
     gains, gain_flags
 end
