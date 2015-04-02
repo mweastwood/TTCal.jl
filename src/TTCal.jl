@@ -47,6 +47,7 @@ include("io.jl")
 include("bandpass.jl")
 include("polcal.jl")
 include("applycal.jl")
+include("diagnose.jl")
 
 function run_bandpass(args)
     ms = Table(ascii(args["--input"]))
@@ -89,6 +90,10 @@ function run_applycal(args)
                   apply_to_corrected=apply_to_corrected)
     end
     nothing
+end
+
+function run_diagnose(args)
+    diagnose(args["--calibration"])
 end
 
 end

@@ -30,6 +30,7 @@ CLI.print_banner()
 push!(CLI.commands,Command("bandpass","Solve for a bandpass calibration."))
 push!(CLI.commands,Command("polcal","Solve for a polarization calibration."))
 push!(CLI.commands,Command("applycal","Apply a calibration."))
+push!(CLI.commands,Command("diagnose","Diagnose a poor calibration."))
 
 CLI.options["bandpass"] = [
     Option("--input","""
@@ -101,6 +102,8 @@ try
         TTCal.run_polcal(args)
     elseif command == "applycal"
         TTCal.run_applycal(args)
+    elseif command == "diagnose"
+        TTCal.run_diagnose(args)
     end
 catch err
     if isa(err, ErrorException)
