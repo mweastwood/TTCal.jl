@@ -112,7 +112,7 @@ function test_bandpass(gains,data,model)
     @test vecnorm(mygains-gains)/vecnorm(gains) < 1e-4
 
     rm(gaintable)
-    run(`julia ../src/ttcal.jl bandpass --input $name --output $gaintable --sources sources.json --maxiter 100 --tolerance 1e-6`)
+    run(`$JULIA_HOME/julia ../src/ttcal.jl bandpass --input $name --output $gaintable --sources sources.json --maxiter 100 --tolerance 1e-6`)
     mygains,_ = TTCal.read_gains(gaintable)
     @test vecnorm(mygains-gains)/vecnorm(gains) < 1e-4
 end
