@@ -138,6 +138,10 @@ function polcal_onechannel!(gains, gain_flags,
         end
         iter += 1
     end
+    if !converged
+        gain_flags[:] = true
+        return
+    end
 
     # 6. Fix the phase of the reference antenna.
     # TODO
