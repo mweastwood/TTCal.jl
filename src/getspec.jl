@@ -33,7 +33,7 @@ function getspec(ms::Table,
         return zeros(length(ν)),zeros(length(ν)),zeros(length(ν)),zeros(length(ν))
     end
 
-    data  = ms["CORRECTED_DATA"]
+    data  = Tables.checkColumnExists(ms,"CORRECTED_DATA")? ms["CORRECTED_DATA"] : ms["DATA"]
     flags = ms["FLAG"]
     l,m = dir2lm(frame,dir)
     u,v,w = uvw(ms)
@@ -65,7 +65,7 @@ function getspec_internal(data::Array{Complex64,3},
         # Don't use auto-correlations
         ant1[α] == ant2[α] && continue
         for β = 1:length(ν)
-            any(flags[:,β,α]) && continue
+            any(slice(flags,:,β,α)) && continue
             # Taking the real part of A is equivalent to
             # computing (A + conj(A))/2. The conjugate of A,
             # in this case, is the baseline going in the
