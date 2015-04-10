@@ -20,7 +20,7 @@ function subsrc!(ms::Table,sources::Vector{PointSource})
     frame = reference_frame(ms)
     u,v,w = uvw(ms)
     ν     = freq(ms)
-    data  = ms["CORRECTED_DATA"]
+    data  = Tables.checkColumnExists(ms,"CORRECTED_DATA")? ms["CORRECTED_DATA"] : ms["DATA"]
 
     subtracted = subsrc(frame,data,u,v,w,ν,sources)
     ms["CORRECTED_DATA"] = subtracted

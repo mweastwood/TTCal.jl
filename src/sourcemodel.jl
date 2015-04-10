@@ -89,8 +89,8 @@ function dir2lm(frame::ReferenceFrame,dir::Direction)
 end
 
 function azel2lm(az,el)
-    l = cos(el)*sin(az)
-    m = cos(el)*cos(az)
+    l = cos(el).*sin(az)
+    m = cos(el).*cos(az)
     l,m
 end
 
