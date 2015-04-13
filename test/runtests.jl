@@ -212,3 +212,37 @@ end
 #test_fitvisibilities()
 =#
 
+function test_subsrc()
+    data = genvis(frame,sources,u,v,w,ν)
+    data_flags = zeros(Bool,size(data))
+
+    name,ms = createms()
+    ms["DATA"] = data
+    ms["FLAG"] = data_flags
+    subsrc!(ms,sources)
+
+    @test vecnorm(ms["CORRECTED_DATA"]) < eps(Float64)
+end
+test_subsrc()
+
+function test_sourceio()
+    name = tempname()
+    writesources(name,sources)
+    _sources = readsources(name)
+    for i = 1:length(sources)
+        @test sources[i].name == _sources[i].name
+        @test sources[i].dir.system == _sources[i].dir.system == "J2000"
+        ra,dec = sources[i].dir.m
+        _ra,_dec = _sources[i].dir.m
+        @test ra - _ra < as(0.1/3600*Degree,Radian)
+        @test dec - _dec < as(0.1/3600*Degree,Radian)
+        @test sources[i].I == _sources[i].I
+        @test sources[i].Q == _sources[i].Q
+        @test sources[i].U == _sources[i].U
+        @test sources[i].V == _sources[i].V
+        @test sources[i].reffreq == _sources[i].reffreq
+        @test sources[i].index == _sources[i].index
+    end
+end
+test_sourceio()
+
