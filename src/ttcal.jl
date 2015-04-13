@@ -88,6 +88,13 @@ CLI.options["applycal"] = [
     Option("--corrected","""
         Apply the calibration to the CORRECTED_DATA column instead
         of the DATA column.""")]
+CLI.options["diagnose"] = [
+    Option("--calibration","""
+        The file containing the calibration solution.""",
+        T=UTF8String,
+        required=true,
+        min=1,
+        max=1)]
 
 import TTCal
 
