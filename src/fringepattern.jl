@@ -20,7 +20,7 @@ function fringepattern(l,m,u,v,w,ν)
 end
 
 function fringepattern!{T<:Complex}(output::Array{T,2},l,m,u,v,w,ν)
-    n = sqrt(1-l^2-m^2)
+    n = sqrt(1-l^2-m^2)-1
     Δν = ν[2] - ν[1]
     Nbase = length(u)
     Nfreq = length(ν)
