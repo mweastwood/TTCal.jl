@@ -1,6 +1,5 @@
 using TTCal
 using Base.Test
-using Base.Dates
 using CasaCore.Quanta
 using CasaCore.Measures
 using CasaCore.Tables
