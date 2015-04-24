@@ -77,7 +77,7 @@ Take a Runge-Kutta step.
 
 The output is stored in `x`, but all three variables are overwritten.
 """ ->
-stagedfunction rkstep!{func!,N}(x,x′,k,::RKInnerStep{func!},::RK{N},args...)
+@generated function rkstep!{func!,N}(x,x′,k,::RKInnerStep{func!},::RK{N},args...)
     tableau = symbol("RK$(N)_tableau")
 
     quote

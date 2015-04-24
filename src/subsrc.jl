@@ -32,10 +32,10 @@ end
 
 function subsrc(frame::ReferenceFrame,
                 data::Array{Complex64,3},
-                u::Vector{quantity(Float64,Meter)},
-                v::Vector{quantity(Float64,Meter)},
-                w::Vector{quantity(Float64,Meter)},
-                ν::Vector{quantity(Float64,Hertz)},
+                u::Vector{Float64},
+                v::Vector{Float64},
+                w::Vector{Float64},
+                ν::Vector{Float64},
                 sources::Vector{PointSource})
     sources = filter(sources) do source
         isabovehorizon(frame,source)

@@ -1,9 +1,9 @@
 using TTCal
 using Base.Test
 using Base.Dates
+using CasaCore.Quanta
 using CasaCore.Measures
 using CasaCore.Tables
-using SIUnits
 
 srand(123)
 
@@ -14,20 +14,20 @@ fringe = TTCal.fringepattern(ϕ[1],ϕ[2]-ϕ[1],length(ϕ))
 @test vecnorm(fringe-fringe_naive)/vecnorm(fringe_naive) < 10eps(Float32)
 
 # Define the interferometer
-const x = TTCal.addunits([  0.  10.  30.  70. 150.],Meter)
-const y = TTCal.addunits([150.  70.  30.  10.   0.],Meter)
-const z = TTCal.addunits([  0.  -1.  +1.  -2.  +2.],Meter)
-const ν = TTCal.addunits([40.0e6:10.0e6:60.0e6;],Hertz)
-const t = (2015.-1858.)*365.*24.*60.*60. * Second # a rough, current Julian date
+const x = [  0.  10.  30.  70. 150.]
+const y = [150.  70.  30.  10.   0.]
+const z = [  0.  -1.  +1.  -2.  +2.]
+const ν = [40.0e6:10.0e6:60.0e6;]
+const t = (2015.-1858.)*365.*24.*60.*60. # a rough, current Julian date (in seconds)
 
 const Nant  = length(x)
 const Nbase = div(Nant*(Nant-1),2) + Nant
 const Nfreq = length(ν)
 
 function xyz2uvw(x,y,z)
-    u = Array(quantity(Float64,Meter),Nbase)
-    v = Array(quantity(Float64,Meter),Nbase)
-    w = Array(quantity(Float64,Meter),Nbase)
+    u = Array{Float64}(Nbase)
+    v = Array{Float64}(Nbase)
+    w = Array{Float64}(Nbase)
     α = 1
     for i = 1:Nant, j = i:Nant
         u[α] = x[j]-x[i]
@@ -58,7 +58,7 @@ function createms()
 
     subtable = Table("$name/SPECTRAL_WINDOW")
     Tables.addRows!(subtable,1)
-    subtable["CHAN_FREQ"] = reshape(TTCal.stripunits(ν),length(ν),1)
+    subtable["CHAN_FREQ"] = reshape(ν,length(ν),1)
     finalize(subtable)
 
     subtable = Table("$name/ANTENNA")
@@ -70,7 +70,7 @@ function createms()
     table[kw"ANTENNA"] = "Table: $name/ANTENNA"
     table["ANTENNA1"] = ant1-1
     table["ANTENNA2"] = ant2-1
-    table["UVW"] = TTCal.stripunits([u v w]')
+    table["UVW"] = [u v w]'
     table["TIME"] = fill(float(t),Nbase)
 
     name,table
@@ -86,8 +86,8 @@ const bandpass_args = Dict("--input"     => "",
 const criteria = TTCal.StoppingCriteria(100,1e-6)
 
 const frame = ReferenceFrame()
-set!(frame,Epoch("UTC",t))
-set!(frame,Measures.observatory(frame,"OVRO_MMA"))
+set!(frame,Epoch(Measures.UTC,Quantity(t,Second)))
+set!(frame,observatory("OVRO_MMA"))
 
 const sources = filter(source -> TTCal.isabovehorizon(frame,source),readsources("sources.json"))
 
@@ -231,11 +231,9 @@ function test_sourceio()
     _sources = readsources(name)
     for i = 1:length(sources)
         @test sources[i].name == _sources[i].name
-        @test sources[i].dir.system == _sources[i].dir.system == "J2000"
-        ra,dec = sources[i].dir.m
-        _ra,_dec = _sources[i].dir.m
-        @test ra - _ra < as(0.1/3600*Degree,Radian)
-        @test dec - _dec < as(0.1/3600*Degree,Radian)
+        @test Measures.reference(sources[i].dir) == Measures.reference(_sources[i].dir)
+        @test_approx_eq_eps longitude(sources[i].dir) longitude(_sources[i].dir) 1e-8
+        @test_approx_eq_eps latitude(sources[i].dir) latitude(_sources[i].dir) 1e-8
         @test sources[i].I == _sources[i].I
         @test sources[i].Q == _sources[i].Q
         @test sources[i].U == _sources[i].U

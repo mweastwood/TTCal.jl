@@ -36,18 +36,13 @@ end
 ################################################################################
 # Internal Interface
 
-@doc """
-1. Sort the sources in order of decreasing flux.
-2. For each source, subtract all other sources.
-3. Fit for the source.
-""" ->
 function fitvis(frame::ReferenceFrame,
                 data::Array{Complex64,3},
                 flags::Array{Bool,3},
-                u::Vector{quantity(Float64,Meter)},
-                v::Vector{quantity(Float64,Meter)},
-                w::Vector{quantity(Float64,Meter)},
-                ν::Vector{quantity(Float64,Hertz)},
+                u::Vector{Float64},
+                v::Vector{Float64},
+                w::Vector{Float64},
+                ν::Vector{Float64},
                 ant1::Vector{Int32},
                 ant2::Vector{Int32},
                 sources::Vector{PointSource})
@@ -56,34 +51,36 @@ function fitvis(frame::ReferenceFrame,
         isabovehorizon(frame,source)
     end
 
-    # 2. Sort the sources in order of decreasing flux.
-    #sort!(sources, by=source->source.I, rev=true)
+    # 2. Get the flux of each source.
+    # (This first pass is necessary to make sure a poor initial estimate of the source
+    # flux doesn't impact the results. This can happen if the source is low in the beam
+    # and is much fainter than it otherwise would be.)
+    for (i,source) in enumerate(sources)
+        l,m = lm(frame,source)
+        I,Q,U,V,reffreq,index = fitvis_spec(data,flags,l,m,u,v,w,ν,ant1,ant2)
+        sources[i] = PointSource(source.name,source.dir,I,Q,U,V,reffreq,index)
+    end
 
-    # 3. For each source:
-    for i = 1:length(sources)
-        name = sources[i].name
-        l,m = getlm(frame,sources[i])
-        lold = l; mold = m # TEMP
+    # 3. Sort by order of decreasing flux.
+    # (This ensures we fit and remove the bright sources first, preventing their sidelobes
+    # from contaminating the faint sources.)
+    sort!(sources,by=source->source.I,rev=true)
 
-        # a) Subtract all other sources.
-        other_sources = PointSource[]
-        for j = 1:length(sources)
-            i == j && continue
-            push!(other_sources,sources[j])
-        end
-        subtracted = subsrc(frame,data,u,v,w,ν,other_sources)
+    # 3. Fit for the position and flux of each source, subtracting each source from the
+    #    data in turn.
+    for (i,source) in enumerate(sources)
+        l,m = getlm(frame,source)
 
-        # b) Solve for the source's position
-        l,m = fitvis_lm(subtracted,flags,l,m,u,v,w,ν,ant1,ant2)
-        az,el = lm2azel(l,m)
+        # a) Solve for the source's position
+        l,m = fitvis_lm(data,flags,l,m,u,v,w,ν,ant1,ant2)
+        dir = Direction("AZEL",lm2azel(l,m)...)
 
-        # c) Solve for the source's spectrum
-        I,Q,U,V,reffreq,index = fitvis_spec(subtracted,flags,l,m,u,v,w,ν,ant1,ant2)
+        # b) Solve for the source's spectrum
+        I,Q,U,V,reffreq,index = fitvis_spec(data,flags,l,m,u,v,w,ν,ant1,ant2)
 
-        #println("----")
-        #@show name lold,l mold,m sources[i].I,I sources[i].Q,Q sources[i].U,U sources[i].V,V sources[i].index,index
-        sources[i] = PointSource(name,Direction("AZEL",az,el),
-                                 I,Q,U,V,reffreq,index)
+        # c) Subtract the source from the data
+        sources[i] = PointSource(source.name,dir,I,Q,U,V,reffreq,index)
+        data = subsrc(frame,data,u,v,w,ν,[sources[i]])
     end
     sources
 end
@@ -92,19 +89,21 @@ function fitvis_lm(data::Array{Complex64,3},
                    flags::Array{Bool,3},
                    l::Float64,
                    m::Float64,
-                   u::Vector{quantity(Float64,Meter)},
-                   v::Vector{quantity(Float64,Meter)},
-                   w::Vector{quantity(Float64,Meter)},
-                   ν::Vector{quantity(Float64,Hertz)},
+                   u::Vector{Float64},
+                   v::Vector{Float64},
+                   w::Vector{Float64},
+                   ν::Vector{Float64},
                    ant1::Vector{Int32},
                    ant2::Vector{Int32})
     Nfreq = length(ν)
     Nbase = length(u)
     λ = [c/ν[β] for β = 1:Nfreq]
 
+    # Calculate the angular resolution of the interferometer
+    resolution = minimum(λ) / maximum(sqrt(u.^2+v.^2))
+
     # Calculate the flux in the given direction
     # (and its derivatives with respect to direction)
-
     fringe = fringepattern(l,m,u,v,w,ν)
     F   = zeros(Nfreq)     # flux at each frequency
     dF  = zeros(2,Nfreq)   # [ ∂F/∂l ∂F/∂m ]
@@ -130,19 +129,30 @@ function fitvis_lm(data::Array{Complex64,3},
             count[β] += 1
         end
     end
-    for β = 1:Nfreq
+    @inbounds for β = 1:Nfreq
         F[β] /= count[β]
         dF[:,β] /= count[β]
         d2F[:,:,β] /= count[β]
     end
 
     # Calculate how far to step in each direction
+    # (weight by 1/wavelength because resolution scales as 1/wavelength)
     dl = 0.0
     dm = 0.0
     normalization = 0.0
     for β = 1:Nfreq
         count[β] .== 0 && continue
-        δ = slice(d2F,:,:,β) \ slice(dF,:,β)
+        if det(slice(d2F,:,:,β)) > 0
+            # If the determinant of the Hessian is positive,
+            # take a Newton step towards where the gradient is zero.
+            δ = -slice(d2F,:,:,β) \ slice(dF,:,β)
+        else
+            # If the determinant of the Hessian is negative,
+            # the above step will take us away from the flux maximum.
+            # Therefore we'll just step in the direction of the
+            # gradient.
+            δ = slice(dF,:,β) * resolution
+        end
         weight = count[β]/(λ[β]/Meter)
         dl += δ[1] * weight
         dm += δ[2] * weight
@@ -150,38 +160,49 @@ function fitvis_lm(data::Array{Complex64,3},
     end
     dl /= normalization
     dm /= normalization
-    force_to_horizon(l-dl,m-dm)
+
+    # Restrict the step size to one resolution element
+    jump_size  = sqrt(dl^2+dm^2)
+    if jump_size > resolution
+        correction = resolution/jump_size
+        dl *= correction
+        dm *= correction
+    end
+
+    # Furthermore, don't let the source lie beyond the horizon
+    force_to_horizon(l+dl,m+dm)
 end
 
 function fitvis_spec(data::Array{Complex64,3},
                      flags::Array{Bool,3},
                      l::Float64,
                      m::Float64,
-                     u::Vector{quantity(Float64,Meter)},
-                     v::Vector{quantity(Float64,Meter)},
-                     w::Vector{quantity(Float64,Meter)},
-                     ν::Vector{quantity(Float64,Hertz)},
+                     u::Vector{Float64},
+                     v::Vector{Float64},
+                     w::Vector{Float64},
+                     ν::Vector{Float64},
                      ant1::Vector{Int32},
                      ant2::Vector{Int32})
     I,Q,U,V = getspec_internal(data,flags,l,m,u,v,w,ν,ant1,ant2)
 
     # power law fit
     mask = (!isnan(I)) .* (I .> 0)
-    reffreq = 47e6Hertz
-    if sum(mask) > 0.5length(mask)
-        # Give a reasonable anser if there are too many channels masked
-        α = [0.0 0.0]
+    reffreq = 47e6
+    if sum(mask) < 5
+        # Give a reasonable answer if there are too many channels masked
+        α = [0.0;0.0]
+        fQ = 0.0
+        fU = 0.0
+        fV = 0.0
     else
         x = log10(ν[mask]/reffreq)
         y = log10(I[mask])
         α = [ones(length(x)) x]\y
+        # polarization fractions
+        fQ = mean(Q[mask]./I[mask])
+        fU = mean(U[mask]./I[mask])
+        fV = mean(V[mask]./I[mask])
     end
-
-    # polarization fractions
-    # (this is messing things up somehow)
-    fQ = mean(Q[mask]./I[mask])
-    fU = mean(U[mask]./I[mask])
-    fV = mean(V[mask]./I[mask])
 
     flux = 10^α[1]
     flux,fQ*flux,fU*flux,fV*flux,reffreq,α[2:end]

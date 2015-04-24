@@ -17,22 +17,22 @@
 
 function uvw(ms::Table)
     uvw_arr = ms["UVW"]
-    u = addunits(squeeze(uvw_arr[1,:],1),Meter)
-    v = addunits(squeeze(uvw_arr[2,:],1),Meter)
-    w = addunits(squeeze(uvw_arr[3,:],1),Meter)
+    u = squeeze(uvw_arr[1,:],1)
+    v = squeeze(uvw_arr[2,:],1)
+    w = squeeze(uvw_arr[3,:],1)
     u,v,w
 end
 
 function freq(ms::Table)
     spw = Table(ms[kw"SPECTRAL_WINDOW"])
-    ν = addunits(spw["CHAN_FREQ",1],Hertz)
+    ν = spw["CHAN_FREQ",1]
     ν
 end
 
 function reference_frame(ms::Table)
     frame = ReferenceFrame()
-    set!(frame,Epoch("UTC",ms["TIME",1]*Second))
-    set!(frame,observatory(frame,"OVRO_MMA"))
+    set!(frame,Epoch(Measures.UTC,Quantity(ms["TIME",1],Second)))
+    set!(frame,observatory("OVRO_MMA"))
     frame
 end
 

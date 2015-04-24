@@ -33,16 +33,17 @@ type PointSource
     Q::Float64
     U::Float64
     V::Float64
-    reffreq::quantity(Float64,Hertz)
+    reffreq::Float64
     index::Vector{Float64}
 end
 
-Base.show(io::IO,source::PointSource) = print(io,source.name)
+name(source::PointSource) = source.name
+Base.show(io::IO,source::PointSource) = print(io,name(source))
 
 ################################################################################
 # Flux
 
-function getflux(reference_flux,index,reference_frequency,frequency)
+function powerlaw(reference_flux,index,reference_frequency,frequency)
     s = sign(reference_flux)
     logflux = log10(abs(reference_flux))
     logfreq = log10(frequency/reference_frequency)
@@ -53,17 +54,17 @@ function getflux(reference_flux,index,reference_frequency,frequency)
 end
 
 for param in (:I,:Q,:U,:V)
-    name = symbol("getstokes",param)
-    @eval function $name{T<:FloatingPoint}(source::PointSource,frequency::quantity(T,Hertz))
-        getflux(source.$param,source.index,source.reffreq,frequency)
+    func = symbol("stokes",param)
+    @eval function $func{T<:FloatingPoint}(source::PointSource,frequency::T)
+        powerlaw(source.$param,source.index,source.reffreq,frequency)
     end
-    @eval function $name{T<:FloatingPoint}(source::PointSource,frequencies::Vector{quantity(T,Hertz)})
-        [$name(source,frequency) for frequency in frequencies]
+    @eval function $func{T<:FloatingPoint}(source::PointSource,frequencies::Vector{T})
+        [$func(source,frequency) for frequency in frequencies]
     end
 end
 
-getflux{T<:FloatingPoint}(source::PointSource,frequency::quantity(T,Hertz)) = getstokesI(source,frequency)
-getflux{T<:FloatingPoint}(source::PointSource,frequencies::Vector{quantity(T,Hertz)}) = getstokesI(source,frequencies)
+flux{T<:FloatingPoint}(source::PointSource,frequency::T) = stokesI(source,frequency)
+flux{T<:FloatingPoint}(source::PointSource,frequencies::Vector{T}) = stokesI(source,frequencies)
 
 ################################################################################
 # Position
@@ -71,12 +72,22 @@ getflux{T<:FloatingPoint}(source::PointSource,frequencies::Vector{quantity(T,Her
 direction(source::PointSource) = source.dir
 
 @doc """
+Convert the direction into a right ascension and declination.
+""" ->
+function dir2radec(frame::ReferenceFrame,dir::Direction)
+    j2000 = measure(frame,dir,Measures.J2000)
+    ra  = longitude(azel)
+    dec = latitude(azel)
+    ra,dec
+end
+
+@doc """
 Convert the direction into an azimuth and elevation.
 """ ->
 function dir2azel(frame::ReferenceFrame,dir::Direction)
-    dir = measure(frame,dir,"AZEL")
-    az = dir.m[1]
-    el = dir.m[2]
+    azel = measure(frame,dir,Measures.AZEL)
+    az = longitude(azel)
+    el = latitude(azel)
     az,el
 end
 
@@ -95,23 +106,18 @@ function azel2lm(az,el)
 end
 
 function lm2azel(l,m)
-    az = atan2(l,m)*Radian
-    el = acos(sqrt(l^2+m^2))*Radian
+    az = atan2(l,m)
+    el = acos(hypot(l,m))
     az,el
 end
 
-getazel(frame::ReferenceFrame,source::PointSource) = dir2azel(frame,direction(source))
-getlm(frame::ReferenceFrame,source::PointSource) = dir2lm(frame,direction(source))
+radec(frame::ReferenceFrame,source::PointSource) = dir2radec(frame,direction(source))
+azel(frame::ReferenceFrame,source::PointSource) = dir2azel(frame,direction(source))
+lm(frame::ReferenceFrame,source::PointSource) = dir2lm(frame,direction(source))
 
-@doc """
-Returns true if the source is above the horizon, false if the source
-is below the horizon.
-""" ->
-isabovehorizon(frame::ReferenceFrame,source::PointSource) = isabovehorizon(frame,direction(source))
-
-function isabovehorizon(frame::ReferenceFrame,dir::Direction)
-    az,el = dir2azel(frame,dir)
-    ifelse(el > 0.0Radian,true,false)
+function isabovehorizon(frame::ReferenceFrame,source::PointSource)
+    az,el = azel(frame,source)
+    el > 0
 end
 
 ################################################################################
@@ -128,9 +134,9 @@ function readsources(filename::AbstractString)
         Q     = parsed_source["Q"]
         U     = parsed_source["U"]
         V     = parsed_source["V"]
-        freq  = parsed_source["freq"]*Hertz
+        freq  = parsed_source["freq"]
         index = parsed_source["index"]
-        dir = Direction("J2000",ra_str(ra),dec_str(dec))
+        dir = Direction(Measures.J2000,Quanta.parse_ra(ra),Quanta.parse_dec(dec))
         push!(sources,PointSource(name,dir,I,Q,U,V,freq,index))
     end
     sources
@@ -139,11 +145,13 @@ end
 function writesources(filename::AbstractString,sources::Vector{PointSource})
     dicts = Dict{UTF8String,Any}[]
     for source in sources
+        ra  = longitude(source.dir,Degree)
+        dec =  latitude(source.dir,Degree)
         dict = Dict{UTF8String,Any}()
         dict["ref"]   = "TTCal"
         dict["name"]  = source.name
-        dict["ra"]    =  ra_str(source.dir.m[1])
-        dict["dec"]   = dec_str(source.dir.m[2])
+        dict["ra"]    = Quanta.format_ra(ra)
+        dict["dec"]   = Quanta.format_dec(dec)
         dict["I"]     = source.I
         dict["Q"]     = source.Q
         dict["U"]     = source.U

@@ -33,10 +33,10 @@ end
 
 function genvis(frame::ReferenceFrame,
                 sources::Vector{PointSource},
-                u::Vector{quantity(Float64,Meter)},
-                v::Vector{quantity(Float64,Meter)},
-                w::Vector{quantity(Float64,Meter)},
-                ν::Vector{quantity(Float64,Hertz)})
+                u::Vector{Float64},
+                v::Vector{Float64},
+                w::Vector{Float64},
+                ν::Vector{Float64})
     model = zeros(Complex64,4,length(ν),length(u))
     genvis!(model,frame,sources,u,v,w,ν)
     model
@@ -45,10 +45,10 @@ end
 function genvis!(model::Array{Complex64,3},
                  frame::ReferenceFrame,
                  sources::Vector{PointSource},
-                 u::Vector{quantity(Float64,Meter)},
-                 v::Vector{quantity(Float64,Meter)},
-                 w::Vector{quantity(Float64,Meter)},
-                 ν::Vector{quantity(Float64,Hertz)})
+                 u::Vector{Float64},
+                 v::Vector{Float64},
+                 w::Vector{Float64},
+                 ν::Vector{Float64})
     for source in sources
         genvis!(model,frame,source,u,v,w,ν)
     end
@@ -58,15 +58,15 @@ end
 function genvis!(model::Array{Complex64,3},
                  frame::ReferenceFrame,
                  source::PointSource,
-                 u::Vector{quantity(Float64,Meter)},
-                 v::Vector{quantity(Float64,Meter)},
-                 w::Vector{quantity(Float64,Meter)},
-                 ν::Vector{quantity(Float64,Hertz)})
-    l,m = getlm(frame,source)
-    I = getstokesI(source,ν)
-    Q = getstokesQ(source,ν)
-    U = getstokesU(source,ν)
-    V = getstokesV(source,ν)
+                 u::Vector{Float64},
+                 v::Vector{Float64},
+                 w::Vector{Float64},
+                 ν::Vector{Float64})
+    l,m = lm(frame,source)
+    I = stokesI(source,ν)
+    Q = stokesQ(source,ν)
+    U = stokesU(source,ν)
+    V = stokesV(source,ν)
     genvis!(model,I,Q,U,V,l,m,u,v,w,ν)
 end
 
@@ -77,10 +77,10 @@ function genvis!(model::Array{Complex64,3},
                  V::Vector{Float64},
                  l::Float64,
                  m::Float64,
-                 u::Vector{quantity(Float64,Meter)},
-                 v::Vector{quantity(Float64,Meter)},
-                 w::Vector{quantity(Float64,Meter)},
-                 ν::Vector{quantity(Float64,Hertz)})
+                 u::Vector{Float64},
+                 v::Vector{Float64},
+                 w::Vector{Float64},
+                 ν::Vector{Float64})
     fringe = fringepattern(l,m,u,v,w,ν)
     for α = 1:length(u), β = 1:length(ν)
         # Based on experiments imaging model visibilities with wsclean

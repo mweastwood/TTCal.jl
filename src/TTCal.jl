@@ -28,11 +28,11 @@ export polcal
 export applycal!
 
 using JSON
-using SIUnits
+using CasaCore.Quanta
 using CasaCore.Measures
 using CasaCore.Tables
 
-include("units.jl")
+const c = 2.99792e+8
 include("ms.jl")
 include("rungekutta.jl")
 
