@@ -31,8 +31,11 @@ end
 
 function reference_frame(ms::Table)
     frame = ReferenceFrame()
-    set!(frame,Epoch(Measures.UTC,Quantity(ms["TIME",1],Second)))
-    set!(frame,observatory("OVRO_MMA"))
+    time   = Epoch(Measures.UTC,Quantity(ms["TIME",1],Second))
+    antpos = slice(Table(ms[kw"ANTENNA"])["POSITION"],:,1)
+    pos    = Measures.from_xyz_in_meters(Measures.ITRF,antpos[1],antpos[2],antpos[3])
+    set!(frame,time)
+    set!(frame,pos)
     frame
 end
 
@@ -41,5 +44,11 @@ function ants(ms::Table)
     ant2 = ms["ANTENNA2"]
     # (the +1 converts to a 1-based indexing scheme)
     ant1+1,ant2+1
+end
+
+function phase_dir(ms::Table)
+    field = Table(ms[kw"FIELD"])
+    dir = field["PHASE_DIR"]
+    Direction(Measures.J2000,Quantity(dir[1],Radian),Quantity(dir[2],Radian))
 end
 

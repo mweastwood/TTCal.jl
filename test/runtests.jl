@@ -13,15 +13,24 @@ fringe = TTCal.fringepattern(ϕ[1],ϕ[2]-ϕ[1],length(ϕ))
 @test vecnorm(fringe-fringe_naive)/vecnorm(fringe_naive) < 10eps(Float32)
 
 # Define the interferometer
-const x = [  0.  10.  30.  70. 150.]
-const y = [150.  70.  30.  10.   0.]
-const z = [  0.  -1.  +1.  -2.  +2.]
+const x = [  0.;  10.;  30.;  70.; 150.]
+const y = [150.;  70.;  30.;  10.;   0.]
+const z = [  0.;  -1.;  +1.;  -2.;  +2.]
 const ν = [40.0e6:10.0e6:60.0e6;]
 const t = (2015.-1858.)*365.*24.*60.*60. # a rough, current Julian date (in seconds)
 
 const Nant  = length(x)
 const Nbase = div(Nant*(Nant-1),2) + Nant
 const Nfreq = length(ν)
+
+const frame = ReferenceFrame()
+set!(frame,Epoch(Measures.UTC,Quantity(t,Second)))
+set!(frame,observatory("OVRO_MMA"))
+
+const zenith = Direction(Measures.AZEL,Quantity(0.0,Degree),Quantity(90.0,Degree))
+const phase_dir = measure(frame,zenith,Measures.J2000)
+
+const pos = observatory("OVRO_MMA")
 
 function xyz2uvw(x,y,z)
     u = Array{Float64}(Nbase)
@@ -62,11 +71,19 @@ function createms()
 
     subtable = Table("$name/ANTENNA")
     Tables.addRows!(subtable,Nant)
+    x,y,z = Measures.xyz_in_meters(pos)
+    subtable["POSITION"] = [x;y;z]*ones(1,Nant)
+    finalize(subtable)
+
+    subtable = Table("$name/FIELD")
+    Tables.addRows!(subtable,1)
+    subtable["PHASE_DIR"] = reshape([longitude(phase_dir);latitude(phase_dir)],2,1)
     finalize(subtable)
 
     Tables.addRows!(table,Nbase)
     table[kw"SPECTRAL_WINDOW"] = "Table: $name/SPECTRAL_WINDOW"
     table[kw"ANTENNA"] = "Table: $name/ANTENNA"
+    table[kw"FIELD"] = "Table: $name/FIELD"
     table["ANTENNA1"] = ant1-1
     table["ANTENNA2"] = ant2-1
     table["UVW"] = [u v w]'
@@ -83,10 +100,6 @@ const bandpass_args = Dict("--input"     => "",
                            "--tolerance" => 1e-6)
 
 const criteria = TTCal.StoppingCriteria(100,1e-6)
-
-const frame = ReferenceFrame()
-set!(frame,Epoch(Measures.UTC,Quantity(t,Second)))
-set!(frame,observatory("OVRO_MMA"))
 
 const sources = filter(source -> TTCal.isabovehorizon(frame,source),readsources("sources.json"))
 
@@ -120,7 +133,7 @@ end
 function test_one()
     println("1")
     gains = ones(Complex64,Nant,2,Nfreq)
-    model = genvis(frame,sources,u,v,w,ν)
+    model = genvis(phase_dir,sources,u,v,w,ν)
     data  = copy(model)
     test_bandpass(gains,data,model)
 end
@@ -131,7 +144,7 @@ function test_two()
     println("2")
     gains = rand(Complex64,Nant,2,Nfreq)
     gains = gains .* conj(gains[1,:,:]) ./ abs(gains[1,:,:])
-    model = genvis(frame,sources,u,v,w,ν)
+    model = genvis(phase_dir,sources,u,v,w,ν)
     data  = copy(model)
     data_flags = zeros(Bool,size(data))
     gain_flags = zeros(Bool,size(gains))
@@ -146,7 +159,7 @@ function test_three()
     println("3")
     gains = rand(Complex64,Nant,2,Nfreq)
     gains = gains .* conj(gains[1,:,:]) ./ abs(gains[1,:,:])
-    model = genvis(frame,sources,u,v,w,ν)
+    model = genvis(phase_dir,sources,u,v,w,ν)
     data  = copy(model)
     data_flags = zeros(Bool,size(data))
     gain_flags = zeros(Bool,size(gains))
@@ -212,7 +225,7 @@ end
 =#
 
 function test_subsrc()
-    data = genvis(frame,sources,u,v,w,ν)
+    data = genvis(phase_dir,sources,u,v,w,ν)
     data_flags = zeros(Bool,size(data))
 
     name,ms = createms()

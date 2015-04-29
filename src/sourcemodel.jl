@@ -94,9 +94,22 @@ end
 @doc """
 Convert the direction into the standard radio coordinate system.
 """ ->
-function dir2lm(frame::ReferenceFrame,dir::Direction)
-    az,el = dir2azel(frame,dir)
-    azel2lm(az,el)
+function dir2lm{ref}(phase_dir::Direction{ref},dir::Direction{ref})
+    long = longitude(phase_dir)
+    lat  = latitude(phase_dir)
+    θ1 = π/2 - long
+    θ2 = π/2 - lat
+    sin_θ1 = sin(θ1); cos_θ1 = cos(θ1)
+    sin_θ2 = sin(θ2); cos_θ2 = cos(θ2)
+    x,y,z = Measures.xyz_in_meters(dir)
+    # - Rotate first by θ1 about the z-axis
+    # - Then rotate by θ2 about the x-axis
+    # ⌈    -l    ⌉   ⌈1    0        0    ⌉   ⌈+cos(θ1) -sin(θ1) 0⌉   ⌈x⌉
+    # |    -m    | = |0 +cos(θ2) -sin(θ2)| * |+sin(θ1) +cos(θ1) 0| * |y|
+    # ⌊√(1-l²-m²)⌋   ⌊0 +sin(θ2) +cos(θ2)⌋   ⌊   0        0     1⌋   ⌊z⌋
+    l =       -cos_θ1*x  +        sin_θ1*y
+    m = -sin_θ1*cos_θ2*x - cos_θ1*cos_θ2*y + sin_θ2*z
+    l,m
 end
 
 function azel2lm(az,el)
@@ -113,7 +126,7 @@ end
 
 radec(frame::ReferenceFrame,source::PointSource) = dir2radec(frame,direction(source))
 azel(frame::ReferenceFrame,source::PointSource) = dir2azel(frame,direction(source))
-lm(frame::ReferenceFrame,source::PointSource) = dir2lm(frame,direction(source))
+lm(phase_dir::Direction,source::PointSource) = dir2lm(phase_dir,direction(source))
 
 function isabovehorizon(frame::ReferenceFrame,source::PointSource)
     az,el = azel(frame,source)

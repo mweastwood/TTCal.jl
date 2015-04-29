@@ -24,45 +24,45 @@ algorithm scales as O(Nbase×Nsource).
 function genvis(ms::Table,sources::Vector{PointSource})
     u,v,w = uvw(ms)
     ν = freq(ms)
-    frame = reference_frame(ms)
-    genvis(frame,sources,u,v,w,ν)
+    dir = phase_dir(ms)
+    genvis(dir,sources,u,v,w,ν)
 end
 
 ################################################################################
 # Internal Interface
 
-function genvis(frame::ReferenceFrame,
+function genvis(phase_dir::Direction,
                 sources::Vector{PointSource},
                 u::Vector{Float64},
                 v::Vector{Float64},
                 w::Vector{Float64},
                 ν::Vector{Float64})
     model = zeros(Complex64,4,length(ν),length(u))
-    genvis!(model,frame,sources,u,v,w,ν)
+    genvis!(model,phase_dir,sources,u,v,w,ν)
     model
 end
 
 function genvis!(model::Array{Complex64,3},
-                 frame::ReferenceFrame,
+                 phase_dir::Direction,
                  sources::Vector{PointSource},
                  u::Vector{Float64},
                  v::Vector{Float64},
                  w::Vector{Float64},
                  ν::Vector{Float64})
     for source in sources
-        genvis!(model,frame,source,u,v,w,ν)
+        genvis!(model,phase_dir,source,u,v,w,ν)
     end
     model
 end
 
 function genvis!(model::Array{Complex64,3},
-                 frame::ReferenceFrame,
+                 phase_dir::Direction,
                  source::PointSource,
                  u::Vector{Float64},
                  v::Vector{Float64},
                  w::Vector{Float64},
                  ν::Vector{Float64})
-    l,m = lm(frame,source)
+    l,m = lm(phase_dir,source)
     I = stokesI(source,ν)
     Q = stokesQ(source,ν)
     U = stokesU(source,ν)

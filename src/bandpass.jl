@@ -26,6 +26,7 @@ function bandpass(ms::Table,
                   model_already_present::Bool = false,
                   reference_antenna::Int = 1)
     frame = reference_frame(ms)
+    dir   = phase_dir(ms)
     u,v,w = uvw(ms)
     ν = freq(ms)
     ant1,ant2 = ants(ms)
@@ -39,7 +40,7 @@ function bandpass(ms::Table,
     gain_flags = zeros(Bool,Nant,2,Nfreq)
 
     data  = ms["DATA"]
-    model = model_already_present? ms["MODEL_DATA"] : genvis(frame,sources,u,v,w,ν)
+    model = model_already_present? ms["MODEL_DATA"] : genvis(dir,sources,u,v,w,ν)
     data_flags = ms["FLAG"]
     row_flags  = ms["FLAG_ROW"]
     for α = 1:length(row_flags)

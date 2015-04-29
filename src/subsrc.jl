@@ -18,11 +18,12 @@
 
 function subsrc!(ms::Table,sources::Vector{PointSource})
     frame = reference_frame(ms)
+    dir   = phase_dir(ms)
     u,v,w = uvw(ms)
     ν     = freq(ms)
     data  = Tables.checkColumnExists(ms,"CORRECTED_DATA")? ms["CORRECTED_DATA"] : ms["DATA"]
 
-    subtracted = subsrc(frame,data,u,v,w,ν,sources)
+    subtracted = subsrc(frame,dir,data,u,v,w,ν,sources)
     ms["CORRECTED_DATA"] = subtracted
     subtracted
 end
@@ -31,6 +32,7 @@ end
 # Internal Interface
 
 function subsrc(frame::ReferenceFrame,
+                phase_dir::Direction,
                 data::Array{Complex64,3},
                 u::Vector{Float64},
                 v::Vector{Float64},
@@ -41,7 +43,7 @@ function subsrc(frame::ReferenceFrame,
         isabovehorizon(frame,source)
     end
 
-    model = genvis(frame,sources,u,v,w,ν)
+    model = genvis(phase_dir,sources,u,v,w,ν)
     # Re-use the space allocated for the model visibilities
     # to store the model subtracted visibilities.
     for i = 1:length(model)
