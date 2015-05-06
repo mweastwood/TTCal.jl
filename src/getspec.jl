@@ -35,7 +35,8 @@ function getspec(ms::Table,
 
     data  = Tables.checkColumnExists(ms,"CORRECTED_DATA")? ms["CORRECTED_DATA"] : ms["DATA"]
     flags = ms["FLAG"]
-    l,m = dir2lm(frame,dir)
+    phase = phase_dir(ms)
+    l,m = dir2lm(phase,dir)
     u,v,w = uvw(ms)
     ant1,ant2 = ants(ms)
     getspec_internal(data,flags,l,m,u,v,w,ν,ant1,ant2)

@@ -24,19 +24,21 @@ can be wildly off.
 function fitvis(ms::Table,
                 sources::Vector{PointSource})
     frame = reference_frame(ms)
+    phase = phase_dir(ms)
     data  = Tables.checkColumnExists(ms,"CORRECTED_DATA")? ms["CORRECTED_DATA"] : ms["DATA"]
     flags = ms["FLAG"]
     u,v,w = uvw(ms)
     ν = freq(ms)
     ant1,ant2 = ants(ms)
 
-    fitvis(frame,data,flags,u,v,w,ν,ant1,ant2,sources)
+    fitvis(frame,phase,data,flags,u,v,w,ν,ant1,ant2,sources)
 end
 
 ################################################################################
 # Internal Interface
 
 function fitvis(frame::ReferenceFrame,
+                phase_dir::Direction,
                 data::Array{Complex64,3},
                 flags::Array{Bool,3},
                 u::Vector{Float64},
@@ -56,7 +58,7 @@ function fitvis(frame::ReferenceFrame,
     # flux doesn't impact the results. This can happen if the source is low in the beam
     # and is much fainter than it otherwise would be.)
     for (i,source) in enumerate(sources)
-        l,m = lm(frame,source)
+        l,m = lm(phase_dir,source)
         I,Q,U,V,reffreq,index = fitvis_spec(data,flags,l,m,u,v,w,ν,ant1,ant2)
         sources[i] = PointSource(source.name,source.dir,I,Q,U,V,reffreq,index)
     end
@@ -69,18 +71,18 @@ function fitvis(frame::ReferenceFrame,
     # 3. Fit for the position and flux of each source, subtracting each source from the
     #    data in turn.
     for (i,source) in enumerate(sources)
-        l,m = getlm(frame,source)
+        l,m = lm(phase_dir,source)
 
         # a) Solve for the source's position
         l,m = fitvis_lm(data,flags,l,m,u,v,w,ν,ant1,ant2)
-        dir = Direction("AZEL",lm2azel(l,m)...)
+        dir = lm2dir(phase_dir,l,m)
 
         # b) Solve for the source's spectrum
         I,Q,U,V,reffreq,index = fitvis_spec(data,flags,l,m,u,v,w,ν,ant1,ant2)
 
         # c) Subtract the source from the data
         sources[i] = PointSource(source.name,dir,I,Q,U,V,reffreq,index)
-        data = subsrc(frame,data,u,v,w,ν,[sources[i]])
+        data = subsrc(frame,phase_dir,data,u,v,w,ν,[sources[i]])
     end
     sources
 end
@@ -153,7 +155,7 @@ function fitvis_lm(data::Array{Complex64,3},
             # gradient.
             δ = slice(dF,:,β) * resolution
         end
-        weight = count[β]/(λ[β]/Meter)
+        weight = count[β]/λ[β]
         dl += δ[1] * weight
         dm += δ[2] * weight
         normalization += weight

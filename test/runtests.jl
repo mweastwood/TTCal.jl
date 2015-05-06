@@ -256,3 +256,18 @@ function test_sourceio()
 end
 test_sourceio()
 
+function test_lm()
+    l = 2rand()-1
+    m = 2rand()-1
+    while hypot(l,m) > 1
+        l = 2rand()-1
+        m = 2rand()-1
+    end
+    phase_dir = Direction(Measures.J2000,ra"19h59m28.35663s",dec"+40d44m02.0970s")
+    dir = TTCal.lm2dir(phase_dir,l,m)
+    l_,m_ = TTCal.dir2lm(phase_dir,dir)
+    @test_approx_eq l l_
+    @test_approx_eq m m_
+end
+test_lm()
+

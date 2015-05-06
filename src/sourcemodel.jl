@@ -112,26 +112,35 @@ function dir2lm{ref}(phase_dir::Direction{ref},dir::Direction{ref})
     l,m
 end
 
-function azel2lm(az,el)
-    l = cos(el).*sin(az)
-    m = cos(el).*cos(az)
-    l,m
-end
-
-function lm2azel(l,m)
-    az = atan2(l,m)
-    el = acos(hypot(l,m))
-    az,el
+function lm2dir{ref}(phase_dir::Direction{ref},l,m)
+    long = longitude(phase_dir)
+    lat  = latitude(phase_dir)
+    θ1 = π/2 - long
+    θ2 = π/2 - lat
+    sin_θ1 = sin(θ1); cos_θ1 = cos(θ1)
+    sin_θ2 = sin(θ2); cos_θ2 = cos(θ2)
+    n = sqrt(1-l^2-m^2)
+    # The rotation matrices in the previous function definition are easily
+    # inverted by taking the transpose.
+    # ⌈x⌉    ⌈+cos(θ1) +sin(θ1) 0⌉   ⌈1    0        0    ⌉   ⌈    -l    ⌉
+    # |y| =  |-sin(θ1) +cos(θ1) 0| * |0 +cos(θ2) +sin(θ2)| * |    -m    |
+    # ⌊z⌋    ⌊   0        0     1⌋   ⌊0 -sin(θ2) +cos(θ2)⌋   ⌊√(1-l²-m²)⌋
+    x = -cos_θ1*l - sin_θ1*cos_θ2*m + sin_θ1*sin_θ2*n
+    y = +sin_θ1*l - cos_θ1*cos_θ2*m + cos_θ1*sin_θ2*n
+    z = sqrt(1-x^2-y^2)
+    Measures.from_xyz_in_meters(ref,x,y,z)
 end
 
 radec(frame::ReferenceFrame,source::PointSource) = dir2radec(frame,direction(source))
 azel(frame::ReferenceFrame,source::PointSource) = dir2azel(frame,direction(source))
 lm(phase_dir::Direction,source::PointSource) = dir2lm(phase_dir,direction(source))
 
-function isabovehorizon(frame::ReferenceFrame,source::PointSource)
-    az,el = azel(frame,source)
+function isabovehorizon(frame::ReferenceFrame,direction::Direction)
+    az,el = dir2azel(frame,direction)
     el > 0
 end
+
+isabovehorizon(frame::ReferenceFrame,source::PointSource) = isabovehorizon(frame,direction(source))
 
 ################################################################################
 # I/O
