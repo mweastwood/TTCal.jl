@@ -20,8 +20,7 @@ function polcal(ms::Table,
                 sources::Vector{PointSource},
                 criteria::StoppingCriteria;
                 force_imaging_columns::Bool = false,
-                model_already_present::Bool = false,
-                reference_antenna::Int = 1)
+                model_already_present::Bool = false)
     frame = reference_frame(ms)
     dir   = phase_dir(ms)
     u,v,w = uvw(ms)
@@ -51,7 +50,7 @@ function polcal(ms::Table,
     end
 
     polcal!(gains,gain_flags,data,model,data_flags,
-            ant1,ant2,criteria,reference_antenna)
+            ant1,ant2,criteria)
     gains,gain_flags
 end
 
@@ -65,8 +64,7 @@ function polcal!(gains::Array{Complex128,4},
                  data_flags::Array{Bool,3},
                  ant1::Vector{Int32},
                  ant2::Vector{Int32},
-                 criteria::StoppingCriteria,
-                 reference_antenna::Int)
+                 criteria::StoppingCriteria)
     # Transpose the data and model arrays to create a better memory access pattern
     data  = permutedims(data, (1,3,2))
     model = permutedims(model,(1,3,2))
@@ -80,8 +78,7 @@ function polcal!(gains::Array{Complex128,4},
                            slice(model,:,:,β),
                            slice(data_flags,:,:,β),
                            ant1, ant2,
-                           criteria,
-                           reference_antenna)
+                           criteria)
     end
 end
 
@@ -89,8 +86,7 @@ function polcal_onechannel!(gains, gain_flags,
                             data, model, data_flags,
                             ant1::Vector{Int32},
                             ant2::Vector{Int32},
-                            criteria::StoppingCriteria,
-                            reference_antenna::Int)
+                            criteria::StoppingCriteria)
     Nant = size(gains,3)
     Nbase = size(data,2)
 
