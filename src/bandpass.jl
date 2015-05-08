@@ -188,10 +188,17 @@ Pack the data into a square Hermitian matrix.
 This method assumes that the data set has no baselines
 with missing data.
 """ ->
-function makesquare(input,ant1::Vector{Int32},ant2::Vector{Int32})
+function makesquare(input,ant1,ant2)
     N = length(input)
     M = round(Integer,div(sqrt(1+8N)-1,2))
     output = zeros(eltype(input),M,M)
+    makesquare!(output,input,ant1,ant2)
+    output
+end
+
+function makesquare!(output,input,ant1,ant2)
+    N = length(input)
+    M = round(Integer,div(sqrt(1+8N)-1,2))
     for α = 1:N
         if ant1[α] == ant2[α]
             output[ant1[α],ant1[α]] = input[α]
@@ -245,7 +252,7 @@ first antenna.
 """ ->
 function bandpass_inner!(output,input,V,M)
     N = length(input)
-    output[:] = complex(0.)
+    output[:] = 0
     normalization = zeros(Float32,N)
     @inbounds for j = 1:N, i = 1:N
         z = conj(input[j])*M[i,j]

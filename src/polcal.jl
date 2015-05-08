@@ -33,7 +33,7 @@ function polcal(ms::Table,
     Nfreq = length(ν)
     Nant  = numrows(Table(ms[kw"ANTENNA"]))
 
-    gains = ones(Complex64,2,2,Nant,Nfreq)
+    gains = ones(Complex128,2,2,Nant,Nfreq)
     gain_flags = zeros(Bool,Nant,Nfreq)
 
     data  = Tables.checkColumnExists(ms,"CORRECTED_DATA")? ms["CORRECTED_DATA"] : ms["DATA"]
@@ -58,7 +58,7 @@ end
 ################################################################################
 # Internal Interface
 
-function polcal!(gains::Array{Complex64,4},
+function polcal!(gains::Array{Complex128,4},
                  gain_flags::Array{Bool,2},
                  data::Array{Complex64,3},
                  model::Array{Complex64,3},
@@ -91,116 +91,114 @@ function polcal_onechannel!(gains, gain_flags,
                             ant2::Vector{Int32},
                             criteria::StoppingCriteria,
                             reference_antenna::Int)
-    # 1. If the entire channel is flagged, don't bother calibrating.
-    #    Just flag the solutions and move on.
+    Nant = size(gains,3)
+    Nbase = size(data,2)
+
+    # If the entire channel is flagged, don't bother calibrating.
+    # Just flag the solutions and move on.
     if all(data_flags)
         gain_flags[:] = true
         return
     end
 
-    # 2. Pack the visibilities into square, Hermitian matrices.
-    square_data  = makesquare_polarized(data, ant1,ant2)
-    square_model = makesquare_polarized(model,ant1,ant2)
-    square_flags = makesquare_polarized(data_flags,ant1,ant2)
-
-    # 3. Flag the auto-correlations.
-    for i = 1:size(square_flags,1)
-        square_flags[i,i] = true
+    for α = 1:Nbase
+        if any(data_flags[:,α])
+            data[:,α] = 0
+            model[:,α] = 0
+        end
     end
 
-    # 4. Start the gains off at something sensible.
-    square_data  = square_data  .* !square_flags
-    square_model = square_model .* !square_flags
     # This is an especially good approximation if we've
     # already applied a bandpass calibration.
-    Nant = size(gains,3)
     for i = 1:Nant
         gains[:,:,i] = [1 0;
                         0 1]
     end
 
-    # 5. Iteratively improve that estimate.
-
-    # Create rkstep! workspace variables.
-    # Because "gains" is not a vector, it isn't serviced by the
-    # current definition of RKWorkspace
-    #workspace = RKWorkspace(gains,4)
-    x′ = similar(gains)
-    k  = [similar(gains) for i = 1:4]
-    oldgains = similar(gains)
-
+    oldχ2 = typemax(Float64)
     iter = 0
     converged = false
     while !converged && iter < criteria.maxiter
-        oldgains[:] = gains
-        rkstep!(gains,x′,k,polcal_step!,RK4,square_data,square_model)
-        if vecnorm(gains-oldgains)/vecnorm(oldgains) < criteria.tolerance
+        χ2,gain_flags[:] = newtonstep!(gains,data,model,1/100)
+        if abs(χ2 - oldχ2)/abs(oldχ2) < criteria.tolerance
             converged = true
         end
+        oldχ2 = χ2
         iter += 1
     end
-    if !converged
-        gain_flags[:] = true
-        return
-    end
-
-    # 6. Fix the phase of the reference antenna.
-    # TODO
-
-    # 7. Flag the antennas with no unflagged data.
-    bad_pols = squeeze(all(square_flags,1),1)
-    bad_ants = zeros(Bool,Nant)
-    for ant = 1:Nant
-        if bad_pols[2ant-1] && bad_pols[2ant]
-            bad_ants[ant] = true
-        end
-    end
-    gain_flags[bad_ants] = true
 
     nothing
 end
 
-function makesquare_polarized(input,ant1::Vector{Int32},ant2::Vector{Int32})
-    N = size(input,2)
-    M = 2round(Integer,div(sqrt(1+8N)-1,2))
-    output = zeros(eltype(input),M,M)
-    for α = 1:N
-        if ant1[α] == ant2[α]
-            output[2ant1[α]-1,2ant1[α]-1] = input[1,α] # xx
-            output[2ant1[α]-0,2ant1[α]-1] = input[2,α] # xy
-            output[2ant1[α]-1,2ant1[α]-0] = input[3,α] # yx
-            output[2ant1[α]-0,2ant1[α]-0] = input[4,α] # yy
-        else
-            output[2ant2[α]-1,2ant1[α]-1] = input[1,α] # x₁x₂
-            output[2ant2[α]-0,2ant1[α]-1] = input[2,α] # x₁y₂
-            output[2ant2[α]-1,2ant1[α]-0] = input[3,α] # y₁x₂
-            output[2ant2[α]-0,2ant1[α]-0] = input[4,α] # y₁y₂
+function newtonstep!(gains,data,model,damping_factor)
+    Nant = size(gains,3)
+    Nbase = div(Nant*(Nant-1),2)
+    # Calculate χ² and its derivatives
+    χ   = 0.0
+    dχ  = zeros(8Nant)
+    d2χ = zeros(8Nant) # We will approximate d2χ (the Hessian) as diagonal
+    for ant1 = 1:Nant, ant2 = ant1+1:Nant
+        α = div((ant1-1)*(2Nant-ant1+2),2) + ant2 - ant1 + 1
+        V = [data[1,α] data[2,α];
+             data[3,α] data[4,α]]
+        M = [model[1,α] model[2,α];
+             model[3,α] model[4,α]]
+        G1 = slice(gains,:,:,ant1)
+        G2 = slice(gains,:,:,ant2)
 
-            output[2ant1[α]-1,2ant2[α]-1] = conj(input[1,α]) # x₂x₁
-            output[2ant1[α]-1,2ant2[α]-0] = conj(input[2,α]) # y₂x₁
-            output[2ant1[α]-0,2ant2[α]-1] = conj(input[3,α]) # x₂y₁
-            output[2ant1[α]-0,2ant2[α]-0] = conj(input[4,α]) # y₂y₁
+        # Compute the residual
+        res = reinterpret(Float64,vec(V - G1*M*G2'))
+
+        # Derivative of the model
+        D = zeros(Complex128,2,2)
+        dM1 = zeros(Float64,8,8)
+        dM2 = zeros(Float64,8,8)
+        @inbounds for p = 0:7
+            # (with respect to antenna 1 parameters)
+            D[:] = 0
+            D[div(p,2)+1] = ifelse(mod(p,2)==0,1.0+0.0im,0.0+1.0im)
+            X = D*M*G2'
+            dM1[1,p+1] = real(X[1,1])
+            dM1[2,p+1] = imag(X[1,1])
+            dM1[3,p+1] = real(X[2,1])
+            dM1[4,p+1] = imag(X[2,1])
+            dM1[5,p+1] = real(X[1,2])
+            dM1[6,p+1] = imag(X[1,2])
+            dM1[7,p+1] = real(X[2,2])
+            dM1[8,p+1] = imag(X[2,2])
+
+            # (with respect to antenna 2 parameters)
+            D[:] = 0
+            D[div(p,2)+1] = ifelse(mod(p,2)==0,1.0+0.0im,0.0+1.0im)
+            X = G1*M*D'
+            dM2[1,p+1] = real(X[1,1])
+            dM2[2,p+1] = imag(X[1,1])
+            dM2[3,p+1] = real(X[2,1])
+            dM2[4,p+1] = imag(X[2,1])
+            dM2[5,p+1] = real(X[1,2])
+            dM2[6,p+1] = imag(X[1,2])
+            dM2[7,p+1] = real(X[2,2])
+            dM2[8,p+1] = imag(X[2,2])
+        end
+
+        # Calculate the corresponding derivatives of χ²
+        χ += sum(abs2(res))
+        @inbounds for p1 = 0:7
+            for p2 = 0:7
+                dχ[8ant1-7+p1] -= res[p2+1].*dM1[p2+1,p1+1]
+                dχ[8ant2-7+p1] -= res[p2+1].*dM2[p2+1,p1+1]
+                # The following two lines give the only nonzero terms
+                # along the diagonal of the Hessian
+                d2χ[8ant1-7+p1] += dM1[p2+1,p1+1].*dM1[p2+1,p1+1]
+                d2χ[8ant2-7+p1] += dM2[p2+1,p1+1].*dM2[p2+1,p1+1]
+            end
         end
     end
-    output
+    step = -(diagm(d2χ)+χ*damping_factor*I)\dχ
+    flags = isnan(step)
+    step[flags] = 0
+    step_reinterpreted = reshape(reinterpret(Complex128,step),(2,2,Nant))
+    gains[:] = gains + step_reinterpreted
+    χ,flags[1:8:end]
 end
-
-function polcal_inner!(output,input,V,M)
-    N = size(input,3)
-    Z = similar(V)
-    @inbounds for j = 1:N, i = 1:N
-        # TODO: make this cleaner
-        # The matrix multiplication is manually inlined to prevent the construction of
-        # a temporary matrix. A cleaner way to express this would be nice.
-        #Z[2i-1:2i,2j-1:2j] = sub(input,:,:,i)' * sub(M,2i-1:2i,2j-1:2j)
-        Z[2i-1,2j-1] = conj(input[1,1,i]) * M[2i-1,2j-1] + conj(input[2,1,i]) * M[2i-0,2j-1]
-        Z[2i-0,2j-1] = conj(input[1,2,i]) * M[2i-1,2j-1] + conj(input[2,2,i]) * M[2i-0,2j-1]
-        Z[2i-1,2j-0] = conj(input[1,1,i]) * M[2i-1,2j-0] + conj(input[2,1,i]) * M[2i-0,2j-0]
-        Z[2i-0,2j-0] = conj(input[1,2,i]) * M[2i-1,2j-0] + conj(input[2,2,i]) * M[2i-0,2j-0]
-    end
-    @inbounds for j = 1:N
-        output[:,:,j] = sub(Z,:,2j-1:2j) \ sub(V,:,2j-1:2j) - sub(input,:,:,j)
-    end
-end
-const polcal_step! = RKInnerStep{:polcal_inner!}()
 
