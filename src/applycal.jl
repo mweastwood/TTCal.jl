@@ -95,3 +95,32 @@ function applycal!(data::Array{Complex64,3},
     end
 end
 
+function corrupt!(data::Array{Complex64,3},
+                  gains::Array{Complex64,3},
+                  ant1::Vector{Int32},
+                  ant2::Vector{Int32})
+    # gains are from bandpass(...)
+    Nbase = length(ant1)
+    Nfreq = size(gains,3)
+    for α = 1:Nbase, β = 1:Nfreq
+        data[1,β,α] = gains[ant1[α],1,β]*conj(gains[ant2[α],1,β])*data[1,β,α]
+        data[2,β,α] = gains[ant1[α],1,β]*conj(gains[ant2[α],2,β])*data[2,β,α]
+        data[3,β,α] = gains[ant1[α],2,β]*conj(gains[ant2[α],1,β])*data[3,β,α]
+        data[4,β,α] = gains[ant1[α],2,β]*conj(gains[ant2[α],2,β])*data[4,β,α]
+    end
+end
+
+#function corrupt!(data::Array{Complex64,3},
+#                  gains::Array{Complex128,4},
+#                  ant1::Vector{Int32},
+#                  ant2::Vector{Int32})
+#    # gains are from polcal(...)
+#    Nbase = length(ant1)
+#    Nfreq = size(gains,4)
+#    V  = Array{Complex128}(2,2)
+#    G1 = Array{Complex128}(2,2)
+#    G2 = Array{Complex128}(2,2)
+#    for α = 1:Nbase, β = 1:Nfreq
+#    end
+#end
+

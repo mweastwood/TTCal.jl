@@ -69,7 +69,7 @@ function bandpass!(gains::Array{Complex64,3},
                    ant1::Vector{Int32},
                    ant2::Vector{Int32},
                    criteria::StoppingCriteria,
-                   reference_antenna::Int)
+                   reference_antenna::Int=1)
     # Transpose the data and model arrays to create a better memory access pattern
     data  = permutedims(data, (3,1,2))
     model = permutedims(model,(3,1,2))

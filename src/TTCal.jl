@@ -46,6 +46,7 @@ include("subsrc.jl")
 include("io.jl")
 include("bandpass.jl")
 include("polcal.jl")
+include("peel.jl")
 include("applycal.jl")
 include("diagnose.jl")
 

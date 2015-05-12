@@ -52,3 +52,29 @@ function phase_dir(ms::Table)
     Direction(Measures.J2000,Quantity(dir[1],Radian),Quantity(dir[2],Radian))
 end
 
+@doc """
+Get the flags from the dataset, but this information is stored in multiple locations.
+Unify all these flags before returning.
+""" ->
+function flags(ms::Table)
+    data_flags = ms["FLAG"]
+    row_flags  = ms["FLAG_ROW"]
+    for α = 1:length(row_flags)
+        if row_flags[α]
+            data_flags[:,:,α] = true
+        end
+    end
+    data_flags
+end
+
+@doc """
+Get the CORRECTED_DATA column if it exists. Otherwise settle for the DATA column.
+""" ->
+function corrected_data(ms::Table)
+    if Tables.checkColumnExists(ms,"CORRECTED_DATA")
+        return ms["CORRECTED_DATA"]
+    else
+        return ms["DATA"]
+    end
+end
+

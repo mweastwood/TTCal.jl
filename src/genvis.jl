@@ -31,6 +31,8 @@ end
 ################################################################################
 # Internal Interface
 
+genvis(phase_dir::Direction,source::PointSource,u,v,w,ν) = genvis(phase_dir,[source],u,v,w,ν)
+
 function genvis(phase_dir::Direction,
                 sources::Vector{PointSource},
                 u::Vector{Float64},
