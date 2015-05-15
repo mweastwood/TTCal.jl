@@ -25,7 +25,7 @@ julia> Pkg.test("TTCal")
 ```
 If all the tests pass, you are ready to begin using TTCal.
 Simply add the `ttcal.jl` file to your `PATH` environment variable.
-You can see the list of available commands by simpling running:
+You can see the list of available commands by running:
 
 ```
 $ ttcal.jl 
@@ -46,6 +46,28 @@ Please provide one of the listed commands.
 ```
 
 ## Unpolarized Bandpass Calibration
+
+With this calibration, TTCal will solve for one complex gain per antenna polarization
+per frequency channel. TTCal assumes that the measurement set contains all baselines
+for a single integrations (multiple frequency channels are allowed though).
+For example, to calibrate a standard OVRO LWA dataset:
+```
+ttcal.jl bandpass --input data.ms --output calibration.ttb --sources sources.json
+ttcal.jl applycal --input data.ms --calibration calibration.ttb
+```
+For a list of all available options, run:
+```
+ttcal.jl bandpass
+```
+
+Sometimes a calibration can fail because bad antenna is poisoning the calibration.
+Casa, for example, attempts to flag misbehaving antennas during calibration.
+TTCal offers the `diagnose` function, which will attempt to divine which antennas
+might need to be flagged.
+```
+ttcal.jl diagnose --calibration calibration.ttb
+```
+
 ## Polarized Bandpass Calibration
 ## Direction-Dependent Calibration
 ## Self-Calibration
