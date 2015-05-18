@@ -50,20 +50,24 @@ Please provide one of the listed commands.
 With this calibration, TTCal will solve for one complex gain per antenna polarization
 per frequency channel. TTCal assumes that the measurement set contains all baselines
 for a single integrations (multiple frequency channels are allowed though).
+TTCal uses the iterative routine describe by Mitchell et al. 2008 to solve for the
+complex gains.
+
 For example, to calibrate a standard OVRO LWA dataset:
 ```
 ttcal.jl bandpass --input data.ms --output calibration.ttb --sources sources.json
 ttcal.jl applycal --input data.ms --calibration calibration.ttb
 ```
+See the "Sky Models" section for an example `sources.json` file.
 For a list of all available options, run:
 ```
 ttcal.jl bandpass
 ```
 
-Sometimes a calibration can fail because bad antenna is poisoning the calibration.
+Sometimes a calibration can fail because a bad antenna is poisoning the calibration.
 Casa, for example, attempts to flag misbehaving antennas during calibration.
 TTCal offers the `diagnose` function, which will attempt to divine which antennas
-might need to be flagged.
+might need to be flagged. This is very experimental.
 ```
 ttcal.jl diagnose --calibration calibration.ttb
 ```
