@@ -20,6 +20,7 @@ To install TTCal, run:
 $ julia
 julia> Pkg.clone("https://github.com/mweastwood/CLI.jl.git")
 julia> Pkg.clone("https://github.com/mweastwood/CasaCore.jl.git")
+julia> Pkg.clone("https://github.com/mweastwood/MeasurementSets.jl.git")
 julia> Pkg.clone("https://github.com/mweastwood/TTCal.jl.git")
 julia> Pkg.test("TTCal")
 ```
