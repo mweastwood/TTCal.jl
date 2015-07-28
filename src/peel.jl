@@ -16,8 +16,6 @@
 ################################################################################
 # Public Interface
 
-using PyPlot
-
 function peel(ms::Table,
               sources::Vector{PointSource},
               criteria::StoppingCriteria)
