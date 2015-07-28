@@ -25,7 +25,7 @@ function write_gains(filename,gains::Array{Complex64,3},gain_flags::Array{Bool,3
     end
 end
 
-function write_gains(filename,gains::Array{Complex64,4},gain_flags::Array{Bool,2})
+function write_gains(filename,gains::Array{Complex128,4},gain_flags::Array{Bool,2})
     # gains are from polcal(...)
     Npol1,Npol2,Nant,Nchan = size(gains)
     open(filename,"w") do f
@@ -48,7 +48,7 @@ function read_gains(filename)
             gains = permutedims(read(f,Complex64,(2,Nchan,Nant)),(3,1,2))
         elseif T == 'J'
             gain_flags = permutedims(read(f,Bool,(Nchan,Nant)),(2,1))
-            gains = permutedims(read(f,Complex64,(2,2,Nchan,Nant)),(1,2,4,3))
+            gains = permutedims(read(f,Complex128,(2,2,Nchan,Nant)),(1,2,4,3))
         else
             error("Unknown calibration type.")
         end
