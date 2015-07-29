@@ -25,6 +25,7 @@ export subsrc!
 
 export bandpass
 export polcal
+export peel!
 export applycal!
 
 using JSON
@@ -39,14 +40,15 @@ include("rungekutta.jl")
 include("sourcemodel.jl")
 include("fringepattern.jl")
 include("genvis.jl")
-#include("getspec.jl")
+include("getspec.jl")
 #include("fitvis.jl")
-#include("subsrc.jl")
+include("subsrc.jl")
 
+abstract Calibration
 #include("io.jl")
 include("bandpass.jl")
 #include("polcal.jl")
-#include("peel.jl")
+include("peel.jl")
 include("applycal.jl")
 #include("diagnose.jl")
 

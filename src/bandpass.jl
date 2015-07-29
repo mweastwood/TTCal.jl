@@ -16,7 +16,7 @@
 ################################################################################
 # Public Interface
 
-immutable GainCalibration
+immutable GainCalibration <: Calibration
     gains::Array{Complex64,3}
     flags::Array{Bool,3}
 end
@@ -34,7 +34,7 @@ Nfreq(g::GainCalibration) = size(g.gains,2)
 Calibrate the given measurement set!
 """ ->
 function bandpass(ms::Table,
-                  sources::Vector{PointSource},
+                  sources::Vector{PointSource};
                   maxiter::Int = 20,
                   tolerance::Float64 = 1e-5,
                   force_imaging_columns::Bool = false,

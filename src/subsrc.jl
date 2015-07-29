@@ -17,13 +17,50 @@
 # Public Interface
 
 function subsrc!(ms::Table,sources::Vector{PointSource})
-    frame = reference_frame(ms)
-    dir   = phase_dir(ms)
-    u,v,w = uvw(ms)
-    ν     = freq(ms)
-    data  = Tables.checkColumnExists(ms,"CORRECTED_DATA")? ms["CORRECTED_DATA"] : ms["DATA"]
+    phase_dir = MeasurementSets.phase_direction(ms)
+    u,v,w = MeasurementSets.uvw(ms)
+    ν = MeasurementSets.frequency(ms)
 
-    subtracted = subsrc(frame,dir,data,u,v,w,ν,sources)
+    frame = ReferenceFrame()
+    set!(frame,MeasurementSets.position(ms))
+    set!(frame,MeasurementSets.time(ms))
+    sources = filter(source -> isabovehorizon(frame,source),sources)
+
+    data  = MeasurementSets.corrected_data(ms)
+
+    subtracted = subsrc(frame,phase_dir,data,u,v,w,ν,sources)
+    ms["CORRECTED_DATA"] = subtracted
+    subtracted
+end
+
+@doc """
+Subtract all of the measured flux from a given direction.
+This should be used to remove RFI, preventing it from contaminating
+the other routines.
+""" ->
+function subsrc!(ms::Table,dir::Direction)
+    phase_dir = MeasurementSets.phase_direction(ms)
+    u,v,w = MeasurementSets.uvw(ms)
+    ν = MeasurementSets.frequency(ms)
+    ant1,ant2 = MeasurementSets.antennas(ms)
+
+    frame = ReferenceFrame()
+    set!(frame,MeasurementSets.position(ms))
+    set!(frame,MeasurementSets.time(ms))
+
+    data  = MeasurementSets.corrected_data(ms)
+    flags = MeasurementSets.flags(ms)
+
+    j2000 = measure(frame,dir,Measures.J2000)
+    l,m = dir2lm(phase_dir,dir)
+    I,Q,U,V = getspec_internal(data,flags,l,m,u,v,w,ν,ant1,ant2)
+
+    model = zeros(Complex64,4,length(ν),length(u))
+    genvis!(model,I,Q,U,V,l,m,u,v,w,ν)
+    subtracted = model # (just a rename, subtracted and model are the same array)
+    for i in eachindex(model)
+        subtracted[i] = data[i] - model[i]
+    end
     ms["CORRECTED_DATA"] = subtracted
     subtracted
 end
@@ -46,7 +83,7 @@ function subsrc(frame::ReferenceFrame,
     model = genvis(phase_dir,sources,u,v,w,ν)
     # Re-use the space allocated for the model visibilities
     # to store the model subtracted visibilities.
-    for i = 1:length(model)
+    for i in eachindex(model)
         model[i] = data[i]-model[i]
     end
     model
