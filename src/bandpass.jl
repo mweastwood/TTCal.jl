@@ -16,84 +16,86 @@
 ################################################################################
 # Public Interface
 
+immutable GainCalibration
+    gains::Array{Complex64,3}
+    flags::Array{Bool,3}
+end
+
+function GainCalibration(Nant,Nfreq)
+    gains = ones(Complex64,Nant,Nfreq,2)
+    flags = zeros(Bool,Nant,Nfreq,2)
+    GainCalibration(gains,flags)
+end
+
+Nant(g::GainCalibration) = size(g.gains,1)
+Nfreq(g::GainCalibration) = size(g.gains,2)
+
 @doc """
 Calibrate the given measurement set!
 """ ->
 function bandpass(ms::Table,
                   sources::Vector{PointSource},
-                  criteria::StoppingCriteria;
+                  maxiter::Int = 20,
+                  tolerance::Float64 = 1e-5,
                   force_imaging_columns::Bool = false,
-                  model_already_present::Bool = false,
                   reference_antenna::Int = 1)
-    frame = reference_frame(ms)
-    dir   = phase_dir(ms)
-    u,v,w = uvw(ms)
-    ν = freq(ms)
-    ant1,ant2 = ants(ms)
+    dir   = MeasurementSets.phase_direction(ms)
+    u,v,w = MeasurementSets.uvw(ms)
+    ν = MeasurementSets.frequency(ms)
+    ant1,ant2 = MeasurementSets.antennas(ms)
 
+    frame = ReferenceFrame()
+    set!(frame,MeasurementSets.position(ms))
+    set!(frame,MeasurementSets.time(ms))
     sources = filter(source -> isabovehorizon(frame,source),sources)
 
-    Nfreq = length(ν)
     Nant  = numrows(Table(ms[kw"ANTENNA"]))
-
-    gains = ones(Complex64,Nant,2,Nfreq)
-    gain_flags = zeros(Bool,Nant,2,Nfreq)
+    Nfreq = length(ν)
+    calibration = GainCalibration(Nant,Nfreq)::GainCalibration
 
     data  = ms["DATA"]
-    model = model_already_present? ms["MODEL_DATA"] : genvis(dir,sources,u,v,w,ν)
-    data_flags = ms["FLAG"]
-    row_flags  = ms["FLAG_ROW"]
-    for α = 1:length(row_flags)
-        if row_flags[α]
-            data_flags[:,:,α] = true
-        end
-    end
+    model = genvis(dir,sources,u,v,w,ν)
+    flags = MeasurementSets.flags(ms)
 
     if force_imaging_columns || Tables.checkColumnExists(ms,"MODEL_DATA")
         ms["MODEL_DATA"] = model
     end
 
-    bandpass!(gains,gain_flags,data,model,data_flags,
-              ant1,ant2,criteria,reference_antenna)
-    gains,gain_flags
+    bandpass_internal!(calibration,data,model,flags,
+                       ant1,ant2,maxiter,tolerance,
+                       reference_antenna)
+    calibration
 end
 
 ################################################################################
 # Internal Interface
 
-function bandpass!(gains::Array{Complex64,3},
-                   gain_flags::Array{Bool,3},
-                   data::Array{Complex64,3},
-                   model::Array{Complex64,3},
-                   data_flags::Array{Bool,3},
-                   ant1::Vector{Int32},
-                   ant2::Vector{Int32},
-                   criteria::StoppingCriteria,
-                   reference_antenna::Int=1)
-    # Transpose the data and model arrays to create a better memory access pattern
-    data  = permutedims(data, (3,1,2))
-    model = permutedims(model,(3,1,2))
-    data_flags = permutedims(data_flags,(3,1,2))
+function bandpass_internal!(calibration,data,model,flags,
+                            ant1,ant2,maxiter,tolerance,
+                            reference_antenna)
+    # Re-order the data to make iterating over it faster
+    data  = permutedims(data, (3,2,1))
+    flags = permutedims(flags,(3,2,1))
+    model = permutedims(model,(3,2,1))
 
-    Nfreq = size(gains,3)
-    for β = 1:Nfreq
+    for β = 1:Nfreq(calibration)
         # Calibrate the X polarization
-        bandpass_onechannel!(slice(gains,:,1,β),
-                             slice(gain_flags,:,1,β),
-                             slice( data,:,1,β),
-                             slice(model,:,1,β),
-                             slice(data_flags,:,1,β),
+        bandpass_onechannel!(slice(calibration.gains,:,β,1),
+                             slice(calibration.flags,:,β,1),
+                             slice(data, :,β,1),
+                             slice(model,:,β,1),
+                             slice(flags,:,β,1),
                              ant1, ant2,
-                             criteria,
+                             maxiter, tolerance,
                              reference_antenna)
         # Calibrate the Y polarization
-        bandpass_onechannel!(slice(gains,:,2,β),
-                             slice(gain_flags,:,2,β),
-                             slice( data,:,4,β),
-                             slice(model,:,4,β),
-                             slice(data_flags,:,4,β),
+        bandpass_onechannel!(slice(calibration.gains,:,β,2),
+                             slice(calibration.flags,:,β,2),
+                             slice(data, :,β,4),
+                             slice(model,:,β,4),
+                             slice(flags,:,β,4),
                              ant1, ant2,
-                             criteria,
+                             maxiter, tolerance,
                              reference_antenna)
     end
 end
@@ -107,15 +109,15 @@ Calibrate the complex gains from a single frequency channel using a two step pro
 3. Flag the auto-correlations.
 4. Get an initial estimate of the complex gains.
 5. Iteratively improve that estimate.
-6. Fix the phase of the reference antenna.
-7. Flag the antennas with no unflagged data.
+6. Flag the entire channel if the iteration didn't converge.
+7. Fix the phase of the reference antenna.
+8. Flag the antennas with no unflagged data.
 """ ->
 function bandpass_onechannel!(gains, gain_flags,
                               data, model, data_flags,
-                              ant1::Vector{Int32},
-                              ant2::Vector{Int32},
-                              criteria::StoppingCriteria,
-                              reference_antenna::Int)
+                              ant1, ant2,
+                              maxiter, tolerance,
+                              reference_antenna)
     # 1. If the entire channel is flagged, don't bother calibrating.
     #    Just flag the solutions and move on.
     if all(data_flags)
@@ -136,9 +138,9 @@ function bandpass_onechannel!(gains, gain_flags,
     # 4. Get an initial estimate of the complex gains.
     # (note that the model data is flagged after taking this
     # initial estimate to prevent a divide-by-zero error)
-    square_data  = square_data  .* !square_flags
+    square_data[square_flags] = 0
     gains[:] = firstguess(square_data,square_model)
-    square_model = square_model .* !square_flags
+    square_model[square_flags] = 0
 
     # Elaborating a little bit more on the application of flags:
     #
@@ -150,32 +152,23 @@ function bandpass_onechannel!(gains, gain_flags,
     # of square_data and square_model. Therefore we need
     # both matrices to have their flagged elements zeroed.
 
-    oldgains = similar(gains)
-    workspace = RKWorkspace(oldgains,4)
-
     # 5. Iteratively improve that estimate.
-    iter = 0
-    converged = false
-    while !converged && iter < criteria.maxiter
-        oldgains[:] = gains
-        rkstep!(gains,workspace,bandpass_step!,square_data,square_model)
-        if vecnorm(gains-oldgains)/vecnorm(oldgains) < criteria.tolerance
-            converged = true
-        end
-        iter += 1
-    end
+    converged = @iterate(BandpassStep(),RK4,maxiter,tolerance,
+                         gains,square_data,square_model)
 
-    # 6. Fix the phase of the reference antenna.
-    factor = conj(gains[reference_antenna])/abs(gains[reference_antenna])
-    for ant = 1:length(gains)
-        gains[ant] = gains[ant]*factor
-    end
+    # 6. Flag the entire channel if the iteration didn't converge.
     if !converged
         gain_flags[:] = true
         return
     end
 
-    # 7. Flag the antennas with no unflagged data.
+    # 7. Fix the phase of the reference antenna.
+    factor = conj(gains[reference_antenna])/abs(gains[reference_antenna])
+    for ant = 1:length(gains)
+        gains[ant] = gains[ant]*factor
+    end
+
+    # 8. Flag the antennas with no unflagged data.
     bad_ants = squeeze(all(square_flags,1),1)
     gains[bad_ants] = 1.0
     gain_flags[bad_ants] = true
@@ -250,28 +243,22 @@ solution of V = g[i]*M*g', where V and M are vectors containing
 the measured and model visibilities where antenna i is the
 first antenna.
 """ ->
-function bandpass_inner!(output,input,V,M)
-    N = length(input)
-    output[:] = 0
+function bandpass_step(g,V,M)
+    N = length(g)
+    output = zeros(Complex64,N)
     normalization = zeros(Float32,N)
     @inbounds for j = 1:N, i = 1:N
-        z = conj(input[j])*M[i,j]
+        z = conj(g[j])*M[i,j]
         output[i] += conj(z)*V[i,j]
         normalization[i] += abs2(z)
     end
     @inbounds for i = 1:N
         normalization[i] == 0. && continue
-        output[i] = output[i]/normalization[i] - input[i]
-    end
-    nothing
-end
-const bandpass_step! = RKInnerStep{:bandpass_inner!}()
-
-function χ2(data,model,flags,gains)
-    output = 0.0
-    for i = 1:length(gains), j = 1:i-1
-        output += (1-flags[i,j])*abs2(data[i,j] - gains[i]*conj(gains[j])*model[i,j])
+        output[i] = output[i]/normalization[i] - g[i]
     end
     output
 end
+
+immutable BandpassStep <: StepFunction end
+call(::BandpassStep,g,V,M) = bandpass_step(g,V,M)
 

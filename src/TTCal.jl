@@ -31,25 +31,26 @@ using JSON
 using CasaCore.Quanta
 using CasaCore.Measures
 using CasaCore.Tables
+using MeasurementSets
 
 const c = 2.99792e+8
-include("ms.jl")
 include("rungekutta.jl")
 
 include("sourcemodel.jl")
 include("fringepattern.jl")
 include("genvis.jl")
-include("getspec.jl")
-include("fitvis.jl")
-include("subsrc.jl")
+#include("getspec.jl")
+#include("fitvis.jl")
+#include("subsrc.jl")
 
-include("io.jl")
+#include("io.jl")
 include("bandpass.jl")
-include("polcal.jl")
-include("peel.jl")
+#include("polcal.jl")
+#include("peel.jl")
 include("applycal.jl")
-include("diagnose.jl")
+#include("diagnose.jl")
 
+#=
 function run_bandpass(args)
     ms = Table(ascii(args["--input"]))
     sources = haskey(args,"--sources")? readsources(args["--sources"]) : Source[]
@@ -96,6 +97,7 @@ end
 function run_diagnose(args)
     diagnose(args["--calibration"])
 end
+=#
 
 end
 

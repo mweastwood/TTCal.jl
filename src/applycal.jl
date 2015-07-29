@@ -14,54 +14,42 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 function applycal!(ms::Table,
-                   gains;
+                   calibration;
                    apply_to_corrected::Bool = false,
                    force_imaging_columns::Bool = false)
-    gain_flags = zeros(Bool,size(gains))
-    applycal!(gains,gain_flags,
-              apply_to_corrected=apply_to_corrected,
-              force_imaging_columns=force_imaging_columns)
-end
-                   
-
-function applycal!(ms::Table,
-                   gains, gain_flags;
-                   apply_to_corrected::Bool = false,
-                   force_imaging_columns::Bool = false)
-    ant1,ant2 = ants(ms)
-    data = apply_to_corrected? ms["CORRECTED_DATA"] : ms["DATA"]
-    data_flags = ms["FLAG"]
-    applycal!(data,data_flags,gains,gain_flags,ant1,ant2)
+    data  = apply_to_corrected? ms["CORRECTED_DATA"] : ms["DATA"]
+    flags = MeasurementSets.flags(ms)
+    ant1,ant2 = MeasurementSets.antennas(ms)
+    applycal!(data,flags,calibration,ant1,ant2)
     if force_imaging_columns || Tables.checkColumnExists(ms,"CORRECTED_DATA")
         ms["CORRECTED_DATA"] = data
     else
         ms["DATA"] = data
     end
-    ms["FLAG"] = data_flags
+    ms["FLAG"] = flags
     data
 end
 
 function applycal!(data::Array{Complex64,3},
-                   data_flags::Array{Bool,3},
-                   gains::Array{Complex64,3},
-                   gain_flags::Array{Bool,3},
-                   ant1::Vector{Int32},
-                   ant2::Vector{Int32})
-    # gains are from bandpass(...)
+                   flags::Array{Bool,3},
+                   cal::GainCalibration,
+                   ant1,ant2)
     Nbase = length(ant1)
-    Nfreq = size(gains,3)
-    for α = 1:Nbase, β = 1:Nfreq
-        if gain_flags[ant1[α],1,β] || gain_flags[ant1[α],2,β] || gain_flags[ant2[α],1,β] || gain_flags[ant2[α],2,β]
-            data_flags[:,β,α] = true
+    for α = 1:Nbase, β = 1:Nfreq(cal)
+        if (cal.flags[ant1[α],β,1] || cal.flags[ant1[α],β,2]
+                                   || cal.flags[ant2[α],β,1]
+                                   || cal.flags[ant2[α],β,2])
+            flags[:,β,α] = true
         else
-            data[1,β,α] = (gains[ant1[α],1,β]*conj(gains[ant2[α],1,β]))\data[1,β,α]
-            data[2,β,α] = (gains[ant1[α],1,β]*conj(gains[ant2[α],2,β]))\data[2,β,α] # this one could be
-            data[3,β,α] = (gains[ant1[α],2,β]*conj(gains[ant2[α],1,β]))\data[3,β,α] # swapped with this one
-            data[4,β,α] = (gains[ant1[α],2,β]*conj(gains[ant2[α],2,β]))\data[4,β,α]
+            data[1,β,α] = (cal.gains[ant1[α],β,1]*conj(cal.gains[ant2[α],β,1]))\data[1,β,α]
+            data[2,β,α] = (cal.gains[ant1[α],β,1]*conj(cal.gains[ant2[α],β,2]))\data[2,β,α]
+            data[3,β,α] = (cal.gains[ant1[α],β,2]*conj(cal.gains[ant2[α],β,1]))\data[3,β,α]
+            data[4,β,α] = (cal.gains[ant1[α],β,2]*conj(cal.gains[ant2[α],β,2]))\data[4,β,α]
         end
     end
 end
 
+#=
 # TODO: fix this to use gain flags correctly
 function applycal!(data::Array{Complex64,3},
                    data_flags::Array{Bool,3},
@@ -94,33 +82,5 @@ function applycal!(data::Array{Complex64,3},
         end
     end
 end
-
-function corrupt!(data::Array{Complex64,3},
-                  gains::Array{Complex64,3},
-                  ant1::Vector{Int32},
-                  ant2::Vector{Int32})
-    # gains are from bandpass(...)
-    Nbase = length(ant1)
-    Nfreq = size(gains,3)
-    for α = 1:Nbase, β = 1:Nfreq
-        data[1,β,α] = gains[ant1[α],1,β]*conj(gains[ant2[α],1,β])*data[1,β,α]
-        data[2,β,α] = gains[ant1[α],1,β]*conj(gains[ant2[α],2,β])*data[2,β,α]
-        data[3,β,α] = gains[ant1[α],2,β]*conj(gains[ant2[α],1,β])*data[3,β,α]
-        data[4,β,α] = gains[ant1[α],2,β]*conj(gains[ant2[α],2,β])*data[4,β,α]
-    end
-end
-
-#function corrupt!(data::Array{Complex64,3},
-#                  gains::Array{Complex128,4},
-#                  ant1::Vector{Int32},
-#                  ant2::Vector{Int32})
-#    # gains are from polcal(...)
-#    Nbase = length(ant1)
-#    Nfreq = size(gains,4)
-#    V  = Array{Complex128}(2,2)
-#    G1 = Array{Complex128}(2,2)
-#    G2 = Array{Complex128}(2,2)
-#    for α = 1:Nbase, β = 1:Nfreq
-#    end
-#end
+=#
 
