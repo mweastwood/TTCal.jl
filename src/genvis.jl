@@ -22,11 +22,13 @@ No gridding is performed, so the runtime of this naive
 algorithm scales as O(Nbase×Nsource).
 """ ->
 function genvis(ms::Table,sources::Vector{PointSource})
-    u,v,w = uvw(ms)
-    ν = freq(ms)
-    dir = phase_dir(ms)
+    u,v,w = MeasurementSets.uvw(ms)
+    ν = MeasurementSets.frequency(ms)
+    dir = MeasurementSets.phase_direction(ms)
     genvis(dir,sources,u,v,w,ν)
 end
+
+genvis(ms::Table,source::PointSource) = genvis(ms,[source])
 
 ################################################################################
 # Internal Interface
