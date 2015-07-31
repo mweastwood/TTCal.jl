@@ -52,7 +52,7 @@ function subsrc!(ms::Table,dir::Direction)
     flags = MeasurementSets.flags(ms)
 
     j2000 = measure(frame,dir,Measures.J2000)
-    l,m = dir2lm(phase_dir,dir)
+    l,m = dir2lm(frame,phase_dir,dir)
     I,Q,U,V = getspec_internal(data,flags,l,m,u,v,w,ν,ant1,ant2)
 
     model = zeros(Complex64,4,length(ν),length(u))
@@ -80,7 +80,7 @@ function subsrc(frame::ReferenceFrame,
         isabovehorizon(frame,source)
     end
 
-    model = genvis(phase_dir,sources,u,v,w,ν)
+    model = genvis(frame,phase_dir,sources,u,v,w,ν)
     # Re-use the space allocated for the model visibilities
     # to store the model subtracted visibilities.
     for i in eachindex(model)

@@ -41,7 +41,7 @@ include("sourcemodel.jl")
 include("fringepattern.jl")
 include("genvis.jl")
 include("getspec.jl")
-#include("fitvis.jl")
+include("fitvis.jl")
 include("subsrc.jl")
 
 abstract Calibration

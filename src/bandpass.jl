@@ -39,7 +39,7 @@ function bandpass(ms::Table,
                   tolerance::Float64 = 1e-5,
                   force_imaging_columns::Bool = false,
                   reference_antenna::Int = 1)
-    dir   = MeasurementSets.phase_direction(ms)
+    phase_dir = MeasurementSets.phase_direction(ms)
     u,v,w = MeasurementSets.uvw(ms)
     ν = MeasurementSets.frequency(ms)
     ant1,ant2 = MeasurementSets.antennas(ms)
@@ -54,7 +54,7 @@ function bandpass(ms::Table,
     calibration = GainCalibration(Nant,Nfreq)::GainCalibration
 
     data  = ms["DATA"]
-    model = genvis(dir,sources,u,v,w,ν)
+    model = genvis(frame,phase_dir,sources,u,v,w,ν)
     flags = MeasurementSets.flags(ms)
 
     if force_imaging_columns || Tables.checkColumnExists(ms,"MODEL_DATA")

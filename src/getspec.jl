@@ -29,11 +29,11 @@ function getspec(ms::Table,
     u,v,w = MeasurementSets.uvw(ms)
     ν = MeasurementSets.frequency(ms)
     ant1,ant2 = MeasurementSets.antennas(ms)
+    l,m = dir2lm(phase_dir,dir)
 
     frame = ReferenceFrame()
     set!(frame,MeasurementSets.position(ms))
     set!(frame,MeasurementSets.time(ms))
-    sources = filter(source -> isabovehorizon(frame,source),sources)
 
     # Return a sensible default value if the source is below the horizon
     if !isabovehorizon(frame,dir)
@@ -43,7 +43,7 @@ function getspec(ms::Table,
     data  = MeasurementSets.corrected_data(ms)
     flags = MeasurementSets.flags(ms)
 
-    getspec_internal(data,data_flags,l,m,u,v,w,ν,ant1,ant2)
+    getspec_internal(data,flags,l,m,u,v,w,ν,ant1,ant2)
 end
 
 getspec(ms::Table,source::PointSource) = getspec(ms,direction(source))

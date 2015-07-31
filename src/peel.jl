@@ -21,7 +21,7 @@ function peel!(ms::Table,
                maxiter::Int = 10,
                tolerance::Float64 = 1e-3,
                minuvw::Float64 = 0.0)
-    dir   = MeasurementSets.phase_direction(ms)
+    phase_dir = MeasurementSets.phase_direction(ms)
     u,v,w = MeasurementSets.uvw(ms)
     ν = MeasurementSets.frequency(ms)
     ant1,ant2 = MeasurementSets.antennas(ms)
@@ -38,7 +38,7 @@ function peel!(ms::Table,
     flags = MeasurementSets.flags(ms)
 
     calibrations = [GainCalibration(Nant,Nfreq) for source in sources]
-    coherencies  = [genvis(dir,source,u,v,w,ν)  for source in sources]
+    coherencies  = [genvis(frame,phase_dir,[source],u,v,w,ν) for source in sources]
 
     peel_internal!(calibrations,coherencies,data,flags,
                    u,v,w,ν,ant1,ant2,maxiter,tolerance,minuvw)
