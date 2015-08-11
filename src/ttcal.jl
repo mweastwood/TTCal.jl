@@ -54,7 +54,7 @@ CLI.options["bandpass"] = [
         min=1,
         max=1),
     Option("--maxiter","""
-        Set the maximum number of Stefcal iterations to take on each
+        Set the maximum number of (Stef|Mitch)Cal iterations to take on each
         frequency channel.""",
         T=Int,
         min=1,

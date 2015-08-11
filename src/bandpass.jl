@@ -30,6 +30,32 @@ end
 Nant(g::GainCalibration) = size(g.gains,1)
 Nfreq(g::GainCalibration) = size(g.gains,2)
 
+function invert!(g::GainCalibration)
+    for i in eachindex(g.gains)
+        g.gains[i] = inv(g.gains[i])
+    end
+end
+
+function invert(g::GainCalibration)
+    out = deepcopy(g)
+    invert!(out)
+    out
+end
+
+"""
+Set the phase of the reference antenna to zero.
+"""
+function fixphase!(g::GainCalibration,
+                   reference_antenna)
+    for pol = 1:2, β = 1:Nfreq(g)
+        factor = (conj(g.gains[reference_antenna,β,pol])
+                    / abs(g.gains[reference_antenna,β,pol]))
+        for ant = 1:Nant(g)
+            g.gains[ant,β,pol] = g.gains[ant,β,pol]*factor
+        end
+    end
+end
+
 @doc """
 Calibrate the given measurement set!
 """ ->
@@ -51,7 +77,7 @@ function bandpass(ms::Table,
 
     Nant  = numrows(Table(ms[kw"ANTENNA"]))
     Nfreq = length(ν)
-    calibration = GainCalibration(Nant,Nfreq)::GainCalibration
+    calibration = GainCalibration(Nant,Nfreq)
 
     data  = ms["DATA"]
     model = genvis(frame,phase_dir,sources,u,v,w,ν)
@@ -86,8 +112,7 @@ function bandpass_internal!(calibration,data,model,flags,
                              slice(model,:,β,1),
                              slice(flags,:,β,1),
                              ant1, ant2,
-                             maxiter, tolerance,
-                             reference_antenna)
+                             maxiter, tolerance)
         # Calibrate the Y polarization
         bandpass_onechannel!(slice(calibration.gains,:,β,2),
                              slice(calibration.flags,:,β,2),
@@ -95,9 +120,10 @@ function bandpass_internal!(calibration,data,model,flags,
                              slice(model,:,β,4),
                              slice(flags,:,β,4),
                              ant1, ant2,
-                             maxiter, tolerance,
-                             reference_antenna)
+                             maxiter, tolerance)
     end
+
+    fixphase!(calibration,reference_antenna)
 end
 
 @doc """
@@ -110,14 +136,12 @@ Calibrate the complex gains from a single frequency channel using a two step pro
 4. Get an initial estimate of the complex gains.
 5. Iteratively improve that estimate.
 6. Flag the entire channel if the iteration didn't converge.
-7. Fix the phase of the reference antenna.
 8. Flag the antennas with no unflagged data.
 """ ->
 function bandpass_onechannel!(gains, gain_flags,
                               data, model, data_flags,
                               ant1, ant2,
-                              maxiter, tolerance,
-                              reference_antenna)
+                              maxiter, tolerance)
     # 1. If the entire channel is flagged, don't bother calibrating.
     #    Just flag the solutions and move on.
     if all(data_flags)
@@ -160,12 +184,6 @@ function bandpass_onechannel!(gains, gain_flags,
     if !converged
         gain_flags[:] = true
         return
-    end
-
-    # 7. Fix the phase of the reference antenna.
-    factor = conj(gains[reference_antenna])/abs(gains[reference_antenna])
-    for ant = 1:length(gains)
-        gains[ant] = gains[ant]*factor
     end
 
     # 8. Flag the antennas with no unflagged data.
