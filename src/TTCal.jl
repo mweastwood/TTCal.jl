@@ -57,7 +57,7 @@ include("io.jl")
 
 function run_bandpass(args)
     ms = Table(ascii(args["--input"]))
-    sources = haskey(args,"--sources")? readsources(args["--sources"]) : Source[]
+    sources = readsources(args["--sources"])
     maxiter = haskey(args,"--maxiter")? args["--maxiter"] : 20
     tolerance = haskey(args,"--tolerance")? args["--tolerance"] : 1e-4
     force_imaging_columns = haskey(args,"--force-imaging")
@@ -83,6 +83,13 @@ end
 #    write_gains(args["--output"],gains,gain_flags)
 #    gains, gain_flags
 #end
+
+function run_peel(args)
+    ms = Table(ascii(args["--input"]))
+    sources = readsources(args["--sources"])
+    minuvw = haskey(args,"--minuvw")? args["--minuvw"] : 15.0
+    peel!(ms,sources,minuvw=minuvw)
+end
 
 function run_applycal(args)
     cal = read(args["--calibration"])
