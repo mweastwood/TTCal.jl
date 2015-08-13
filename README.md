@@ -4,7 +4,7 @@
 [![Build Status](https://travis-ci.org/mweastwood/TTCal.jl.svg?branch=master)](https://travis-ci.org/mweastwood/TTCal.jl)
 [![Coverage Status](https://coveralls.io/repos/mweastwood/TTCal.jl/badge.svg?branch=master)](https://coveralls.io/r/mweastwood/TTCal.jl?branch=master)
 
-TTCal is a bandpass calibration routine developed for the OVRO LWA.
+TTCal is a calibration routine developed for the OVRO LWA.
 
 ## Getting Started
 
@@ -27,7 +27,6 @@ julia> Pkg.test("TTCal")
 If all the tests pass, you are ready to begin using TTCal.
 Simply add the `ttcal.jl` file to your `PATH` environment variable.
 You can see the list of available commands by running:
-
 ```
 $ ttcal.jl 
  TTCal
@@ -38,42 +37,50 @@ Written by Michael Eastwood (mweastwood@astro.caltech.edu).
 usage: ttcal.jl command options...
 
 commands:
-  bandpass        Solve for a bandpass calibration.
+  gaincal         Solve for a gain calibration.
   polcal          Solve for a polarization calibration.
+  peel            Peel sources from the dataset.
   applycal        Apply a calibration.
-  diagnose        Diagnose a poor calibration.
 
 Please provide one of the listed commands.
 ```
 
-## Unpolarized Bandpass Calibration
+## Gain Calibration
 
 With this calibration, TTCal will solve for one complex gain per antenna polarization
 per frequency channel. TTCal assumes that the measurement set contains all baselines
-for a single integrations (multiple frequency channels are allowed though).
-TTCal uses the iterative routine describe by Mitchell et al. 2008 to solve for the
-complex gains.
+for a single integration (multiple frequency channels are allowed though).
+TTCal uses the iterative routine described by Mitchell et al. 2008 and
+Salvini & Wijnholds 2014 to solve for the complex gains.
 
 For example, to calibrate a standard OVRO LWA dataset:
 ```
-ttcal.jl bandpass --input data.ms --output calibration.ttb --sources sources.json
+ttcal.jl gaincal --input data.ms --output calibration.tt --sources sources.json
 ttcal.jl applycal --input data.ms --calibration calibration.ttb
 ```
 See the "Sky Models" section for an example `sources.json` file.
 For a list of all available options, run:
 ```
-ttcal.jl bandpass
+ttcal.jl gaincal
 ```
 
-Sometimes a calibration can fail because a bad antenna is poisoning the calibration.
-Casa, for example, attempts to flag misbehaving antennas during calibration.
-TTCal offers the `diagnose` function, which will attempt to divine which antennas
-might need to be flagged. This is very experimental.
+TTCal will flag frequency channels that do converge within the specified maximum
+number of iterations. However, TTCal will not attempt to identify bad antennas
+that may be poisoning the calibration. These antennas must be flagged ahead of
+time.
+
+## Polarization Calibration
+
+For a polarization calibration, TTCal solves for one Jones matrix per antenna per
+frequency channel. This is accomplished by using the fully polarized version of
+the iterative routine described by Mitchell et al. 2008 and Salvini & Wijnholds 2014.
+
+A standard OVRO LWA dataset can be calibrated with:
 ```
-ttcal.jl diagnose --calibration calibration.ttb
+ttcal.jl polcal --input data.ms --output calibration.tt --sources sources.json
+ttcal.jl applycal --input data.ms --calibration calibration.tt
 ```
 
-## Polarized Bandpass Calibration
 ## Direction-Dependent Calibration
 ## Self-Calibration
 
