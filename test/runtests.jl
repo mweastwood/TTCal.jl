@@ -107,8 +107,8 @@ const sources = filter(source -> TTCal.isabovehorizon(frame,source),readsources(
 function test_gaincal(cal,data,model)
     mycal = TTCal.GainCalibration(Nant,Nfreq)
     flags = zeros(Bool,size(data))
-    TTCal.gaincal_internal!(mycal,data,model,flags,
-                            ant1,ant2,maxiter,tolerance,1)
+    TTCal.gaincal!(mycal,data,model,flags,
+                   ant1,ant2,maxiter,tolerance,1)
     @test vecnorm(mycal.gains-cal.gains)/vecnorm(cal.gains) < 1e-4
 
     name,ms = createms()
