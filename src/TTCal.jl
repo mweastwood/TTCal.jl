@@ -53,7 +53,6 @@ include("peel.jl")
 include("io.jl")
 
 #include("polcal.jl")
-#include("diagnose.jl")
 
 function run_bandpass(args)
     ms = Table(ascii(args["--input"]))
@@ -103,10 +102,6 @@ function run_applycal(args)
     end
     nothing
 end
-
-#function run_diagnose(args)
-#    diagnose(args["--calibration"])
-#end
 
 end
 

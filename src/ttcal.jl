@@ -31,7 +31,6 @@ push!(CLI.commands,Command("bandpass","Solve for a bandpass calibration."))
 #push!(CLI.commands,Command("polcal","Solve for a polarization calibration."))
 push!(CLI.commands,Command("peel","Peel sources from the dataset."))
 push!(CLI.commands,Command("applycal","Apply a calibration."))
-#push!(CLI.commands,Command("diagnose","Diagnose a poor calibration."))
 
 CLI.options["bandpass"] = [
     Option("--input","""
@@ -109,13 +108,6 @@ CLI.options["applycal"] = [
     Option("--corrected","""
         Apply the calibration to the CORRECTED_DATA column instead
         of the DATA column.""")]
-#CLI.options["diagnose"] = [
-#    Option("--calibration","""
-#        The file containing the calibration solution.""",
-#        T=UTF8String,
-#        required=true,
-#        min=1,
-#        max=1)]
 
 import TTCal
 
@@ -130,8 +122,6 @@ try
 #        TTCal.run_polcal(args)
     elseif command == "applycal"
         TTCal.run_applycal(args)
-#    elseif command == "diagnose"
-#        TTCal.run_diagnose(args)
     end
 catch err
     if isa(err, ErrorException)
