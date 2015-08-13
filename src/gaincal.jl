@@ -97,29 +97,29 @@ function gaincal!(calibration,data,model,flags,
                   reference_antenna)
     for β = 1:Nfreq(calibration)
         # Calibrate the X polarization
-        bandpass_onechannel!(slice(calibration.gains,:,β,1),
-                             slice(calibration.flags,:,β,1),
-                             slice(data, 1,β,:),
-                             slice(model,1,β,:),
-                             slice(flags,1,β,:),
-                             ant1, ant2,
-                             maxiter, tolerance)
+        gaincal_onechannel!(slice(calibration.gains,:,β,1),
+                            slice(calibration.flags,:,β,1),
+                            slice(data, 1,β,:),
+                            slice(model,1,β,:),
+                            slice(flags,1,β,:),
+                            ant1, ant2,
+                            maxiter, tolerance)
         # Calibrate the Y polarization
-        bandpass_onechannel!(slice(calibration.gains,:,β,2),
-                             slice(calibration.flags,:,β,2),
-                             slice(data, 4,β,:),
-                             slice(model,4,β,:),
-                             slice(flags,4,β,:),
-                             ant1, ant2,
-                             maxiter, tolerance)
+        gaincal_onechannel!(slice(calibration.gains,:,β,2),
+                            slice(calibration.flags,:,β,2),
+                            slice(data, 4,β,:),
+                            slice(model,4,β,:),
+                            slice(flags,4,β,:),
+                            ant1, ant2,
+                            maxiter, tolerance)
     end
     fixphase!(calibration,reference_antenna)
 end
 
-function bandpass_onechannel!(gains, gain_flags,
-                              data, model, data_flags,
-                              ant1, ant2,
-                              maxiter, tolerance)
+function gaincal_onechannel!(gains, gain_flags,
+                             data, model, data_flags,
+                             ant1, ant2,
+                             maxiter, tolerance)
     # If the entire channel is flagged, don't bother calibrating.
     if all(data_flags)
         gains[:] = 1
@@ -129,8 +129,8 @@ function bandpass_onechannel!(gains, gain_flags,
 
     square_data  = gaincal_makesquare( data,data_flags,ant1,ant2)
     square_model = gaincal_makesquare(model,data_flags,ant1,ant2)
-    best_gains   = ones(Complex64,length(gains))
-    converged = @iterate(BandpassStep(),RK4,maxiter,tolerance,
+    best_gains   = gaincal_firstguess(square_data,square_model)
+    converged = @iterate(GainCalStep(),RK4,maxiter,tolerance,
                          best_gains,square_data,square_model)
 
     # Flag the entire channel if the solution did not converge.
@@ -147,7 +147,7 @@ function bandpass_onechannel!(gains, gain_flags,
 end
 
 function gaincal_makesquare(data,flags,ant1,ant2)
-    Nbase = size(data,2)
+    Nbase = length(data)
     Nant  = round(Integer,div(sqrt(1+8Nbase)-1,2))
     output = zeros(Complex64,Nant,Nant)
     for α = 1:Nbase
@@ -157,6 +157,32 @@ function gaincal_makesquare(data,flags,ant1,ant2)
         output[ant2[α],ant1[α]] = conj(data[α])
     end
     output
+end
+
+"""
+Take a rough first guess at the visibilities.
+
+This function works by looking for the principle eigenvector
+of the matrix Gij = (Vij/Mij) where V is the matrix of measured
+visibilities, and M is the matrix of model visibilities. In the
+absence of noise, and if the model is complete, then G = gg',
+where g is the vector of complex gains.
+
+The main confounding factor for this method is the presence of
+a nonzero noise term on the diagonal (from the autocorrelations).
+Most calibration routines neglect the autocorrelations for this
+reason, but there is no obvious way to exclude them in this case.
+Hence we use this as a first guess to an iterative method that
+refines the calibration.
+"""
+function gaincal_firstguess(data,model)
+    G = similar(data)
+    for i in eachindex(G)
+        G[i] = model[i] == 0? 0 : data[i]/model[i]
+    end
+    λ,v = eigs(G,nev=1,which=:LM)
+    w = sqrt(λ[1])
+    squeeze(v,2)*w
 end
 
 """
@@ -176,7 +202,7 @@ solution of V = g[i]*M*g', where V and M are vectors containing
 the measured and model visibilities where antenna i is the
 first antenna.
 """
-function bandpass_step(input,data,model)
+function gaincal_step(input,data,model)
     Nant = length(input)
     step = zeros(Complex64,Nant)
     @inbounds for j = 1:Nant
@@ -193,8 +219,8 @@ function bandpass_step(input,data,model)
     step
 end
 
-immutable BandpassStep <: StepFunction end
-call(::BandpassStep,g,V,M) = bandpass_step(g,V,M)
+immutable GainCalStep <: StepFunction end
+call(::GainCalStep,g,V,M) = gaincal_step(g,V,M)
 
 function corrupt!(data::Array{Complex64,3},
                   flags::Array{Bool,3},

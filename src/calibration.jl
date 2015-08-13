@@ -40,7 +40,7 @@ function applycal!(data::Array{Complex64,3},
                    cal::Calibration,
                    ant1,ant2)
     inverse_cal = invert(cal)
-    corrupt!(data,flags,cal,ant1,ant2)
+    corrupt!(data,flags,inverse_cal,ant1,ant2)
     data
 end
 

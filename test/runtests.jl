@@ -67,18 +67,18 @@ function createms()
     subtable = Table("$name/SPECTRAL_WINDOW")
     Tables.addRows!(subtable,1)
     subtable["CHAN_FREQ"] = reshape(ν,length(ν),1)
-    finalize(subtable)
+    unlock(subtable)
 
     subtable = Table("$name/ANTENNA")
     Tables.addRows!(subtable,Nant)
     x,y,z = Measures.xyz_in_meters(pos)
     subtable["POSITION"] = [x;y;z]*ones(1,Nant)
-    finalize(subtable)
+    unlock(subtable)
 
     subtable = Table("$name/FIELD")
     Tables.addRows!(subtable,1)
     subtable["PHASE_DIR"] = reshape([longitude(phase_dir);latitude(phase_dir)],2,1)
-    finalize(subtable)
+    unlock(subtable)
 
     Tables.addRows!(table,Nbase)
     table[kw"SPECTRAL_WINDOW"] = "Table: $name/SPECTRAL_WINDOW"
@@ -92,15 +92,15 @@ function createms()
     name,table
 end
 
+const maxiter = 100
+const tolerance = 1e-4
+
 const gaintable = tempname()*".bcal"
 const gaincal_args = Dict("--input"     => "",
                           "--output"    => gaintable,
                           "--sources"   => "sources.json",
-                          "--maxiter"   => 100,
-                          "--tolerance" => 1e-6)
-
-const maxiter = 100
-const tolerance = 1e-6
+                          "--maxiter"   => maxiter,
+                          "--tolerance" => tolerance)
 
 const sources = filter(source -> TTCal.isabovehorizon(frame,source),readsources("sources.json"))
 
@@ -109,23 +109,23 @@ function test_gaincal(cal,data,model)
     flags = zeros(Bool,size(data))
     TTCal.gaincal!(mycal,data,model,flags,
                    ant1,ant2,maxiter,tolerance,1)
-    @test vecnorm(mycal.gains-cal.gains)/vecnorm(cal.gains) < 1e-4
+    @test vecnorm(mycal.gains-cal.gains)/vecnorm(cal.gains) < 10tolerance
 
     name,ms = createms()
     gaincal_args["--input"] = name
     ms["DATA"] = data
     ms["FLAG"] = flags
     ms["FLAG_ROW"] = zeros(Bool,Nbase)
-    finalize(ms)
+    unlock(ms)
 
     TTCal.run_gaincal(gaincal_args)
     mycal = TTCal.read(gaintable)
-    @test vecnorm(mycal.gains-cal.gains)/vecnorm(cal.gains) < 1e-4
+    @test vecnorm(mycal.gains-cal.gains)/vecnorm(cal.gains) < 10tolerance
 
     rm(gaintable)
-    run(`$JULIA_HOME/julia ../src/ttcal.jl gaincal --input $name --output $gaintable --sources sources.json --maxiter 100 --tolerance 1e-6`)
+    run(`$JULIA_HOME/julia ../src/ttcal.jl gaincal --input $name --output $gaintable --sources sources.json --maxiter $maxiter --tolerance $tolerance`)
     mycal = TTCal.read(gaintable)
-    @test vecnorm(mycal.gains-cal.gains)/vecnorm(cal.gains) < 1e-4
+    @test vecnorm(mycal.gains-cal.gains)/vecnorm(cal.gains) < 10tolerance
 end
 
 # Unity gains
@@ -148,7 +148,7 @@ function test_two()
     model = genvis(frame,phase_dir,sources,u,v,w,ν)
     data  = copy(model)
     flags = zeros(Bool,size(data))
-    applycal!(data,flags,TTCal.invert(cal),ant1,ant2)
+    corrupt!(data,flags,cal,ant1,ant2)
     test_gaincal(cal,data,model)
 end
 test_two()
@@ -163,7 +163,7 @@ function test_three()
     model = genvis(frame,phase_dir,sources,u,v,w,ν)
     data  = copy(model)
     flags = zeros(Bool,size(data))
-    applycal!(data,flags,TTCal.invert(cal),ant1,ant2)
+    corrupt!(data,flags,cal,ant1,ant2)
     α = 1
     for ant = 1:Nant
         data[:,:,α] = rand(4,Nfreq)
@@ -184,7 +184,7 @@ function test_applycal()
     ms["DATA"] = data
     ms["FLAG"] = flags
     ms["FLAG_ROW"] = zeros(Bool,Nbase)
-    finalize(ms)
+    unlock(ms)
 
     bcal_name = tempname()
     TTCal.write(bcal_name,cal)
