@@ -67,18 +67,18 @@ function createms()
     subtable = Table("$name/SPECTRAL_WINDOW")
     Tables.addRows!(subtable,1)
     subtable["CHAN_FREQ"] = reshape(ν,length(ν),1)
-    finalize(subtable)
+    unlock(subtable)
 
     subtable = Table("$name/ANTENNA")
     Tables.addRows!(subtable,Nant)
     x,y,z = Measures.xyz_in_meters(pos)
     subtable["POSITION"] = [x;y;z]*ones(1,Nant)
-    finalize(subtable)
+    unlock(subtable)
 
     subtable = Table("$name/FIELD")
     Tables.addRows!(subtable,1)
     subtable["PHASE_DIR"] = reshape([longitude(phase_dir);latitude(phase_dir)],2,1)
-    finalize(subtable)
+    unlock(subtable)
 
     Tables.addRows!(table,Nbase)
     table[kw"SPECTRAL_WINDOW"] = "Table: $name/SPECTRAL_WINDOW"
@@ -92,64 +92,64 @@ function createms()
     name,table
 end
 
-const gaintable = tempname()*".bcal"
-const bandpass_args = Dict("--input"     => "",
-                           "--output"    => gaintable,
-                           "--sources"   => "sources.json",
-                           "--maxiter"   => 100,
-                           "--tolerance" => 1e-6)
+const maxiter = 100
+const tolerance = 1e-4
 
-const criteria = TTCal.StoppingCriteria(100,1e-6)
+const gaintable = tempname()*".bcal"
+const gaincal_args = Dict("--input"     => "",
+                          "--output"    => gaintable,
+                          "--sources"   => "sources.json",
+                          "--maxiter"   => maxiter,
+                          "--tolerance" => tolerance)
 
 const sources = filter(source -> TTCal.isabovehorizon(frame,source),readsources("sources.json"))
 
-function test_bandpass(gains,data,model)
-    mygains = similar(gains)
-    gain_flags = zeros(Bool,size(gains))
-    data_flags = zeros(Bool,size(data))
-    TTCal.bandpass!(mygains,gain_flags,
-                    data,model,data_flags,
-                    ant1,ant2,criteria,1)
-    @test vecnorm(mygains-gains)/vecnorm(gains) < 1e-4
+function test_gaincal(cal,data,model)
+    mycal = TTCal.GainCalibration(Nant,Nfreq)
+    flags = zeros(Bool,size(data))
+    TTCal.gaincal!(mycal,data,model,flags,
+                   ant1,ant2,maxiter,tolerance,1)
+    @test vecnorm(mycal.gains-cal.gains)/vecnorm(cal.gains) < 10tolerance
 
     name,ms = createms()
-    bandpass_args["--input"] = name
+    gaincal_args["--input"] = name
     ms["DATA"] = data
-    ms["FLAG"] = data_flags
+    ms["FLAG"] = flags
     ms["FLAG_ROW"] = zeros(Bool,Nbase)
-    finalize(ms)
+    unlock(ms)
 
-    TTCal.run_bandpass(bandpass_args)
-    mygains,_ = TTCal.read_gains(gaintable)
-    @test vecnorm(mygains-gains)/vecnorm(gains) < 1e-4
+    TTCal.run_gaincal(gaincal_args)
+    mycal = TTCal.read(gaintable)
+    @test vecnorm(mycal.gains-cal.gains)/vecnorm(cal.gains) < 10tolerance
 
     rm(gaintable)
-    run(`$JULIA_HOME/julia ../src/ttcal.jl bandpass --input $name --output $gaintable --sources sources.json --maxiter 100 --tolerance 1e-6`)
-    mygains,_ = TTCal.read_gains(gaintable)
-    @test vecnorm(mygains-gains)/vecnorm(gains) < 1e-4
+    run(`$JULIA_HOME/julia ../src/ttcal.jl gaincal --input $name --output $gaintable --sources sources.json --maxiter $maxiter --tolerance $tolerance`)
+    mycal = TTCal.read(gaintable)
+    @test vecnorm(mycal.gains-cal.gains)/vecnorm(cal.gains) < 10tolerance
 end
 
 # Unity gains
 function test_one()
     println("1")
-    gains = ones(Complex64,Nant,2,Nfreq)
-    model = genvis(phase_dir,sources,u,v,w,ν)
+    cal = TTCal.GainCalibration(Nant,Nfreq)
+    cal.gains[:] = 1
+    model = genvis(frame,phase_dir,sources,u,v,w,ν)
     data  = copy(model)
-    test_bandpass(gains,data,model)
+    test_gaincal(cal,data,model)
 end
 test_one()
 
 # Random gains
 function test_two()
     println("2")
-    gains = rand(Complex64,Nant,2,Nfreq)
-    gains = gains .* conj(gains[1,:,:]) ./ abs(gains[1,:,:])
-    model = genvis(phase_dir,sources,u,v,w,ν)
+    cal = TTCal.GainCalibration(Nant,Nfreq)
+    rand!(cal.gains)
+    TTCal.fixphase!(cal,1)
+    model = genvis(frame,phase_dir,sources,u,v,w,ν)
     data  = copy(model)
-    data_flags = zeros(Bool,size(data))
-    gain_flags = zeros(Bool,size(gains))
-    applycal!(data,data_flags,1./gains,gain_flags,ant1,ant2)
-    test_bandpass(gains,data,model)
+    flags = zeros(Bool,size(data))
+    corrupt!(data,flags,cal,ant1,ant2)
+    test_gaincal(cal,data,model)
 end
 test_two()
 
@@ -157,36 +157,37 @@ test_two()
 # Corrupted autocorrelations
 function test_three()
     println("3")
-    gains = rand(Complex64,Nant,2,Nfreq)
-    gains = gains .* conj(gains[1,:,:]) ./ abs(gains[1,:,:])
-    model = genvis(phase_dir,sources,u,v,w,ν)
+    cal = TTCal.GainCalibration(Nant,Nfreq)
+    rand!(cal.gains)
+    TTCal.fixphase!(cal,1)
+    model = genvis(frame,phase_dir,sources,u,v,w,ν)
     data  = copy(model)
-    data_flags = zeros(Bool,size(data))
-    gain_flags = zeros(Bool,size(gains))
-    applycal!(data,data_flags,1./gains,gain_flags,ant1,ant2)
+    flags = zeros(Bool,size(data))
+    corrupt!(data,flags,cal,ant1,ant2)
     α = 1
     for ant = 1:Nant
         data[:,:,α] = rand(4,Nfreq)
         α += Nant-ant+1
     end
-    test_bandpass(gains,data,model)
+    test_gaincal(cal,data,model)
 end
 test_three()
 
 function test_applycal()
     g = 2
-    gains = 2*ones(Complex64,Nant,2,Nfreq)
+    cal = TTCal.GainCalibration(Nant,Nfreq)
+    cal.gains[:] = g
     data  = rand(Complex64,4,Nfreq,Nbase)
-    gain_flags = zeros(Bool,size(gains))
-    data_flags = zeros(Bool,size(data))
+    flags = zeros(Bool,size(data))
 
     name,ms = createms()
     ms["DATA"] = data
-    ms["FLAG"] = data_flags
-    finalize(ms)
+    ms["FLAG"] = flags
+    ms["FLAG_ROW"] = zeros(Bool,Nbase)
+    unlock(ms)
 
     bcal_name = tempname()
-    TTCal.write_gains(bcal_name,gains,gain_flags)
+    TTCal.write(bcal_name,cal)
 
     args = Dict("--input" => [name],
                 "--calibration" => bcal_name)
@@ -225,12 +226,13 @@ end
 =#
 
 function test_subsrc()
-    data = genvis(phase_dir,sources,u,v,w,ν)
-    data_flags = zeros(Bool,size(data))
+    data  = genvis(frame,phase_dir,sources,u,v,w,ν)
+    flags = zeros(Bool,size(data))
 
     name,ms = createms()
     ms["DATA"] = data
-    ms["FLAG"] = data_flags
+    ms["FLAG"] = flags
+    ms["FLAG_ROW"] = zeros(Bool,Nbase)
     subsrc!(ms,sources)
 
     @test vecnorm(ms["CORRECTED_DATA"]) < eps(Float64)
@@ -265,7 +267,7 @@ function test_lm()
     end
     phase_dir = Direction(Measures.J2000,ra"19h59m28.35663s",dec"+40d44m02.0970s")
     dir = TTCal.lm2dir(phase_dir,l,m)
-    l_,m_ = TTCal.dir2lm(phase_dir,dir)
+    l_,m_ = TTCal.dir2lm(frame,phase_dir,dir)
     @test_approx_eq l l_
     @test_approx_eq m m_
 end

@@ -22,16 +22,25 @@ to have the positions of the point sources relatively close, but the flux
 can be wildly off.
 """ ->
 function fitvis(ms::Table,
-                sources::Vector{PointSource})
-    frame = reference_frame(ms)
-    phase = phase_dir(ms)
-    data  = Tables.checkColumnExists(ms,"CORRECTED_DATA")? ms["CORRECTED_DATA"] : ms["DATA"]
-    flags = ms["FLAG"]
-    u,v,w = uvw(ms)
-    ν = freq(ms)
-    ant1,ant2 = ants(ms)
+                sources::Vector{PointSource};
+                minuvw::Float64 = 0.0)
+    phase_dir = MeasurementSets.phase_direction(ms)
+    u,v,w = MeasurementSets.uvw(ms)
+    ν = MeasurementSets.frequency(ms)
+    ant1,ant2 = MeasurementSets.antennas(ms)
 
-    fitvis(frame,phase,data,flags,u,v,w,ν,ant1,ant2,sources)
+    frame = ReferenceFrame()
+    set!(frame,MeasurementSets.position(ms))
+    set!(frame,MeasurementSets.time(ms))
+
+    data  = MeasurementSets.corrected_data(ms)
+    flags = MeasurementSets.flags(ms)
+
+    for i = 1:5
+        sources = fitvis(frame,phase_dir,data,flags,
+                         u,v,w,ν,ant1,ant2,sources,minuvw)
+    end
+    sources
 end
 
 ################################################################################
@@ -47,7 +56,19 @@ function fitvis(frame::ReferenceFrame,
                 ν::Vector{Float64},
                 ant1::Vector{Int32},
                 ant2::Vector{Int32},
-                sources::Vector{PointSource})
+                sources::Vector{PointSource},
+                minuvw)
+    Nfreq = size(data,2)
+    Nbase = size(data,3)
+
+    # Flag all of the short baselines
+    # (so that they do not contribute to the fit)
+    for α = 1:Nbase, β = 1:Nfreq
+        if sqrt(u[α]^2 + v[α]^2 + w[α]^2) < minuvw*c/ν[β]
+            flags[:,β,α] = true
+        end
+    end
+
     # 1. Discard sources that are below the horizon.
     sources = filter(sources) do source
         isabovehorizon(frame,source)
@@ -58,7 +79,7 @@ function fitvis(frame::ReferenceFrame,
     # flux doesn't impact the results. This can happen if the source is low in the beam
     # and is much fainter than it otherwise would be.)
     for (i,source) in enumerate(sources)
-        l,m = lm(phase_dir,source)
+        l,m = lm(frame,phase_dir,source)
         I,Q,U,V,reffreq,index = fitvis_spec(data,flags,l,m,u,v,w,ν,ant1,ant2)
         sources[i] = PointSource(source.name,source.dir,I,Q,U,V,reffreq,index)
     end
@@ -71,7 +92,7 @@ function fitvis(frame::ReferenceFrame,
     # 3. Fit for the position and flux of each source, subtracting each source from the
     #    data in turn.
     for (i,source) in enumerate(sources)
-        l,m = lm(phase_dir,source)
+        l,m = lm(frame,phase_dir,source)
 
         # a) Solve for the source's position
         l,m = fitvis_lm(data,flags,l,m,u,v,w,ν,ant1,ant2)

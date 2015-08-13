@@ -16,28 +16,44 @@
 ################################################################################
 # Public Interface
 
-function peel(ms::Table,
-              sources::Vector{PointSource},
-              criteria::StoppingCriteria)
-    frame = reference_frame(ms)
-    dir   = phase_dir(ms)
-    u,v,w = uvw(ms)
-    ν = freq(ms)
-    ant1,ant2 = ants(ms)
-    data = corrected_data(ms)
-    data_flags = flags(ms)
+function peel!(ms::Table,
+               sources::Vector{PointSource};
+               maxiter::Int = 10,
+               tolerance::Float64 = 1e-3,
+               minuvw::Float64 = 0.0)
+    phase_dir = MeasurementSets.phase_direction(ms)
+    u,v,w = MeasurementSets.uvw(ms)
+    ν = MeasurementSets.frequency(ms)
+    ant1,ant2 = MeasurementSets.antennas(ms)
 
-    Nsource = length(sources)
-    Nfreq   = length(ν)
-    Nant    = numrows(Table(ms[kw"ANTENNA"]))
-    Nbase   = length(u)
-
+    frame = ReferenceFrame()
+    set!(frame,MeasurementSets.position(ms))
+    set!(frame,MeasurementSets.time(ms))
     sources = filter(source -> isabovehorizon(frame,source),sources)
-    coherencies = [genvis(dir,source,u,v,w,ν) for source in sources]
-    #gains = [identity_matrices(Nant,Nfreq) for source in sources]
-    #gain_flags = zeros(Bool,Nant,Nfreq)
-    gains = [ones(Complex64,Nant,2,Nfreq) for source in sources]
-    gain_flags = zeros(Bool,Nant,2,Nfreq)
+
+    Nant    = numrows(Table(ms[kw"ANTENNA"]))
+    Nfreq   = length(ν)
+
+    data  = MeasurementSets.corrected_data(ms)
+    flags = MeasurementSets.flags(ms)
+
+    calibrations = [GainCalibration(Nant,Nfreq) for source in sources]
+    coherencies  = [genvis(frame,phase_dir,[source],u,v,w,ν) for source in sources]
+
+    peel_internal!(calibrations,coherencies,data,flags,
+                   u,v,w,ν,ant1,ant2,maxiter,tolerance,minuvw)
+    ms["CORRECTED_DATA"] = data
+    calibrations
+end
+
+################################################################################
+# Internal Interface
+
+function peel_internal!(calibrations,coherencies,data,flags,
+                        u,v,w,ν,ant1,ant2,maxiter,tolerance,minuvw)
+    Nsource = length(calibrations)
+    Nfreq = size(data,2)
+    Nbase = size(data,3)
 
     # Subtract all of the sources
     # (assuming the beam is unity towards each source)
@@ -47,40 +63,53 @@ function peel(ms::Table,
         end
     end
 
+    # Flag all of the short baselines
+    # (so that they do not contribute to the fit)
+    for α = 1:Nbase, β = 1:Nfreq
+        if sqrt(u[α]^2 + v[α]^2 + w[α]^2) < minuvw*c/ν[β]
+            flags[:,β,α] = true
+        end
+    end
+
     # Derive a calibration towards each source
     for iter = 1:3
-        @time for s = 1:Nsource
-            tic()
-            @show sources[s]
+        for s = 1:Nsource
             coherency = coherencies[s]
-            gains_toward_source = gains[s]
+            calibration_toward_source = calibrations[s]
 
+            # Put one source back into the visibilities.
             corrupted = copy(coherency)
-            corrupt!(corrupted,gains_toward_source,ant1,ant2)
+            corrupt!(corrupted,calibration_toward_source,ant1,ant2)
             for i in eachindex(data)
                 data[i] += corrupted[i]
             end
 
-            #polcal!(gains_toward_source,gain_flags,
-                    #data,coherency,data_flags,
-                    #ant1,ant2,criteria,1/1000)
-            bandpass!(gains_toward_source,gain_flags,
-                      data,coherency,data_flags,
-                      ant1,ant2,criteria)
-            @show gains_toward_source[1]
+            bandpass_internal!(calibration_toward_source,
+                               data,coherency,flags,
+                               ant1,ant2,maxiter,tolerance,1)
 
             # Take the source back out of the measured visibilities,
-            # but this time subtract it with the gains toward that direction.
+            # but this time subtract it with the corrected gains toward
+            # that direction.
             corrupted = copy(coherency)
-            corrupt!(corrupted,gains_toward_source,ant1,ant2)
+            corrupt!(corrupted,calibration_toward_source,ant1,ant2)
             for i in eachindex(data)
                 data[i] -= corrupted[i]
             end
-            toc()
         end
     end
-    #applycal!(data,data_flags,gains[2],gain_flags,ant1,ant2)
+    nothing
+end
 
-    ms["CORRECTED_DATA"] = data
+function corrupt!(data::Array{Complex64,3},
+                  cal::GainCalibration,
+                  ant1,ant2)
+    Nbase = length(ant1)
+    for α = 1:Nbase, β = 1:Nfreq(cal)
+        data[1,β,α] = cal.gains[ant1[α],β,1]*conj(cal.gains[ant2[α],β,1])*data[1,β,α]
+        data[2,β,α] = cal.gains[ant1[α],β,1]*conj(cal.gains[ant2[α],β,2])*data[2,β,α]
+        data[3,β,α] = cal.gains[ant1[α],β,2]*conj(cal.gains[ant2[α],β,1])*data[3,β,α]
+        data[4,β,α] = cal.gains[ant1[α],β,2]*conj(cal.gains[ant2[α],β,2])*data[4,β,α]
+    end
 end
 

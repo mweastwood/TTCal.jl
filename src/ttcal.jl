@@ -27,12 +27,12 @@ CLI.set_banner("""
 
 CLI.print_banner()
 
-push!(CLI.commands,Command("bandpass","Solve for a bandpass calibration."))
+push!(CLI.commands,Command("gaincal","Solve for a gain calibration."))
 push!(CLI.commands,Command("polcal","Solve for a polarization calibration."))
+push!(CLI.commands,Command("peel","Peel sources from the dataset."))
 push!(CLI.commands,Command("applycal","Apply a calibration."))
-push!(CLI.commands,Command("diagnose","Diagnose a poor calibration."))
 
-CLI.options["bandpass"] = [
+CLI.options["gaincal"] = [
     Option("--input","""
         The measurement set used to solve for the calibration.""",
         T=UTF8String,
@@ -47,14 +47,13 @@ CLI.options["bandpass"] = [
         min=1,
         max=1),
     Option("--sources","""
-        A JSON file describing the sources to be used for the sky model.
-        If this option is not used, TTCal assumes there is a MODEL_DATA
-        column populated with model visibilities.""",
+        A JSON file describing the sources to be used for the sky model.""",
         T=UTF8String,
+        required=true,
         min=1,
         max=1),
     Option("--maxiter","""
-        Set the maximum number of Stefcal iterations to take on each
+        Set the maximum number of (Stef|Mitch)Cal iterations to take on each
         frequency channel.""",
         T=Int,
         min=1,
@@ -67,7 +66,28 @@ CLI.options["bandpass"] = [
     Option("--force-imaging","""
         Create and use the MODEL_DATA and CORRECTED_DATA columns even if
         they do not already exist in the measurement set.""")]
-CLI.options["polcal"] = CLI.options["bandpass"]
+CLI.options["polcal"] = CLI.options["gaincal"]
+CLI.options["peel"] = [
+    Option("--input","""
+        The measurement set that will have sources peeled.""",
+        T=UTF8String,
+        required=true,
+        min=1,
+        max=1),
+    Option("--sources","""
+        A JSON file describing the sources to be peeled from the given
+        measurement set.""",
+        T=UTF8String,
+        required=true,
+        min=1,
+        max=1),
+    Option("--minuvw","""
+        The minimum baseline length (measured in wavelengths) to use while
+        peeling sources. This parameter can be used to mitigate sensitivity
+        to unmodeled diffuse emission.""",
+        T=Float64,
+        min=1,
+        max=1)]
 CLI.options["applycal"] = [
     Option("--input","""
         The list of measurement sets that the calibration will be applied to.""",
@@ -88,13 +108,6 @@ CLI.options["applycal"] = [
     Option("--corrected","""
         Apply the calibration to the CORRECTED_DATA column instead
         of the DATA column.""")]
-CLI.options["diagnose"] = [
-    Option("--calibration","""
-        The file containing the calibration solution.""",
-        T=UTF8String,
-        required=true,
-        min=1,
-        max=1)]
 
 import TTCal
 
@@ -103,14 +116,12 @@ import TTCal
 # (comment out the try/catch block for debugging)
 try
     command,args = CLI.parse_args(ARGS)
-    if     command == "bandpass"
-        TTCal.run_bandpass(args)
+    if     command == "gaincal"
+        TTCal.run_gaincal(args)
     elseif command == "polcal"
         TTCal.run_polcal(args)
     elseif command == "applycal"
         TTCal.run_applycal(args)
-    elseif command == "diagnose"
-        TTCal.run_diagnose(args)
     end
 catch err
     if isa(err, ErrorException)

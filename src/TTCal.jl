@@ -13,6 +13,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+__precompile__()
+
 module TTCal
 
 export PointSource
@@ -23,78 +25,77 @@ export getspec
 export fitvis
 export subsrc!
 
-export bandpass
-export polcal
-export applycal!
+export gaincal, polcal
+export applycal!, corrupt!
+export peel!
+
+importall Base.Operators
+import Base: zero, one, det, inv, norm
 
 using JSON
 using CasaCore.Quanta
 using CasaCore.Measures
 using CasaCore.Tables
+using MeasurementSets
 
 const c = 2.99792e+8
-include("ms.jl")
 include("rungekutta.jl")
-
+include("jones.jl")
 include("sourcemodel.jl")
 include("fringepattern.jl")
 include("genvis.jl")
 include("getspec.jl")
 include("fitvis.jl")
 include("subsrc.jl")
-
-include("io.jl")
-include("bandpass.jl")
-include("polcal.jl")
+include("calibration.jl")
 include("peel.jl")
-include("applycal.jl")
-include("diagnose.jl")
 
-function run_bandpass(args)
+function run_gaincal(args)
     ms = Table(ascii(args["--input"]))
-    sources = haskey(args,"--sources")? readsources(args["--sources"]) : Source[]
+    sources = readsources(args["--sources"])
     maxiter = haskey(args,"--maxiter")? args["--maxiter"] : 20
-    tol = haskey(args,"--tolerance")? args["--tolerance"] : 1e-4
-    criteria = StoppingCriteria(maxiter,tol)
+    tolerance = haskey(args,"--tolerance")? args["--tolerance"] : 1e-4
     force_imaging_columns = haskey(args,"--force-imaging")
-    model_already_present = !haskey(args,"--sources")
-    gains,gain_flags = bandpass(ms,sources,criteria,
-                                force_imaging_columns=force_imaging_columns,
-                                model_already_present=model_already_present)
-    write_gains(args["--output"],gains,gain_flags)
-    gains, gain_flags
+    cal = gaincal(ms,sources,
+                  maxiter=maxiter,
+                  tolerance=tolerance,
+                  force_imaging_columns=force_imaging_columns)
+    write(args["--output"],cal)
+    cal
 end
 
 function run_polcal(args)
     ms = Table(ascii(args["--input"]))
-    sources = haskey(args,"--sources")? readsources(args["--sources"]) : Source[]
+    sources = readsources(args["--sources"])
     maxiter = haskey(args,"--maxiter")? args["--maxiter"] : 20
-    tol = haskey(args,"--tolerance")? args["--tolerance"] : 1e-4
-    criteria = StoppingCriteria(maxiter,tol)
+    tolerance = haskey(args,"--tolerance")? args["--tolerance"] : 1e-4
     force_imaging_columns = haskey(args,"--force-imaging")
-    model_already_present = !haskey(args,"--sources")
-    gains,gain_flags = polcal(ms,sources,criteria,
-                              force_imaging_columns=force_imaging_columns,
-                              model_already_present=model_already_present)
-    write_gains(args["--output"],gains,gain_flags)
-    gains, gain_flags
+    cal = polcal(ms,sources,
+                 maxiter=maxiter,
+                 tolerance=tolerance,
+                 force_imaging_columns=force_imaging_columns)
+    write(args["--output"],cal)
+    cal
+end
+
+function run_peel(args)
+    ms = Table(ascii(args["--input"]))
+    sources = readsources(args["--sources"])
+    minuvw = haskey(args,"--minuvw")? args["--minuvw"] : 15.0
+    peel!(ms,sources,minuvw=minuvw)
 end
 
 function run_applycal(args)
-    gains,gain_flags = read_gains(args["--calibration"])
+    cal = read(args["--calibration"])
     force_imaging_columns = haskey(args,"--force-imaging")
     apply_to_corrected = haskey(args,"--corrected")
     for input in args["--input"]
         ms = Table(ascii(input))
-        applycal!(ms,gains,gain_flags,
+        applycal!(ms,cal,
                   force_imaging_columns=force_imaging_columns,
                   apply_to_corrected=apply_to_corrected)
     end
-    nothing
-end
-
-function run_diagnose(args)
-    diagnose(args["--calibration"])
+    cal
 end
 
 end

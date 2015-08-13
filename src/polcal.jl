@@ -13,188 +13,172 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-################################################################################
-# Public Interface
+"""
+This type stores the information for calibrating the
+polarization of the interferometer. That is, it stores
+Jones matrices and flags for each antenna and each
+frequency channel.
+"""
+immutable PolarizationCalibration <: Calibration
+    jones::Array{JonesMatrix,2}
+    flags::Array{Bool,2}
+end
 
+function PolarizationCalibration(Nant,Nfreq)
+    jones = fill(JonesMatrix(),Nant,Nfreq)
+    flags = fill(false,Nant,Nfreq)
+    PolarizationCalibration(jones,flags)
+end
+
+Nant(cal::PolarizationCalibration) = size(cal.jones,1)
+Nfreq(cal::PolarizationCalibration) = size(cal.jones,2)
+
+function invert(cal::PolarizationCalibration)
+    output = PolarizationCalibration(Nant(cal),Nfreq(cal))
+    for i in eachindex(cal.jones)
+        output.jones[i] = inv(cal.jones[i])
+    end
+    output
+end
+
+"""
+Solve for the polarization properties of the interferometer.
+"""
 function polcal(ms::Table,
-                sources::Vector{PointSource},
-                criteria::StoppingCriteria;
-                force_imaging_columns::Bool = false,
-                model_already_present::Bool = false)
-    frame = reference_frame(ms)
-    dir   = phase_dir(ms)
-    u,v,w = uvw(ms)
-    ν = freq(ms)
-    ant1,ant2 = ants(ms)
+                sources::Vector{PointSource};
+                maxiter::Int = 20,
+                tolerance::Float64 = 1e-5,
+                force_imaging_columns::Bool = false)
+    phase_dir = MeasurementSets.phase_direction(ms)
+    u,v,w = MeasurementSets.uvw(ms)
+    ν = MeasurementSets.frequency(ms)
+    ant1,ant2 = MeasurementSets.antennas(ms)
 
+    frame = ReferenceFrame()
+    set!(frame,MeasurementSets.position(ms))
+    set!(frame,MeasurementSets.time(ms))
     sources = filter(source -> isabovehorizon(frame,source),sources)
 
-    Nfreq = length(ν)
     Nant  = numrows(Table(ms[kw"ANTENNA"]))
+    Nfreq = length(ν)
+    calibration = PolarizationCalibration(Nant,Nfreq)
 
-    gains = ones(Complex128,2,2,Nant,Nfreq)
-    gain_flags = zeros(Bool,Nant,Nfreq)
-
-    data  = Tables.checkColumnExists(ms,"CORRECTED_DATA")? ms["CORRECTED_DATA"] : ms["DATA"]
-    model = model_already_present? ms["MODEL_DATA"] : genvis(dir,sources,u,v,w,ν)
-    data_flags = ms["FLAG"]
-    row_flags  = ms["FLAG_ROW"]
-    for α = 1:length(row_flags)
-        if row_flags[α]
-            data_flags[:,:,α] = true
-        end
-    end
+    data  = ms["DATA"]
+    model = genvis(frame,phase_dir,sources,u,v,w,ν)
+    flags = MeasurementSets.flags(ms)
 
     if force_imaging_columns || Tables.checkColumnExists(ms,"MODEL_DATA")
         ms["MODEL_DATA"] = model
     end
 
-    polcal!(gains,gain_flags,data,model,data_flags,
-            ant1,ant2,criteria)
-    gains,gain_flags
+    polcal!(calibration,data,model,flags,
+            ant1,ant2,maxiter,tolerance)
+    calibration
 end
 
-################################################################################
-# Internal Interface
-
-function polcal!(gains::Array{Complex128,4},
-                 gain_flags::Array{Bool,2},
-                 data::Array{Complex64,3},
-                 model::Array{Complex64,3},
-                 data_flags::Array{Bool,3},
-                 ant1::Vector{Int32},
-                 ant2::Vector{Int32},
-                 criteria::StoppingCriteria)
-    # Transpose the data and model arrays to create a better memory access pattern
-    data  = permutedims(data, (1,3,2))
-    model = permutedims(model,(1,3,2))
-    data_flags = permutedims(data_flags,(1,3,2))
-
-    Nfreq = size(gains,4)
-    for β = 1:Nfreq
-        polcal_onechannel!(slice(gains,:,:,:,β),
-                           slice(gain_flags,:,β),
-                           slice( data,:,:,β),
-                           slice(model,:,:,β),
-                           slice(data_flags,:,:,β),
+function polcal!(calibration,data,model,flags,
+                 ant1,ant2,maxiter,tolerance)
+    for β = 1:Nfreq(calibration)
+        polcal_onechannel!(slice(calibration.jones,:,β),
+                           slice(calibration.flags,:,β),
+                           slice( data,:,β,:),
+                           slice(model,:,β,:),
+                           slice(flags,:,β,:),
                            ant1, ant2,
-                           criteria)
+                           maxiter, tolerance)
     end
+    # TODO: In the unpolarized gain calibration, we are free to
+    # pick the overall phase. Usually this is used to zero the
+    # phase of a reference antenna. Is there an equivalent
+    # degree of freedom for the polarized case?
 end
 
-function polcal_onechannel!(gains, gain_flags,
+function polcal_onechannel!(jones, jones_flags,
                             data, model, data_flags,
-                            ant1::Vector{Int32},
-                            ant2::Vector{Int32},
-                            criteria::StoppingCriteria)
-    Nant = size(gains,3)
-    Nbase = size(data,2)
-
+                            ant1, ant2,
+                            maxiter, tolerance)
     # If the entire channel is flagged, don't bother calibrating.
-    # Just flag the solutions and move on.
     if all(data_flags)
+        jones[:] = JonesMatrix()
+        jones_flags[:] = true
+        return
+    end
+
+    square_data  = polcal_makesquare( data,data_flags,ant1,ant2)
+    square_model = polcal_makesquare(model,data_flags,ant1,ant2)
+    best_jones   = ones(JonesMatrix,length(jones))
+    converged = @iterate(PolCalStep(),RK4,maxiter,tolerance,
+                         best_jones,square_data,square_model)
+
+    # Flag the entire channel if the solution did not converge.
+    if !converged
+        gains[:] = 1
         gain_flags[:] = true
         return
     end
 
-    for α = 1:Nbase
-        if any(data_flags[:,α])
-            data[:,α] = 0
-            model[:,α] = 0
-        end
+    # Output
+    for ant = 1:length(jones)
+        jones[ant] = best_jones[ant]
     end
-
-    # This is an especially good approximation if we've
-    # already applied a bandpass calibration.
-    for i = 1:Nant
-        gains[:,:,i] = [1 0;
-                        0 1]
-    end
-
-    oldχ2 = typemax(Float64)
-    iter = 0
-    converged = false
-    while !converged && iter < criteria.maxiter
-        χ2,gain_flags[:] = newtonstep!(gains,data,model,1/100)
-        if abs(χ2 - oldχ2)/abs(oldχ2) < criteria.tolerance
-            converged = true
-        end
-        oldχ2 = χ2
-        iter += 1
-    end
-
-    nothing
 end
 
-function newtonstep!(gains,data,model,damping_factor)
-    Nant = size(gains,3)
-    Nbase = div(Nant*(Nant-1),2)
-    # Calculate χ² and its derivatives
-    χ   = 0.0
-    dχ  = zeros(8Nant)
-    d2χ = zeros(8Nant) # We will approximate d2χ (the Hessian) as diagonal
-    for ant1 = 1:Nant, ant2 = ant1+1:Nant
-        α = div((ant1-1)*(2Nant-ant1+2),2) + ant2 - ant1 + 1
-        V = [data[1,α] data[2,α];
-             data[3,α] data[4,α]]
-        M = [model[1,α] model[2,α];
-             model[3,α] model[4,α]]
-        G1 = slice(gains,:,:,ant1)
-        G2 = slice(gains,:,:,ant2)
+function polcal_makesquare(data,flags,ant1,ant2)
+    Nbase = size(data,2)
+    Nant  = round(Integer,div(sqrt(1+8Nbase)-1,2))
+    output = zeros(JonesMatrix,Nant,Nant)
+    for α = 1:Nbase
+        (flags[1,α] || flags[2,α] || flags[3,α] || flags[4,α]) && continue
+        ant1[α] == ant2[α] && continue
+        output[ant1[α],ant2[α]] = JonesMatrix(data[1,α],data[2,α],
+                                              data[3,α],data[4,α])
+        output[ant2[α],ant1[α]] = output[ant1[α],ant2[α]]'
+    end
+    output
+end
 
-        # Compute the residual
-        res = reinterpret(Float64,vec(V - G1*M*G2'))
-
-        # Derivative of the model
-        D = zeros(Complex128,2,2)
-        dM1 = zeros(Float64,8,8)
-        dM2 = zeros(Float64,8,8)
-        @inbounds for p = 0:7
-            # (with respect to antenna 1 parameters)
-            D[:] = 0
-            D[div(p,2)+1] = ifelse(mod(p,2)==0,1.0+0.0im,0.0+1.0im)
-            X = D*M*G2'
-            dM1[1,p+1] = real(X[1,1])
-            dM1[2,p+1] = imag(X[1,1])
-            dM1[3,p+1] = real(X[2,1])
-            dM1[4,p+1] = imag(X[2,1])
-            dM1[5,p+1] = real(X[1,2])
-            dM1[6,p+1] = imag(X[1,2])
-            dM1[7,p+1] = real(X[2,2])
-            dM1[8,p+1] = imag(X[2,2])
-
-            # (with respect to antenna 2 parameters)
-            D[:] = 0
-            D[div(p,2)+1] = ifelse(mod(p,2)==0,1.0+0.0im,0.0+1.0im)
-            X = G1*M*D'
-            dM2[1,p+1] = real(X[1,1])
-            dM2[2,p+1] = imag(X[1,1])
-            dM2[3,p+1] = real(X[2,1])
-            dM2[4,p+1] = imag(X[2,1])
-            dM2[5,p+1] = real(X[1,2])
-            dM2[6,p+1] = imag(X[1,2])
-            dM2[7,p+1] = real(X[2,2])
-            dM2[8,p+1] = imag(X[2,2])
+"""
+This function defines the update step for `polcal`.
+"""
+function polcal_step(input,data,model)
+    Nant = length(input)
+    step = fill(JonesMatrix(),Nant)
+    @inbounds for j = 1:Nant
+        numerator   = zero(JonesMatrix)
+        denominator = zero(JonesMatrix)
+        for i = 1:Nant
+            GM = input[i]*model[i,j]
+            numerator = numerator + GM'*data[i,j]
+            denominator = denominator + GM'*GM
         end
+        ok = det(denominator) > eps(Float32)
+        step[j] = ifelse(ok,conj(numerator/denominator) - input[j],zero(JonesMatrix))
+    end
+    step
+end
 
-        # Calculate the corresponding derivatives of χ²
-        χ += sum(abs2(res))
-        @inbounds for p1 = 0:7
-            for p2 = 0:7
-                dχ[8ant1-7+p1] -= res[p2+1].*dM1[p2+1,p1+1]
-                dχ[8ant2-7+p1] -= res[p2+1].*dM2[p2+1,p1+1]
-                # The following two lines give the only nonzero terms
-                # along the diagonal of the Hessian
-                d2χ[8ant1-7+p1] += dM1[p2+1,p1+1].*dM1[p2+1,p1+1]
-                d2χ[8ant2-7+p1] += dM2[p2+1,p1+1].*dM2[p2+1,p1+1]
-            end
+immutable PolCalStep <: StepFunction end
+call(::PolCalStep,input,data,model) = polcal_step(input,data,model)
+
+function corrupt!(data::Array{Complex64,3},
+                  flags::Array{Bool,3},
+                  cal::PolarizationCalibration,
+                  ant1,ant2)
+    Nbase = length(ant1)
+    for α = 1:Nbase, β = 1:Nfreq(cal)
+        if cal.flags[ant1[α],β] || cal.flags[ant2[α],β]
+            flags[:,β,α] = true
+        else
+            V = JonesMatrix(data[1,β,α],data[2,β,α],
+                            data[3,β,α],data[4,β,α])
+            G1 = cal.jones[ant1[α],β]
+            G2 = cal.jones[ant2[α],β]
+            V = G1*V*G2'
+            data[1,β,α] = V.xx
+            data[2,β,α] = V.xy
+            data[3,β,α] = V.yx
+            data[4,β,α] = V.yy
         end
     end
-    step = -(diagm(d2χ)+χ*damping_factor*I)\dχ
-    flags = isnan(step)
-    step[flags] = 0
-    step_reinterpreted = reshape(reinterpret(Complex128,step),(2,2,Nant))
-    gains[:] = gains + step_reinterpreted
-    χ,flags[1:8:end]
 end
 

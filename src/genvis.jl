@@ -22,29 +22,38 @@ No gridding is performed, so the runtime of this naive
 algorithm scales as O(Nbase×Nsource).
 """ ->
 function genvis(ms::Table,sources::Vector{PointSource})
-    u,v,w = uvw(ms)
-    ν = freq(ms)
-    dir = phase_dir(ms)
-    genvis(dir,sources,u,v,w,ν)
+    phase_dir = MeasurementSets.phase_direction(ms)
+    u,v,w = MeasurementSets.uvw(ms)
+    ν = MeasurementSets.frequency(ms)
+
+    frame = ReferenceFrame()
+    set!(frame,MeasurementSets.position(ms))
+    set!(frame,MeasurementSets.time(ms))
+
+    genvis(frame,phase_dir,sources,u,v,w,ν)
 end
+
+genvis(ms::Table,source::PointSource) = genvis(ms,[source])
 
 ################################################################################
 # Internal Interface
 
 genvis(phase_dir::Direction,source::PointSource,u,v,w,ν) = genvis(phase_dir,[source],u,v,w,ν)
 
-function genvis(phase_dir::Direction,
+function genvis(frame::ReferenceFrame,
+                phase_dir::Direction,
                 sources::Vector{PointSource},
                 u::Vector{Float64},
                 v::Vector{Float64},
                 w::Vector{Float64},
                 ν::Vector{Float64})
     model = zeros(Complex64,4,length(ν),length(u))
-    genvis!(model,phase_dir,sources,u,v,w,ν)
+    genvis!(model,frame,phase_dir,sources,u,v,w,ν)
     model
 end
 
 function genvis!(model::Array{Complex64,3},
+                 frame::ReferenceFrame,
                  phase_dir::Direction,
                  sources::Vector{PointSource},
                  u::Vector{Float64},
@@ -52,19 +61,20 @@ function genvis!(model::Array{Complex64,3},
                  w::Vector{Float64},
                  ν::Vector{Float64})
     for source in sources
-        genvis!(model,phase_dir,source,u,v,w,ν)
+        genvis!(model,frame,phase_dir,source,u,v,w,ν)
     end
     model
 end
 
 function genvis!(model::Array{Complex64,3},
+                 frame::ReferenceFrame,
                  phase_dir::Direction,
                  source::PointSource,
                  u::Vector{Float64},
                  v::Vector{Float64},
                  w::Vector{Float64},
                  ν::Vector{Float64})
-    l,m = lm(phase_dir,source)
+    l,m = lm(frame,phase_dir,source)
     I = stokesI(source,ν)
     Q = stokesQ(source,ν)
     U = stokesU(source,ν)

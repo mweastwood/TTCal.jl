@@ -94,14 +94,14 @@ end
 @doc """
 Convert the direction into the standard radio coordinate system.
 """ ->
-function dir2lm{ref}(phase_dir::Direction{ref},dir::Direction{ref})
+function dir2lm{ref}(frame::ReferenceFrame,phase_dir::Direction{Measures.J2000},dir::Direction{ref})
     long = longitude(phase_dir)
     lat  = latitude(phase_dir)
     θ1 = π/2 - long
     θ2 = π/2 - lat
     sin_θ1 = sin(θ1); cos_θ1 = cos(θ1)
     sin_θ2 = sin(θ2); cos_θ2 = cos(θ2)
-    x,y,z = Measures.xyz_in_meters(dir)
+    x,y,z = Measures.xyz_in_meters(measure(frame,dir,Measures.J2000))
     # - Rotate first by θ1 about the z-axis
     # - Then rotate by θ2 about the x-axis
     # ⌈    -l    ⌉   ⌈1    0        0    ⌉   ⌈+cos(θ1) -sin(θ1) 0⌉   ⌈x⌉
@@ -112,7 +112,7 @@ function dir2lm{ref}(phase_dir::Direction{ref},dir::Direction{ref})
     l,m
 end
 
-function lm2dir{ref}(phase_dir::Direction{ref},l,m)
+function lm2dir(phase_dir::Direction{Measures.J2000},l,m)
     long = longitude(phase_dir)
     lat  = latitude(phase_dir)
     θ1 = π/2 - long
@@ -128,19 +128,21 @@ function lm2dir{ref}(phase_dir::Direction{ref},l,m)
     x = -cos_θ1*l - sin_θ1*cos_θ2*m + sin_θ1*sin_θ2*n
     y = +sin_θ1*l - cos_θ1*cos_θ2*m + cos_θ1*sin_θ2*n
     z = sqrt(1-x^2-y^2)
-    Measures.from_xyz_in_meters(ref,x,y,z)
+    Measures.from_xyz_in_meters(Measures.J2000,x,y,z)
 end
 
 radec(frame::ReferenceFrame,source::PointSource) = dir2radec(frame,direction(source))
 azel(frame::ReferenceFrame,source::PointSource) = dir2azel(frame,direction(source))
-lm(phase_dir::Direction,source::PointSource) = dir2lm(phase_dir,direction(source))
+lm(frame::ReferenceFrame,phase_dir::Direction,source::PointSource) = dir2lm(frame,phase_dir,direction(source))
 
 function isabovehorizon(frame::ReferenceFrame,direction::Direction)
     az,el = dir2azel(frame,direction)
     el > 0
 end
 
-isabovehorizon(frame::ReferenceFrame,source::PointSource) = isabovehorizon(frame,direction(source))
+function isabovehorizon(frame::ReferenceFrame,source::PointSource)
+    isabovehorizon(frame,direction(source))
+end
 
 ################################################################################
 # I/O
@@ -150,15 +152,19 @@ function readsources(filename::AbstractString)
     parsed_sources = JSON.parsefile(filename)
     for parsed_source in parsed_sources
         name  = parsed_source["name"]
-        ra    = parsed_source["ra"]
-        dec   = parsed_source["dec"]
+        if name == "Sun"
+            dir = Direction(Measures.SUN)
+        else
+            ra  = parsed_source["ra"]
+            dec = parsed_source["dec"]
+            dir = Direction(Measures.J2000,Quanta.parse_ra(ra),Quanta.parse_dec(dec))
+        end
         I     = parsed_source["I"]
         Q     = parsed_source["Q"]
         U     = parsed_source["U"]
         V     = parsed_source["V"]
         freq  = parsed_source["freq"]
         index = parsed_source["index"]
-        dir = Direction(Measures.J2000,Quanta.parse_ra(ra),Quanta.parse_dec(dec))
         push!(sources,PointSource(name,dir,I,Q,U,V,freq,index))
     end
     sources
@@ -172,8 +178,10 @@ function writesources(filename::AbstractString,sources::Vector{PointSource})
         dict = Dict{UTF8String,Any}()
         dict["ref"]   = "TTCal"
         dict["name"]  = source.name
-        dict["ra"]    = Quanta.format_ra(ra)
-        dict["dec"]   = Quanta.format_dec(dec)
+        if name != "Sun"
+            dict["ra"]    = Quanta.format_ra(ra)
+            dict["dec"]   = Quanta.format_dec(dec)
+        end
         dict["I"]     = source.I
         dict["Q"]     = source.Q
         dict["U"]     = source.U

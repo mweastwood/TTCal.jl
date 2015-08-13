@@ -25,20 +25,24 @@ in a given direction (if all baselines are weighted equally).
 """ ->
 function getspec(ms::Table,
                  dir::Direction)
-    frame = reference_frame(ms)
-    ν = freq(ms)
+    phase_dir = MeasurementSets.phase_direction(ms)
+    u,v,w = MeasurementSets.uvw(ms)
+    ν = MeasurementSets.frequency(ms)
+    ant1,ant2 = MeasurementSets.antennas(ms)
+    l,m = dir2lm(phase_dir,dir)
+
+    frame = ReferenceFrame()
+    set!(frame,MeasurementSets.position(ms))
+    set!(frame,MeasurementSets.time(ms))
 
     # Return a sensible default value if the source is below the horizon
     if !isabovehorizon(frame,dir)
         return zeros(length(ν)),zeros(length(ν)),zeros(length(ν)),zeros(length(ν))
     end
 
-    data  = Tables.checkColumnExists(ms,"CORRECTED_DATA")? ms["CORRECTED_DATA"] : ms["DATA"]
-    flags = ms["FLAG"]
-    phase = phase_dir(ms)
-    l,m = dir2lm(phase,dir)
-    u,v,w = uvw(ms)
-    ant1,ant2 = ants(ms)
+    data  = MeasurementSets.corrected_data(ms)
+    flags = MeasurementSets.flags(ms)
+
     getspec_internal(data,flags,l,m,u,v,w,ν,ant1,ant2)
 end
 
