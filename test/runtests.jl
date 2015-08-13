@@ -93,37 +93,37 @@ function createms()
 end
 
 const gaintable = tempname()*".bcal"
-const bandpass_args = Dict("--input"     => "",
-                           "--output"    => gaintable,
-                           "--sources"   => "sources.json",
-                           "--maxiter"   => 100,
-                           "--tolerance" => 1e-6)
+const gaincal_args = Dict("--input"     => "",
+                          "--output"    => gaintable,
+                          "--sources"   => "sources.json",
+                          "--maxiter"   => 100,
+                          "--tolerance" => 1e-6)
 
 const maxiter = 100
 const tolerance = 1e-6
 
 const sources = filter(source -> TTCal.isabovehorizon(frame,source),readsources("sources.json"))
 
-function test_bandpass(cal,data,model)
+function test_gaincal(cal,data,model)
     mycal = TTCal.GainCalibration(Nant,Nfreq)
     flags = zeros(Bool,size(data))
-    TTCal.bandpass_internal!(mycal,data,model,flags,
-                             ant1,ant2,maxiter,tolerance,1)
+    TTCal.gaincal_internal!(mycal,data,model,flags,
+                            ant1,ant2,maxiter,tolerance,1)
     @test vecnorm(mycal.gains-cal.gains)/vecnorm(cal.gains) < 1e-4
 
     name,ms = createms()
-    bandpass_args["--input"] = name
+    gaincal_args["--input"] = name
     ms["DATA"] = data
     ms["FLAG"] = flags
     ms["FLAG_ROW"] = zeros(Bool,Nbase)
     finalize(ms)
 
-    TTCal.run_bandpass(bandpass_args)
+    TTCal.run_gaincal(gaincal_args)
     mycal = TTCal.read(gaintable)
     @test vecnorm(mycal.gains-cal.gains)/vecnorm(cal.gains) < 1e-4
 
     rm(gaintable)
-    run(`$JULIA_HOME/julia ../src/ttcal.jl bandpass --input $name --output $gaintable --sources sources.json --maxiter 100 --tolerance 1e-6`)
+    run(`$JULIA_HOME/julia ../src/ttcal.jl gaincal --input $name --output $gaintable --sources sources.json --maxiter 100 --tolerance 1e-6`)
     mycal = TTCal.read(gaintable)
     @test vecnorm(mycal.gains-cal.gains)/vecnorm(cal.gains) < 1e-4
 end
@@ -135,7 +135,7 @@ function test_one()
     cal.gains[:] = 1
     model = genvis(frame,phase_dir,sources,u,v,w,ν)
     data  = copy(model)
-    test_bandpass(cal,data,model)
+    test_gaincal(cal,data,model)
 end
 test_one()
 
@@ -149,7 +149,7 @@ function test_two()
     data  = copy(model)
     flags = zeros(Bool,size(data))
     applycal!(data,flags,TTCal.invert(cal),ant1,ant2)
-    test_bandpass(cal,data,model)
+    test_gaincal(cal,data,model)
 end
 test_two()
 
@@ -169,7 +169,7 @@ function test_three()
         data[:,:,α] = rand(4,Nfreq)
         α += Nant-ant+1
     end
-    test_bandpass(cal,data,model)
+    test_gaincal(cal,data,model)
 end
 test_three()
 

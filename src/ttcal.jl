@@ -27,12 +27,12 @@ CLI.set_banner("""
 
 CLI.print_banner()
 
-push!(CLI.commands,Command("bandpass","Solve for a bandpass calibration."))
-#push!(CLI.commands,Command("polcal","Solve for a polarization calibration."))
+push!(CLI.commands,Command("gaincal","Solve for a gain calibration."))
+push!(CLI.commands,Command("polcal","Solve for a polarization calibration."))
 push!(CLI.commands,Command("peel","Peel sources from the dataset."))
 push!(CLI.commands,Command("applycal","Apply a calibration."))
 
-CLI.options["bandpass"] = [
+CLI.options["gaincal"] = [
     Option("--input","""
         The measurement set used to solve for the calibration.""",
         T=UTF8String,
@@ -66,7 +66,7 @@ CLI.options["bandpass"] = [
     Option("--force-imaging","""
         Create and use the MODEL_DATA and CORRECTED_DATA columns even if
         they do not already exist in the measurement set.""")]
-#CLI.options["polcal"] = CLI.options["bandpass"]
+CLI.options["polcal"] = CLI.options["gaincal"]
 CLI.options["peel"] = [
     Option("--input","""
         The measurement set that will have sources peeled.""",
@@ -116,10 +116,10 @@ import TTCal
 # (comment out the try/catch block for debugging)
 try
     command,args = CLI.parse_args(ARGS)
-    if     command == "bandpass"
-        TTCal.run_bandpass(args)
-#    elseif command == "polcal"
-#        TTCal.run_polcal(args)
+    if     command == "gaincal"
+        TTCal.run_gaincal(args)
+    elseif command == "polcal"
+        TTCal.run_polcal(args)
     elseif command == "applycal"
         TTCal.run_applycal(args)
     end
