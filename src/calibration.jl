@@ -44,16 +44,21 @@ function applycal!(data::Array{Complex64,3},
     data
 end
 
+"""
+Corrupt the model data as if it had been observed
+with an instrument with the given calibration.
+"""
+function corrupt!(data::Array{Complex64,3},
+                  cal::Calibration,
+                  ant1,ant2)
+    flags = fill(false,size(data))
+    corrupt!(data,flags,cal,ant1,ant2)
+end
+
 import JLD
 write(filename,calibration::Calibration) = JLD.save(filename,"cal",calibration)
 read(filename) = JLD.load(filename,"cal")
 
 include("gaincal.jl")
 include("polcal.jl")
-
-"""
-Corrupt the model data as if it had been observed
-with an instrument with the given calibration.
-"""
-corrupt!
 

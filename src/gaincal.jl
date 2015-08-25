@@ -122,7 +122,6 @@ function gaincal_onechannel!(gains, gain_flags,
                              maxiter, tolerance)
     # If the entire channel is flagged, don't bother calibrating.
     if all(data_flags)
-        gains[:] = 1
         gain_flags[:] = true
         return
     end
@@ -135,7 +134,6 @@ function gaincal_onechannel!(gains, gain_flags,
 
     # Flag the entire channel if the solution did not converge.
     if !converged
-        gains[:] = 1
         gain_flags[:] = true
         return
     end
@@ -232,12 +230,11 @@ function corrupt!(data::Array{Complex64,3},
                                    || cal.flags[ant2[α],β,1]
                                    || cal.flags[ant2[α],β,2])
             flags[:,β,α] = true
-        else
-            data[1,β,α] = cal.gains[ant1[α],β,1]*conj(cal.gains[ant2[α],β,1])*data[1,β,α]
-            data[2,β,α] = cal.gains[ant1[α],β,1]*conj(cal.gains[ant2[α],β,2])*data[2,β,α]
-            data[3,β,α] = cal.gains[ant1[α],β,2]*conj(cal.gains[ant2[α],β,1])*data[3,β,α]
-            data[4,β,α] = cal.gains[ant1[α],β,2]*conj(cal.gains[ant2[α],β,2])*data[4,β,α]
         end
+        data[1,β,α] = cal.gains[ant1[α],β,1]*conj(cal.gains[ant2[α],β,1])*data[1,β,α]
+        data[2,β,α] = cal.gains[ant1[α],β,1]*conj(cal.gains[ant2[α],β,2])*data[2,β,α]
+        data[3,β,α] = cal.gains[ant1[α],β,2]*conj(cal.gains[ant2[α],β,1])*data[3,β,α]
+        data[4,β,α] = cal.gains[ant1[α],β,2]*conj(cal.gains[ant2[α],β,2])*data[4,β,α]
     end
 end
 

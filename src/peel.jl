@@ -13,12 +13,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-################################################################################
-# Public Interface
-
 function peel!(ms::Table,
                sources::Vector{PointSource};
-               maxiter::Int = 10,
+               maxiter::Int = 20,
                tolerance::Float64 = 1e-3,
                minuvw::Float64 = 0.0)
     phase_dir = MeasurementSets.phase_direction(ms)
@@ -40,17 +37,14 @@ function peel!(ms::Table,
     calibrations = [GainCalibration(Nant,Nfreq) for source in sources]
     coherencies  = [genvis(frame,phase_dir,[source],u,v,w,ν) for source in sources]
 
-    peel_internal!(calibrations,coherencies,data,flags,
-                   u,v,w,ν,ant1,ant2,maxiter,tolerance,minuvw)
+    peel!(calibrations,coherencies,data,flags,
+          u,v,w,ν,ant1,ant2,maxiter,tolerance,minuvw)
     ms["CORRECTED_DATA"] = data
     calibrations
 end
 
-################################################################################
-# Internal Interface
-
-function peel_internal!(calibrations,coherencies,data,flags,
-                        u,v,w,ν,ant1,ant2,maxiter,tolerance,minuvw)
+function peel!(calibrations,coherencies,data,flags,
+               u,v,w,ν,ant1,ant2,maxiter,tolerance,minuvw)
     Nsource = length(calibrations)
     Nfreq = size(data,2)
     Nbase = size(data,3)
@@ -84,9 +78,9 @@ function peel_internal!(calibrations,coherencies,data,flags,
                 data[i] += corrupted[i]
             end
 
-            bandpass_internal!(calibration_toward_source,
-                               data,coherency,flags,
-                               ant1,ant2,maxiter,tolerance,1)
+            gaincal!(calibration_toward_source,
+                     data,coherency,flags,
+                     ant1,ant2,maxiter,tolerance,1)
 
             # Take the source back out of the measured visibilities,
             # but this time subtract it with the corrected gains toward
@@ -99,17 +93,5 @@ function peel_internal!(calibrations,coherencies,data,flags,
         end
     end
     nothing
-end
-
-function corrupt!(data::Array{Complex64,3},
-                  cal::GainCalibration,
-                  ant1,ant2)
-    Nbase = length(ant1)
-    for α = 1:Nbase, β = 1:Nfreq(cal)
-        data[1,β,α] = cal.gains[ant1[α],β,1]*conj(cal.gains[ant2[α],β,1])*data[1,β,α]
-        data[2,β,α] = cal.gains[ant1[α],β,1]*conj(cal.gains[ant2[α],β,2])*data[2,β,α]
-        data[3,β,α] = cal.gains[ant1[α],β,2]*conj(cal.gains[ant2[α],β,1])*data[3,β,α]
-        data[4,β,α] = cal.gains[ant1[α],β,2]*conj(cal.gains[ant2[α],β,2])*data[4,β,α]
-    end
 end
 
