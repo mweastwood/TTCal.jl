@@ -64,6 +64,7 @@ function gaincal(ms::Table,
                  tolerance::Float64 = 1e-5,
                  force_imaging_columns::Bool = false,
                  reference_antenna::Int = 1)
+    println("This is Marin's copy")
     phase_dir = MeasurementSets.phase_direction(ms)
     u,v,w = MeasurementSets.uvw(ms)
     ν = MeasurementSets.frequency(ms)
