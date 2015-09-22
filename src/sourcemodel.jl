@@ -55,16 +55,16 @@ end
 
 for param in (:I,:Q,:U,:V)
     func = symbol("stokes",param)
-    @eval function $func{T<:FloatingPoint}(source::PointSource,frequency::T)
+    @eval function $func{T<:AbstractFloat}(source::PointSource,frequency::T)
         powerlaw(source.$param,source.index,source.reffreq,frequency)
     end
-    @eval function $func{T<:FloatingPoint}(source::PointSource,frequencies::Vector{T})
+    @eval function $func{T<:AbstractFloat}(source::PointSource,frequencies::Vector{T})
         [$func(source,frequency) for frequency in frequencies]
     end
 end
 
-flux{T<:FloatingPoint}(source::PointSource,frequency::T) = stokesI(source,frequency)
-flux{T<:FloatingPoint}(source::PointSource,frequencies::Vector{T}) = stokesI(source,frequencies)
+flux{T<:AbstractFloat}(source::PointSource,frequency::T) = stokesI(source,frequency)
+flux{T<:AbstractFloat}(source::PointSource,frequencies::Vector{T}) = stokesI(source,frequencies)
 
 ################################################################################
 # Position
