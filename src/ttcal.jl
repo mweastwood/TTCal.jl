@@ -122,6 +122,8 @@ try
         TTCal.run_polcal(args)
     elseif command == "applycal"
         TTCal.run_applycal(args)
+    elseif command == "peel"
+        TTCal.run_peel(args)
     end
 catch err
     if isa(err, ErrorException)

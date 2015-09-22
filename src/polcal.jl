@@ -99,7 +99,6 @@ function polcal_onechannel!(jones, jones_flags,
                             maxiter, tolerance)
     # If the entire channel is flagged, don't bother calibrating.
     if all(data_flags)
-        jones[:] = JonesMatrix()
         jones_flags[:] = true
         return
     end
@@ -112,8 +111,7 @@ function polcal_onechannel!(jones, jones_flags,
 
     # Flag the entire channel if the solution did not converge.
     if !converged
-        gains[:] = 1
-        gain_flags[:] = true
+        jones_flags[:] = true
         return
     end
 
@@ -168,17 +166,16 @@ function corrupt!(data::Array{Complex64,3},
     for α = 1:Nbase, β = 1:Nfreq(cal)
         if cal.flags[ant1[α],β] || cal.flags[ant2[α],β]
             flags[:,β,α] = true
-        else
-            V = JonesMatrix(data[1,β,α],data[2,β,α],
-                            data[3,β,α],data[4,β,α])
-            G1 = cal.jones[ant1[α],β]
-            G2 = cal.jones[ant2[α],β]
-            V = G1*V*G2'
-            data[1,β,α] = V.xx
-            data[2,β,α] = V.xy
-            data[3,β,α] = V.yx
-            data[4,β,α] = V.yy
         end
+        V = JonesMatrix(data[1,β,α],data[2,β,α],
+                        data[3,β,α],data[4,β,α])
+        G1 = cal.jones[ant1[α],β]
+        G2 = cal.jones[ant2[α],β]
+        V = G1*V*G2'
+        data[1,β,α] = V.xx
+        data[2,β,α] = V.xy
+        data[3,β,α] = V.yx
+        data[4,β,α] = V.yy
     end
 end
 

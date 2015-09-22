@@ -1,12 +1,13 @@
 language: julia
 julia:
+    - 0.4
     - nightly
 notifications:
     email: false
 before_install:
-    - sudo add-apt-repository ppa:ska-sa/main -y
+    - sudo add-apt-repository ppa:radio-astro/main -y
     - sudo apt-get update -qq -y
-    - sudo apt-get install libcasacore-dev -y
+    - sudo apt-get install libcasacore2-dev -y
     - sudo apt-get install casacore-data -y
     - julia -e "Pkg.clone(\"https://github.com/mweastwood/CLI.jl.git\")"
     - julia -e "Pkg.clone(\"CasaCore\")"
@@ -16,5 +17,5 @@ script:
     - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
     - julia --check-bounds=yes -e "Pkg.clone(pwd()); Pkg.test(\"TTCal\"; coverage=true)"
 after_success:
-    - julia -e "cd(Pkg.dir(\"TTCal\")); Pkg.add(\"Coverage\"); using Coverage; Coveralls.submit(Coveralls.process_folder())"
+    - julia -e "cd(Pkg.dir(\"TTCal\")); Pkg.add(\"Coverage\"); using Coverage; Codecov.submit(process_folder())"
 

@@ -76,8 +76,8 @@ Convert the direction into a right ascension and declination.
 """ ->
 function dir2radec(frame::ReferenceFrame,dir::Direction)
     j2000 = measure(frame,dir,Measures.J2000)
-    ra  = longitude(azel)
-    dec = latitude(azel)
+    ra  = longitude(j2000)
+    dec = latitude(j2000)
     ra,dec
 end
 
