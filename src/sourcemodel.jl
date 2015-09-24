@@ -159,10 +159,17 @@ function readsources(filename::AbstractString)
             dec = parsed_source["dec"]
             dir = Direction(Measures.J2000,Quanta.parse_ra(ra),Quanta.parse_dec(dec))
         end
-        I     = parsed_source["I"]
-        Q     = parsed_source["Q"]
-        U     = parsed_source["U"]
-        V     = parsed_source["V"]
+        if haskey(parsed_source,"flux")
+            I = parsed_source["flux"]
+            Q = 0.0
+            U = 0.0
+            V = 0.0
+        else
+            I = parsed_source["I"]
+            Q = parsed_source["Q"]
+            U = parsed_source["U"]
+            V = parsed_source["V"]
+        end
         freq  = parsed_source["freq"]
         index = parsed_source["index"]
         push!(sources,PointSource(name,dir,I,Q,U,V,freq,index))
