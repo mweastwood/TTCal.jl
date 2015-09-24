@@ -16,11 +16,11 @@
 ################################################################################
 # Public Interface
 
-@doc """
+"""
 Generate model visibilities for a given point source model.
 No gridding is performed, so the runtime of this naive
 algorithm scales as O(Nbase×Nsource).
-""" ->
+"""
 function genvis(ms::Table,sources::Vector{PointSource})
     phase_dir = MeasurementSets.phase_direction(ms)
     u,v,w = MeasurementSets.uvw(ms)
@@ -77,9 +77,9 @@ function genvis!(model::Array{Complex64,3},
     l,m = lm(frame,phase_dir,source)
     att = beammodel(frame,phase_dir,l,m)
     I = stokesI(source,ν) * att
-    Q = stokesQ(source,ν) 
-    U = stokesU(source,ν) 
-    V = stokesV(source,ν) 
+    Q = stokesQ(source,ν)
+    U = stokesU(source,ν)
+    V = stokesV(source,ν)
     genvis!(model,I,Q,U,V,l,m,u,v,w,ν)
 end
 
