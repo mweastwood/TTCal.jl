@@ -46,7 +46,7 @@ doc"""
     invert(cal::GainCalibration)
 
 Returns the inverse of the given calibration.
-The gain $g$ of each antenna is set to $1/g$.
+The complex gain $g$ of each antenna is set to $1/g$.
 """
 function invert(cal::GainCalibration)
     output = GainCalibration(Nant(cal),Nfreq(cal))
