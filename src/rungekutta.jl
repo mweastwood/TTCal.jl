@@ -15,31 +15,31 @@
 
 abstract StepFunction
 
-@doc """
+"""
 The Butcher tableau for the 2nd-order Runge-Kutta method.
-""" ->
+"""
 const RK2_tableau = [1/2 0.0
                      0.0 1.0]
 
-@doc """
+"""
 The Butcher tableau for the 3rd-order Runge-Kutta method.
-""" ->
+"""
 const RK3_tableau = [1/2 0.0 0.0;
                     -1.0 2.0 0.0;
                      1/6 2/3 1/6]
 
-@doc """
+"""
 The Butcher tableau for the 4th-order Runge-Kutta method.
-""" ->
+"""
 const RK4_tableau = [1/2 0.0 0.0 0.0;
                      0.0 1/2 0.0 0.0;
                      0.0 0.0 1.0 0.0;
                      1/6 1/3 1/3 1/6]
 
-@doc """
+"""
 This singleton type is used to indicate which Runge-Kutta method
 should be used. For example, `RK{4}` tells us to use the RK4 method.
-""" ->
+"""
 immutable RK{N} end
 RK(N) = RK{N}()
 rkorder{N}(::RK{N}) = N
@@ -82,7 +82,7 @@ const RK4 = RK(4)
     end
 end
 
-@doc """
+"""
 Take a Runge-Kutta step.
 * `step(x,args...)` must return the list of steps to take from the given location `x`
 * `rk` is the order of the Runge-Kutta method to use (eg. `RK4`)

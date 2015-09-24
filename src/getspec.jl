@@ -16,13 +16,13 @@
 ################################################################################
 # Public Interface
 
-@doc """
+"""
 This function extracts the spectrum in a given direction by means of an
 inverse discrete Fourier transform. Note that no gridding is performed,
 so this does *not* use a fast Fourier transform. However, the inverse
 discrete Fourier transform *is* the least squares estimator for the flux
 in a given direction (if all baselines are weighted equally).
-""" ->
+"""
 function getspec(ms::Table,
                  dir::Direction)
     phase_dir = MeasurementSets.phase_direction(ms)

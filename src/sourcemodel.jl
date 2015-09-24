@@ -16,7 +16,7 @@
 ################################################################################
 # Source Definitions
 
-@doc """
+"""
 These sources have a multi-component power-law spectrum
 such that:
 
@@ -25,7 +25,7 @@ such that:
 
 Polarized fluxes are obtained in a similar manner by
 substituting Q/U/V for I in the above expression.
-""" ->
+"""
 type PointSource
     name::ASCIIString
     dir::Direction
@@ -71,9 +71,9 @@ flux{T<:AbstractFloat}(source::PointSource,frequencies::Vector{T}) = stokesI(sou
 
 direction(source::PointSource) = source.dir
 
-@doc """
+"""
 Convert the direction into a right ascension and declination.
-""" ->
+"""
 function dir2radec(frame::ReferenceFrame,dir::Direction)
     j2000 = measure(frame,dir,Measures.J2000)
     ra  = longitude(j2000)
@@ -81,9 +81,9 @@ function dir2radec(frame::ReferenceFrame,dir::Direction)
     ra,dec
 end
 
-@doc """
+"""
 Convert the direction into an azimuth and elevation.
-""" ->
+"""
 function dir2azel(frame::ReferenceFrame,dir::Direction)
     azel = measure(frame,dir,Measures.AZEL)
     az = longitude(azel)
@@ -91,9 +91,9 @@ function dir2azel(frame::ReferenceFrame,dir::Direction)
     az,el
 end
 
-@doc """
+"""
 Convert the direction into the standard radio coordinate system.
-""" ->
+"""
 function dir2lm{ref}(frame::ReferenceFrame,phase_dir::Direction{Measures.J2000},dir::Direction{ref})
     long = longitude(phase_dir)
     lat  = latitude(phase_dir)

@@ -33,11 +33,11 @@ function subsrc!(ms::Table,sources::Vector{PointSource})
     subtracted
 end
 
-@doc """
+"""
 Subtract all of the measured flux from a given direction.
 This should be used to remove RFI, preventing it from contaminating
 the other routines.
-""" ->
+"""
 function subsrc!(ms::Table,dir::Direction)
     phase_dir = MeasurementSets.phase_direction(ms)
     u,v,w = MeasurementSets.uvw(ms)
