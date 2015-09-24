@@ -59,6 +59,7 @@ import JLD
 write(filename,calibration::Calibration) = JLD.save(filename,"cal",calibration)
 read(filename) = JLD.load(filename,"cal")
 
+include("ampcal.jl")
 include("gaincal.jl")
 include("polcal.jl")
 

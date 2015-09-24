@@ -204,8 +204,8 @@ function gaincal_step(input,data,model)
     Nant = length(input)
     step = zeros(Complex64,Nant)
     @inbounds for j = 1:Nant
-        numerator   = Complex64(0)
-        denominator = Complex64(0)
+        numerator   = zero(Complex64)
+        denominator = zero(Complex64)
         for i = 1:Nant
             GM = input[i]*model[i,j]
             numerator = numerator + GM'*data[i,j]
