@@ -165,11 +165,11 @@ function ampcal_step(input,data,model)
         denominator = zero(Float64)
         for i = 1:Nant
             GM = input[i]*model[i,j]
-            numerator = numerator + abs(real(GM*data[i,j]))
+            numerator = numerator + abs(real(GM'*data[i,j]))
             denominator = denominator + abs2(GM)
         end
         ok = abs(denominator) > eps(Float64)
-        step[j] = ifelse(ok,conj(numerator/denominator) - input[j],0)
+        step[j] = ifelse(ok,numerator/denominator - input[j],0)
     end
     step
 end
