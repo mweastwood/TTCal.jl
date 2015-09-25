@@ -13,9 +13,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-################################################################################
-# Public Interface
+"""
+    subsrc!(ms::Table,sources::Vector{PointSource}
 
+Remove the list of sources from the measurement set.
+"""
 function subsrc!(ms::Table,sources::Vector{PointSource})
     phase_dir = MeasurementSets.phase_direction(ms)
     u,v,w = MeasurementSets.uvw(ms)
@@ -34,9 +36,12 @@ function subsrc!(ms::Table,sources::Vector{PointSource})
 end
 
 """
+    subsrc!(ms::Table,dir::Direction)
+
 Subtract all of the measured flux from a given direction.
-This should be used to remove RFI, preventing it from contaminating
-the other routines.
+
+This can be used to remove RFI sources provided they have
+a known direction.
 """
 function subsrc!(ms::Table,dir::Direction)
     phase_dir = MeasurementSets.phase_direction(ms)
@@ -65,9 +70,6 @@ function subsrc!(ms::Table,dir::Direction)
     subtracted
 end
 
-################################################################################
-# Internal Interface
-
 function subsrc(frame::ReferenceFrame,
                 phase_dir::Direction,
                 data::Array{Complex64,3},
@@ -81,11 +83,22 @@ function subsrc(frame::ReferenceFrame,
     end
 
     model = genvis(frame,phase_dir,sources,u,v,w,ν)
-    # Re-use the space allocated for the model visibilities
-    # to store the model subtracted visibilities.
-    for i in eachindex(model)
-        model[i] = data[i]-model[i]
+    subtracted = copy(data)
+    subsrc!(subtracted,model)
+    subtracted
+end
+
+function subsrc!(data,model)
+    for i in eachindex(data,model)
+        data[i] -= model[i]
     end
-    model
+    data
+end
+
+function putsrc!(data,model)
+    for i in eachindex(data,model)
+        data[i] += model[i]
+    end
+    data
 end
 

@@ -177,6 +177,14 @@ end
 immutable AmpCalStep <: StepFunction end
 call(::AmpCalStep,g,V,M) = ampcal_step(g,V,M)
 
+function solve!(calibration::AmplitudeCalibration,
+                data,model,flags,
+                ant1,ant2,maxiter,tolerance)
+    ampcal!(calibration,
+            data,model,flags,
+            ant1,ant2,maxiter,tolerance)
+end
+
 function corrupt!(data::Array{Complex64,3},
                   flags::Array{Bool,3},
                   cal::AmplitudeCalibration,

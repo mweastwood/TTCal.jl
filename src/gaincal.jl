@@ -243,6 +243,14 @@ end
 immutable GainCalStep <: StepFunction end
 call(::GainCalStep,g,V,M) = gaincal_step(g,V,M)
 
+function solve!(calibration::GainCalibration,
+                data,model,flags,
+                ant1,ant2,maxiter,tolerance)
+    gaincal!(calibration,
+             data,model,flags,
+             ant1,ant2,maxiter,tolerance,1)
+end
+
 function corrupt!(data::Array{Complex64,3},
                   flags::Array{Bool,3},
                   cal::GainCalibration,
