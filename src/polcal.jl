@@ -14,6 +14,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 """
+    PolarizationCalibration <: Calibration
+
 This type stores the information for calibrating the
 polarization of the interferometer. That is, it stores
 Jones matrices and flags for each antenna and each
@@ -24,6 +26,13 @@ immutable PolarizationCalibration <: Calibration
     flags::Array{Bool,2}
 end
 
+"""
+    PolarizationCalibration(Nant,Nfreq)
+
+Create a calibration table for `Nant` antennas with
+`Nfreq` frequency channels where all the Jones matrices
+are initially set to the identity matrix.
+"""
 function PolarizationCalibration(Nant,Nfreq)
     jones = fill(JonesMatrix(),Nant,Nfreq)
     flags = fill(false,Nant,Nfreq)
@@ -33,6 +42,12 @@ end
 Nant(cal::PolarizationCalibration) = size(cal.jones,1)
 Nfreq(cal::PolarizationCalibration) = size(cal.jones,2)
 
+doc"""
+    invert(cal::GainCalibration)
+
+Returns the inverse of the given calibration.
+The Jones matrix $J$ of each antenna is set to $J^{-1}$.
+"""
 function invert(cal::PolarizationCalibration)
     output = PolarizationCalibration(Nant(cal),Nfreq(cal))
     for i in eachindex(cal.jones)
@@ -42,6 +57,10 @@ function invert(cal::PolarizationCalibration)
 end
 
 """
+    polcal(ms::Table, sources::Vector{PointSources};
+           maxiter = 20, tolerance = 1e-5,
+           force_imaging_columns = false)
+
 Solve for the polarization properties of the interferometer.
 """
 function polcal(ms::Table,
@@ -136,7 +155,11 @@ function polcal_makesquare(data,flags,ant1,ant2)
 end
 
 """
-This function defines the update step for `polcal`.
+    polcal_step(jones,data,model) -> step
+
+Given the `data` and `model` visibilities, and the current
+guess for the Jones matrices (`jones`), solve for `step` such
+that the new value of the Jones matrices is `jones+step`.
 """
 function polcal_step(input,data,model)
     Nant = length(input)

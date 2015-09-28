@@ -57,7 +57,7 @@ function invert(cal::AmplitudeCalibration)
 end
 
 """
-    ampcal(ms::Table,sources::Vector{PointSource};
+    ampcal(ms::Table, sources::Vector{PointSource};
            maxiter = 30, tolerance = 1e-3,
            force_imaging_columns = false)
 

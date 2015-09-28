@@ -73,7 +73,7 @@ function fixphase!(cal::GainCalibration,
 end
 
 """
-    gaincal(ms::Table,sources::Vector{PointSource};
+    gaincal(ms::Table, sources::Vector{PointSource};
             maxiter = 20, tolerance = 1e-5,
             force_imaging_columns = false,
             reference_antenna = 1)
