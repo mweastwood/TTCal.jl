@@ -77,9 +77,9 @@ function genvis!(model::Array{Complex64,3},
     l,m = lm(frame,phase_dir,source)
     att = beammodel(frame,phase_dir,l,m)
     I = stokesI(source,ν) * att
-    Q = stokesQ(source,ν)
-    U = stokesU(source,ν)
-    V = stokesV(source,ν)
+    Q = stokesQ(source,ν) * att
+    U = stokesU(source,ν) * att
+    V = stokesV(source,ν) * att
     genvis!(model,I,Q,U,V,l,m,u,v,w,ν)
 end
 

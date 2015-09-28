@@ -82,7 +82,7 @@ function polcal(ms::Table,
     Nfreq = length(ν)
     calibration = PolarizationCalibration(Nant,Nfreq)
 
-    data  = ms["DATA"]
+    data  = MeasurementSets.corrected_data(ms)
     model = genvis(frame,phase_dir,sources,u,v,w,ν)
     flags = MeasurementSets.flags(ms)
 
@@ -172,14 +172,22 @@ function polcal_step(input,data,model)
             numerator = numerator + GM'*data[i,j]
             denominator = denominator + GM'*GM
         end
-        ok = det(denominator) > eps(Float32)
-        step[j] = ifelse(ok,conj(numerator/denominator) - input[j],zero(JonesMatrix))
+        ok = abs(det(denominator)) > eps(Float32)
+        step[j] = ifelse(ok,conj(denominator\numerator) - input[j],zero(JonesMatrix))
     end
     step
 end
 
 immutable PolCalStep <: StepFunction end
 call(::PolCalStep,input,data,model) = polcal_step(input,data,model)
+
+function solve!(calibration::PolarizationCalibration,
+                data,model,flags,
+                ant1,ant2,maxiter,tolerance)
+    polcal!(calibration,
+            data,model,flags,
+            ant1,ant2,maxiter,tolerance)
+end
 
 function corrupt!(data::Array{Complex64,3},
                   flags::Array{Bool,3},
