@@ -16,11 +16,11 @@
 ################################################################################
 # Public Interface
 
-@doc """
+"""
 Fit the visibilities to a model of point sources. The input model needs
 to have the positions of the point sources relatively close, but the flux
 can be wildly off.
-""" ->
+"""
 function fitvis(ms::Table,
                 sources::Vector{PointSource};
                 minuvw::Float64 = 0.0)
@@ -231,11 +231,11 @@ function fitvis_spec(data::Array{Complex64,3},
     flux,fQ*flux,fU*flux,fV*flux,reffreq,α[2:end]
 end
 
-@doc """
+"""
 This function forces l and m to be above the horizon.
 Although this is a nasty hack, it is necessary for fitting
 some sources that are near the horizon.
-""" ->
+"""
 function force_to_horizon(l,m)
     # (check to make sure we're still above the horizon)
     r2 = l^2+m^2

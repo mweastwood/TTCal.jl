@@ -13,11 +13,26 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+"""
+    AmplitudeCalibration <: Calibration
+
+This type stores the information for calibrating only
+the amplitude of the electronic gains. It stores
+the gain amplitudes and flags for each antenna, frequency channel,
+and polarization.
+"""
 immutable AmplitudeCalibration <: Calibration
     amplitudes::Array{Float64,3}
     flags::Array{Bool,3}
 end
 
+"""
+    AmplitudeCalibration(Nant,Nfreq)
+
+Create a calibration table for `Nant` antennas with
+`Nfreq` frequency channels where all the amplitudes
+are initially set to unity.
+"""
 function AmplitudeCalibration(Nant,Nfreq)
     amplitudes = ones(Float64,Nant,Nfreq,2)
     flags = zeros(Bool,Nant,Nfreq,2)
@@ -27,6 +42,12 @@ end
 Nant(g::AmplitudeCalibration) = size(g.amplitudes,1)
 Nfreq(g::AmplitudeCalibration) = size(g.amplitudes,2)
 
+doc"""
+    invert(cal::AmplitudeCalibration)
+
+Returns the inverse of the given calibration.
+The gain amplitude $a$ of each antenna is set to $1/a$.
+"""
 function invert(cal::AmplitudeCalibration)
     output = AmplitudeCalibration(Nant(cal),Nfreq(cal))
     for i in eachindex(cal.amplitudes)
@@ -35,6 +56,13 @@ function invert(cal::AmplitudeCalibration)
     output
 end
 
+"""
+    ampcal(ms::Table, sources::Vector{PointSource};
+           maxiter = 30, tolerance = 1e-3,
+           force_imaging_columns = false)
+
+Solve for the amplitude of the interferometer's gains.
+"""
 function ampcal(ms::Table,
                 sources::Vector{PointSource};
                 maxiter::Int = 30,
@@ -122,6 +150,13 @@ function ampcal_makesquare(data,flags,ant1,ant2)
     gaincal_makesquare(data,flags,ant1,ant2)
 end
 
+"""
+    ampcal_step(amplitudes,data,model) -> step
+
+Given the `data` and `model` visibilities, and the current
+guess for the gain `amplitudes`, solve for `step` such
+that the new value of the amplitudes is `amplitudes+step`.
+"""
 function ampcal_step(input,data,model)
     Nant = length(input)
     step = zeros(Float64,Nant)
@@ -130,17 +165,25 @@ function ampcal_step(input,data,model)
         denominator = zero(Float64)
         for i = 1:Nant
             GM = input[i]*model[i,j]
-            numerator = numerator + abs(real(GM*data[i,j]))
+            numerator = numerator + abs(real(GM'*data[i,j]))
             denominator = denominator + abs2(GM)
         end
         ok = abs(denominator) > eps(Float64)
-        step[j] = ifelse(ok,conj(numerator/denominator) - input[j],0)
+        step[j] = ifelse(ok,numerator/denominator - input[j],0)
     end
     step
 end
 
 immutable AmpCalStep <: StepFunction end
 call(::AmpCalStep,g,V,M) = ampcal_step(g,V,M)
+
+function solve!(calibration::AmplitudeCalibration,
+                data,model,flags,
+                ant1,ant2,maxiter,tolerance)
+    ampcal!(calibration,
+            data,model,flags,
+            ant1,ant2,maxiter,tolerance)
+end
 
 function corrupt!(data::Array{Complex64,3},
                   flags::Array{Bool,3},

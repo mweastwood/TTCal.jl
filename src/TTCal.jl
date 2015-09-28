@@ -25,7 +25,9 @@ export getspec
 export fitvis
 export subsrc!
 
-export ampcal, gaincal, polcal
+export AmplitudeCalibration, ampcal
+export GainCalibration, gaincal
+export PolarizationCalibration, polcal
 export applycal!, corrupt!
 export peel!
 

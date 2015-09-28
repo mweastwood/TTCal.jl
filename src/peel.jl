@@ -13,11 +13,28 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-function peel!(ms::Table,
-               sources::Vector{PointSource};
-               maxiter::Int = 20,
-               tolerance::Float64 = 1e-3,
-               minuvw::Float64 = 0.0)
+"""
+    peel!{T<:Calibration}(::Type{T},
+                          ms::Table,
+                          sources::Vector{PointSource};
+                          maxiter = 20, tolerance = 1e-3,
+                          minuvw = 0.0)
+
+Peel the given list of sources from the measurement set.
+
+The type supplied as the first argument determines the
+manner in which the sources are peeled:
+
+* `PolarizationCalibration` - each source receives a full set of Jones matrices
+* `GainCalibration` - each source receives a full set of complex gains
+* `AmplitudeCalibration` - each source receives a full set of gain amplitudes
+"""
+function peel!{T<:Calibration}(::Type{T},
+                               ms::Table,
+                               sources::Vector{PointSource};
+                               maxiter::Int = 20,
+                               tolerance::Float64 = 1e-3,
+                               minuvw::Float64 = 0.0)
     phase_dir = MeasurementSets.phase_direction(ms)
     u,v,w = MeasurementSets.uvw(ms)
     ν = MeasurementSets.frequency(ms)
@@ -34,7 +51,7 @@ function peel!(ms::Table,
     data  = MeasurementSets.corrected_data(ms)
     flags = MeasurementSets.flags(ms)
 
-    calibrations = [GainCalibration(Nant,Nfreq) for source in sources]
+    calibrations = [T(Nant,Nfreq) for source in sources]
     coherencies  = [genvis(frame,phase_dir,[source],u,v,w,ν) for source in sources]
 
     peel!(calibrations,coherencies,data,flags,
@@ -52,9 +69,7 @@ function peel!(calibrations,coherencies,data,flags,
     # Subtract all of the sources
     # (assuming the beam is unity towards each source)
     for coherency in coherencies
-        for i in eachindex(data)
-            data[i] -= coherency[i]
-        end
+        subsrc!(data,coherency)
     end
 
     # Flag all of the short baselines
@@ -74,22 +89,20 @@ function peel!(calibrations,coherencies,data,flags,
             # Put one source back into the visibilities.
             corrupted = copy(coherency)
             corrupt!(corrupted,calibration_toward_source,ant1,ant2)
-            for i in eachindex(data)
-                data[i] += corrupted[i]
-            end
+            putsrc!(data,corrupted)
 
-            gaincal!(calibration_toward_source,
-                     data,coherency,flags,
-                     ant1,ant2,maxiter,tolerance,1)
+            # Solve for the calibration in the direction
+            # of the current source.
+            solve!(calibration_toward_source,
+                   data,coherency,flags,
+                   ant1,ant2,maxiter,tolerance)
 
             # Take the source back out of the measured visibilities,
             # but this time subtract it with the corrected gains toward
             # that direction.
             corrupted = copy(coherency)
             corrupt!(corrupted,calibration_toward_source,ant1,ant2)
-            for i in eachindex(data)
-                data[i] -= corrupted[i]
-            end
+            subsrc!(data,corrupted)
         end
     end
     nothing

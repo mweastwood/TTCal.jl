@@ -14,6 +14,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 """
+    GainCalibration <: Calibration
+
 This type stores the information for calibrating the
 electronic gains of the interferometer. That is, it stores
 complex gains and flags for each antenna, frequency channel,
@@ -24,6 +26,13 @@ immutable GainCalibration <: Calibration
     flags::Array{Bool,3}
 end
 
+"""
+    GainCalibration(Nant,Nfreq)
+
+Create a calibration table for `Nant` antennas with
+`Nfreq` frequency channels where all the gains are
+initially set to unity.
+"""
 function GainCalibration(Nant,Nfreq)
     gains = ones(Complex64,Nant,Nfreq,2)
     flags = zeros(Bool,Nant,Nfreq,2)
@@ -33,6 +42,12 @@ end
 Nant(cal::GainCalibration) = size(cal.gains,1)
 Nfreq(cal::GainCalibration) = size(cal.gains,2)
 
+doc"""
+    invert(cal::GainCalibration)
+
+Returns the inverse of the given calibration.
+The complex gain $g$ of each antenna is set to $1/g$.
+"""
 function invert(cal::GainCalibration)
     output = GainCalibration(Nant(cal),Nfreq(cal))
     for i in eachindex(cal.gains)
@@ -42,6 +57,8 @@ function invert(cal::GainCalibration)
 end
 
 """
+    fixphase!(cal::GainCalibration,reference_antenna)
+
 Set the phase of the reference antenna to zero.
 """
 function fixphase!(cal::GainCalibration,
@@ -56,6 +73,11 @@ function fixphase!(cal::GainCalibration,
 end
 
 """
+    gaincal(ms::Table, sources::Vector{PointSource};
+            maxiter = 20, tolerance = 1e-5,
+            force_imaging_columns = false,
+            reference_antenna = 1)
+
 Solve for the interferometer's electronic gains.
 """
 function gaincal(ms::Table,
@@ -157,17 +179,18 @@ function gaincal_makesquare(data,flags,ant1,ant2)
     output
 end
 
-"""
+doc"""
+    gaincal_firstguess(data,model)
+
 Take a rough first guess at the visibilities.
 
 This function works by looking for the principle eigenvector
-of the matrix Gij = (Vij/Mij) where V is the matrix of measured
-visibilities, and M is the matrix of model visibilities. In the
-absence of noise, and if the model is complete, then G = gg',
-where g is the vector of complex gains.
+of the matrix $G[i,j] = data[i,j]/model[i,j]$. In the
+absence of noise, and if the model is complete, then $G = g g^{*}$,
+where $g$ is the vector of complex gains.
 
 The main confounding factor for this method is the presence of
-a nonzero noise term on the diagonal (from the autocorrelations).
+an additive noise term on the diagonal (from the autocorrelations).
 Most calibration routines neglect the autocorrelations for this
 reason, but there is no obvious way to exclude them in this case.
 Hence we use this as a first guess to an iterative method that
@@ -183,22 +206,22 @@ function gaincal_firstguess(data,model)
     squeeze(v,2)*w
 end
 
-"""
-This function defines the step for an iterative method of
-solving for the complex gains. It is based on the work of
-Stef Salvini.
+doc"""
+    gaincal_step(gains,data,model) -> step
 
-This method avoids the need to construct and invert huge
-Jacobian matrices by ignoring the derivative of the residuals
-altogether. Instead an incredibly simple update step is
-defined. Convergence is then accelerated by taking clever
-linear combinations of these steps (as is done in numerical
-ODE solvers).
+Given the `data` and `model` visibilities, and the current
+guess for the electronic `gains`, solve for `step` such
+that the new value of the gains is `gains+step`.
 
-The update step defined here is g[i] → linear least squares
-solution of V = g[i]*M*g', where V and M are vectors containing
-the measured and model visibilities where antenna i is the
-first antenna.
+The update step is defined such that the new value of the
+gains minimizes
+$\sum_{i,j}\|data[i,j] - gains[i,j] conj(newgains[i,j]) model[i,j]\|^2$,
+where $i$ and $j$ label the antennas.
+
+*References*
+
+* Michell, D. et al. 2008, JSTSP, 2, 5
+* Salvini, S. & Wijnholds, S. 2014, A&A, 571, 97
 """
 function gaincal_step(input,data,model)
     Nant = length(input)
@@ -219,6 +242,14 @@ end
 
 immutable GainCalStep <: StepFunction end
 call(::GainCalStep,g,V,M) = gaincal_step(g,V,M)
+
+function solve!(calibration::GainCalibration,
+                data,model,flags,
+                ant1,ant2,maxiter,tolerance)
+    gaincal!(calibration,
+             data,model,flags,
+             ant1,ant2,maxiter,tolerance,1)
+end
 
 function corrupt!(data::Array{Complex64,3},
                   flags::Array{Bool,3},
