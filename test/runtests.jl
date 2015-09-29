@@ -5,6 +5,7 @@ using CasaCore.Measures
 using CasaCore.Tables
 
 srand(123)
+include("jones.jl")
 
 # Test fringepattern!
 ϕ = linspace(1,10,100)
