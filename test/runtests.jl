@@ -6,6 +6,7 @@ using CasaCore.Tables
 
 srand(123)
 include("jones.jl")
+include("sourcemodel.jl")
 
 # Test fringepattern!
 ϕ = linspace(1,10,100)
@@ -240,37 +241,4 @@ function test_subsrc()
 end
 test_subsrc()
 
-function test_sourceio()
-    name = tempname()
-    writesources(name,sources)
-    _sources = readsources(name)
-    for i = 1:length(sources)
-        @test sources[i].name == _sources[i].name
-        @test Measures.reference(sources[i].dir) == Measures.reference(_sources[i].dir)
-        @test_approx_eq_eps longitude(sources[i].dir) longitude(_sources[i].dir) 1e-8
-        @test_approx_eq_eps latitude(sources[i].dir) latitude(_sources[i].dir) 1e-8
-        @test sources[i].I == _sources[i].I
-        @test sources[i].Q == _sources[i].Q
-        @test sources[i].U == _sources[i].U
-        @test sources[i].V == _sources[i].V
-        @test sources[i].reffreq == _sources[i].reffreq
-        @test sources[i].index == _sources[i].index
-    end
-end
-test_sourceio()
-
-function test_lm()
-    l = 2rand()-1
-    m = 2rand()-1
-    while hypot(l,m) > 1
-        l = 2rand()-1
-        m = 2rand()-1
-    end
-    phase_dir = Direction(Measures.J2000,ra"19h59m28.35663s",dec"+40d44m02.0970s")
-    dir = TTCal.lm2dir(phase_dir,l,m)
-    l_,m_ = TTCal.dir2lm(frame,phase_dir,dir)
-    @test_approx_eq l l_
-    @test_approx_eq m m_
-end
-test_lm()
 
