@@ -75,6 +75,7 @@ function genvis!(model::Array{Complex64,3},
                  w::Vector{Float64},
                  ν::Vector{Float64})
     l,m = lm(frame,phase_dir,source)
+    # att = beammodel(frame,phase_dir,l,m,mean(ν)) # currently using J.Dowell beam model
     att = beammodel(frame,phase_dir,l,m)
     I = stokesI(source,ν) * att
     Q = stokesQ(source,ν) * att

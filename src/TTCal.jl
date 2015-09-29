@@ -35,6 +35,7 @@ importall Base.Operators
 import Base: zero, one, det, inv, norm
 
 using JSON
+using JLD
 using CasaCore.Quanta
 using CasaCore.Measures
 using CasaCore.Tables
