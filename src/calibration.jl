@@ -55,7 +55,6 @@ function corrupt!(data::Array{Complex64,3},
     corrupt!(data,flags,cal,ant1,ant2)
 end
 
-import JLD
 write(filename,calibration::Calibration) = JLD.save(filename,"cal",calibration)
 read(filename) = JLD.load(filename,"cal")
 
