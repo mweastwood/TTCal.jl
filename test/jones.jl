@@ -26,6 +26,6 @@ let
     @test convert(Matrix,J1') == mat1'
     @test det(J1) ≈ det(mat1)
     @test convert(Matrix,inv(J1)) ≈ inv(mat1)
-    @test norm(J1) == vecnorm(mat1)
+    @test norm(J1) ≈ vecnorm(mat1)
 end
 
