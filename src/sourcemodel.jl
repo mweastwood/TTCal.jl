@@ -107,7 +107,7 @@ function dir2lm{ref}(frame::ReferenceFrame,phase_dir::Direction{Measures.J2000},
     # ⌈    -l    ⌉   ⌈1    0        0    ⌉   ⌈+cos(θ1) -sin(θ1) 0⌉   ⌈x⌉
     # |    -m    | = |0 +cos(θ2) -sin(θ2)| * |+sin(θ1) +cos(θ1) 0| * |y|
     # ⌊√(1-l²-m²)⌋   ⌊0 +sin(θ2) +cos(θ2)⌋   ⌊   0        0     1⌋   ⌊z⌋
-    l =       -cos_θ1*x  +        sin_θ1*y
+    l =        -cos_θ1*x +        sin_θ1*y
     m = -sin_θ1*cos_θ2*x - cos_θ1*cos_θ2*y + sin_θ2*z
     l,m
 end
@@ -127,7 +127,7 @@ function lm2dir(phase_dir::Direction{Measures.J2000},l,m)
     # ⌊z⌋    ⌊   0        0     1⌋   ⌊0 -sin(θ2) +cos(θ2)⌋   ⌊√(1-l²-m²)⌋
     x = -cos_θ1*l - sin_θ1*cos_θ2*m + sin_θ1*sin_θ2*n
     y = +sin_θ1*l - cos_θ1*cos_θ2*m + cos_θ1*sin_θ2*n
-    z = sqrt(1-x^2-y^2)
+    z =                    sin_θ2*m +        cos_θ2*n
     Measures.from_xyz_in_meters(Measures.J2000,x,y,z)
 end
 

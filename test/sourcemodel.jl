@@ -72,14 +72,23 @@ let
     t = (2015.-1858.)*365.*24.*60.*60. # a rough, current Julian date (in seconds)
     set!(frame,Epoch(Measures.UTC,Quantity(t,Second)))
     set!(frame,observatory("OVRO_MMA"))
+    phase_dir = Direction(Measures.J2000,ra"19h59m28.35663s",dec"+40d44m02.0970s")
 
-    l = 2rand()-1
-    m = 2rand()-1
-    while hypot(l,m) > 1
+    for iteration = 1:5
         l = 2rand()-1
         m = 2rand()-1
+        while hypot(l,m) > 1
+            l = 2rand()-1
+            m = 2rand()-1
+        end
+        dir = TTCal.lm2dir(phase_dir,l,m)
+        l′,m′ = TTCal.dir2lm(frame,phase_dir,dir)
+        @test l ≈ l′
+        @test m ≈ m′
     end
-    phase_dir = Direction(Measures.J2000,ra"19h59m28.35663s",dec"+40d44m02.0970s")
+
+    # z should be negative in lm2dir
+    l,m = (-0.26521340920368575,-0.760596242177856)
     dir = TTCal.lm2dir(phase_dir,l,m)
     l′,m′ = TTCal.dir2lm(frame,phase_dir,dir)
     @test l ≈ l′
