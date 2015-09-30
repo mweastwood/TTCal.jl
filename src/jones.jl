@@ -30,6 +30,17 @@ JonesMatrix() = one(JonesMatrix)
 zero(::Type{JonesMatrix}) = JonesMatrix(0,0,0,0)
 one(::Type{JonesMatrix}) = JonesMatrix(1,0,0,1) # the identity matrix
 
+function JonesMatrix(mat::Matrix)
+    size(mat) == (2,2) || throw(DimensionMismatch("A Jones matrix must be 2x2."))
+    JonesMatrix(mat[1,1],mat[1,2],mat[2,1],mat[2,2])
+end
+
+function Base.convert{T}(::Type{Matrix{T}},J::JonesMatrix)
+    T[J.xx J.xy
+      J.yx J.yy]
+end
+Base.convert(::Type{Matrix},J::JonesMatrix) = Base.convert(Matrix{Complex64},J)
+
 for op in (:+,:-)
     @eval function $op(J1::JonesMatrix,J2::JonesMatrix)
         JonesMatrix($op(J1.xx,J2.xx),
