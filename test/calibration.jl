@@ -5,14 +5,24 @@ let
     Nbase = div(Nant*(Nant-1),2) + Nant
     ant1,ant2 = ant1ant2(Nant)
 
+    data  = rand(Complex64,4,Nfreq,Nbase)
+    data′ = copy(data)
+    flags = zeros(Bool,4,Nfreq,Nbase)
+
+    # ampcal
+    cal = TTCal.AmplitudeCalibration(Nant,Nfreq)
+    for i in eachindex(cal.amplitudes)
+        cal.amplitudes[i] = rand()
+    end
+    corrupt!(data,flags,cal,ant1,ant2)
+    applycal!(data,flags,cal,ant1,ant2)
+    @test data ≈ data′
+
+    # gaincal
     cal = TTCal.GainCalibration(Nant,Nfreq)
     for i in eachindex(cal.gains)
         cal.gains[i] = complex(randn(),randn())
     end
-
-    data  = rand(Complex64,4,Nfreq,Nbase)
-    data′ = copy(data)
-    flags = zeros(Bool,4,Nfreq,Nbase)
     corrupt!(data,flags,cal,ant1,ant2)
     applycal!(data,flags,cal,ant1,ant2)
     @test data ≈ data′
