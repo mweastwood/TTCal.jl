@@ -4,33 +4,9 @@ using CasaCore.Quanta
 using CasaCore.Measures
 using CasaCore.Tables
 
-srand(123)
-include("fringepattern.jl")
-include("jones.jl")
-include("sourcemodel.jl")
-
-
-# Define the interferometer
-const x = [  0.;  10.;  30.;  70.; 150.]
-const y = [150.;  70.;  30.;  10.;   0.]
-const z = [  0.;  -1.;  +1.;  -2.;  +2.]
-const ν = [40.0e6:10.0e6:60.0e6;]
-const t = (2015.-1858.)*365.*24.*60.*60. # a rough, current Julian date (in seconds)
-
-const Nant  = length(x)
-const Nbase = div(Nant*(Nant-1),2) + Nant
-const Nfreq = length(ν)
-
-const frame = ReferenceFrame()
-set!(frame,Epoch(Measures.UTC,Quantity(t,Second)))
-set!(frame,observatory("OVRO_MMA"))
-
-const zenith = Direction(Measures.AZEL,Quantity(0.0,Degree),Quantity(90.0,Degree))
-const phase_dir = measure(frame,zenith,Measures.J2000)
-
-const pos = observatory("OVRO_MMA")
-
 function xyz2uvw(x,y,z)
+    Nant = length(x)
+    Nbase = div(Nant*(Nant-1),2) + Nant
     u = Array{Float64}(Nbase)
     v = Array{Float64}(Nbase)
     w = Array{Float64}(Nbase)
@@ -43,9 +19,9 @@ function xyz2uvw(x,y,z)
     end
     u,v,w
 end
-const u,v,w = xyz2uvw(x,y,z)
 
-function getant1ant2()
+function ant1ant2(Nant)
+    Nbase = div(Nant*(Nant-1),2) + Nant
     ant1 = Array(Int32,Nbase)
     ant2 = Array(Int32,Nbase)
     α = 1
@@ -56,9 +32,25 @@ function getant1ant2()
     end
     ant1,ant2
 end
-const ant1,ant2 = getant1ant2()
 
-function createms()
+function createms(Nant,Nfreq)
+    Nbase = div(Nant*(Nant-1),2) + Nant
+
+    x = 100*randn(Nant)
+    y = 100*randn(Nant)
+    z = randn(Nant)
+    u,v,w = xyz2uvw(x,y,z)
+    ν = linspace(40e6,60e6,Nfreq) |> collect
+    t = (2015.-1858.)*365.*24.*60.*60. # a rough, current Julian date (in seconds)
+    ant1,ant2 = ant1ant2(Nant)
+
+    frame = ReferenceFrame()
+    pos = observatory("OVRO_MMA")
+    set!(frame,Epoch(Measures.UTC,Quantity(t,Second)))
+    set!(frame,pos)
+    zenith = Direction(Measures.AZEL,Quantity(0.0,Degree),Quantity(90.0,Degree))
+    phase_dir = measure(frame,zenith,Measures.J2000)
+
     name  = tempname()*".ms"
     table = Table(name)
 
@@ -86,115 +78,20 @@ function createms()
     table["ANTENNA2"] = ant2-1
     table["UVW"] = [u v w]'
     table["TIME"] = fill(float(t),Nbase)
+    table["FLAG_ROW"] = zeros(Bool,Nbase)
+    table["FLAG"] = zeros(Bool,4,Nfreq,Nbase)
+    sources = readsources("sources.json")
+    table["DATA"] = genvis(frame,phase_dir,sources,u,v,w,ν)
 
     name,table
 end
 
-const maxiter = 100
-const tolerance = 1e-4
-
-const gaintable = tempname()*".bcal"
-const gaincal_args = Dict("--input"     => "",
-                          "--output"    => gaintable,
-                          "--sources"   => "sources.json",
-                          "--maxiter"   => maxiter,
-                          "--tolerance" => tolerance)
-
-const sources = filter(source -> TTCal.isabovehorizon(frame,source),readsources("sources.json"))
-
-function test_gaincal(cal,data,model)
-    mycal = TTCal.GainCalibration(Nant,Nfreq)
-    flags = zeros(Bool,size(data))
-    TTCal.gaincal!(mycal,data,model,flags,
-                   ant1,ant2,maxiter,tolerance,1)
-    @test vecnorm(mycal.gains-cal.gains)/vecnorm(cal.gains) < 10tolerance
-
-    name,ms = createms()
-    gaincal_args["--input"] = name
-    ms["DATA"] = data
-    ms["FLAG"] = flags
-    ms["FLAG_ROW"] = zeros(Bool,Nbase)
-    unlock(ms)
-
-    TTCal.run_gaincal(gaincal_args)
-    mycal = TTCal.read(gaintable)
-    @test vecnorm(mycal.gains-cal.gains)/vecnorm(cal.gains) < 10tolerance
-
-    rm(gaintable)
-    run(`$JULIA_HOME/julia ../src/ttcal.jl gaincal --input $name --output $gaintable --sources sources.json --maxiter $maxiter --tolerance $tolerance`)
-    mycal = TTCal.read(gaintable)
-    @test vecnorm(mycal.gains-cal.gains)/vecnorm(cal.gains) < 10tolerance
-end
-
-# Unity gains
-function test_one()
-    println("1")
-    cal = TTCal.GainCalibration(Nant,Nfreq)
-    cal.gains[:] = 1
-    model = genvis(frame,phase_dir,sources,u,v,w,ν)
-    data  = copy(model)
-    test_gaincal(cal,data,model)
-end
-test_one()
-
-# Random gains
-function test_two()
-    println("2")
-    cal = TTCal.GainCalibration(Nant,Nfreq)
-    rand!(cal.gains)
-    TTCal.fixphase!(cal,1)
-    model = genvis(frame,phase_dir,sources,u,v,w,ν)
-    data  = copy(model)
-    flags = zeros(Bool,size(data))
-    corrupt!(data,flags,cal,ant1,ant2)
-    test_gaincal(cal,data,model)
-end
-test_two()
-
-# Random gains
-# Corrupted autocorrelations
-function test_three()
-    println("3")
-    cal = TTCal.GainCalibration(Nant,Nfreq)
-    rand!(cal.gains)
-    TTCal.fixphase!(cal,1)
-    model = genvis(frame,phase_dir,sources,u,v,w,ν)
-    data  = copy(model)
-    flags = zeros(Bool,size(data))
-    corrupt!(data,flags,cal,ant1,ant2)
-    α = 1
-    for ant = 1:Nant
-        data[:,:,α] = rand(4,Nfreq)
-        α += Nant-ant+1
-    end
-    test_gaincal(cal,data,model)
-end
-test_three()
-
-function test_applycal()
-    g = 2
-    cal = TTCal.GainCalibration(Nant,Nfreq)
-    cal.gains[:] = g
-    data  = rand(Complex64,4,Nfreq,Nbase)
-    flags = zeros(Bool,size(data))
-
-    name,ms = createms()
-    ms["DATA"] = data
-    ms["FLAG"] = flags
-    ms["FLAG_ROW"] = zeros(Bool,Nbase)
-    unlock(ms)
-
-    bcal_name = tempname()
-    TTCal.write(bcal_name,cal)
-
-    args = Dict("--input" => [name],
-                "--calibration" => bcal_name)
-    TTCal.run_applycal(args)
-
-    calibrated_ms = Table(name)
-    @test calibrated_ms["DATA"] == data / (g*conj(g))
-end
-test_applycal()
+srand(123)
+include("calibration.jl")
+include("fringepattern.jl")
+include("jones.jl")
+include("sourcemodel.jl")
+include("subsrc.jl")
 
 #=
 function test_fitvisibilities()
@@ -222,19 +119,4 @@ function test_fitvisibilities()
 end
 #test_fitvisibilities()
 =#
-
-function test_subsrc()
-    data  = genvis(frame,phase_dir,sources,u,v,w,ν)
-    flags = zeros(Bool,size(data))
-
-    name,ms = createms()
-    ms["DATA"] = data
-    ms["FLAG"] = flags
-    ms["FLAG_ROW"] = zeros(Bool,Nbase)
-    subsrc!(ms,sources)
-
-    @test vecnorm(ms["CORRECTED_DATA"]) < eps(Float64)
-end
-test_subsrc()
-
 
