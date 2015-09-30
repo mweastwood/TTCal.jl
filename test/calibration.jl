@@ -43,6 +43,3 @@ let
     @test data/(g*conj(g)) ≈ calibrated_ms["DATA"]
 end
 
-include("gaincal.jl")
-include("polcal.jl")
-

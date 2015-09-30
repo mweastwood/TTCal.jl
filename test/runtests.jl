@@ -4,6 +4,8 @@ using CasaCore.Quanta
 using CasaCore.Measures
 using CasaCore.Tables
 
+import TTCal.JonesMatrix
+
 function xyz2uvw(x,y,z)
     Nant = length(x)
     Nbase = div(Nant*(Nant-1),2) + Nant
@@ -87,11 +89,14 @@ function createms(Nant,Nfreq)
 end
 
 srand(123)
-include("calibration.jl")
-include("fringepattern.jl")
 include("jones.jl")
 include("sourcemodel.jl")
+include("fringepattern.jl")
 include("subsrc.jl")
+include("calibration.jl")
+include("ampcal.jl")
+include("gaincal.jl")
+include("polcal.jl")
 
 #=
 function test_fitvisibilities()

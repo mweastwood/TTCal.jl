@@ -1,5 +1,3 @@
-import TTCal.JonesMatrix
-
 let
     mat = eye(2,2)
     J = one(JonesMatrix)
