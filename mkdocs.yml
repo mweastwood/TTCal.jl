@@ -1,0 +1,16 @@
+site_name: TTCal
+site_url: https://github.com/mweastwood/TTCal.jl
+repo_url: https://github.com/mweastwood/TTCal.jl
+site_description: A calibration routine developed for the OVRO LWA.
+site_author: Michael Eastwood
+
+pages:
+    - Home: index.md
+    - Usage:
+        - Gain Calibration: gaincal.md
+        - Polarization Calibration: polcal.md
+        - Amplitude Calibration: ampcal.md
+        - Sky Models: sources.md
+    - API: api.md
+theme: readthedocs
+
