@@ -86,7 +86,7 @@ function run_peel(args)
     ms = Table(ascii(args["--input"]))
     sources = readsources(args["--sources"])
     minuvw = haskey(args,"--minuvw")? args["--minuvw"] : 15.0
-    peel!(ms,sources,minuvw=minuvw)
+    peel!(GainCalibration,ms,sources,minuvw=minuvw)
 end
 
 function run_applycal(args)
