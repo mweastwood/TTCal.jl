@@ -29,6 +29,8 @@ end
 JonesMatrix() = one(JonesMatrix)
 zero(::Type{JonesMatrix}) = JonesMatrix(0,0,0,0)
 one(::Type{JonesMatrix}) = JonesMatrix(1,0,0,1) # the identity matrix
+rand(::Type{JonesMatrix}) = JonesMatrix(rand(Complex64),rand(Complex64),
+                                        rand(Complex64),rand(Complex64))
 
 function JonesMatrix(mat::Matrix)
     size(mat) == (2,2) || throw(DimensionMismatch("A Jones matrix must be 2x2."))

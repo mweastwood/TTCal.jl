@@ -32,7 +32,7 @@ export applycal!, corrupt!
 export peel!
 
 importall Base.Operators
-import Base: zero, one, det, inv, norm
+import Base: zero, one, rand, det, inv, norm
 
 using JSON
 using JLD
