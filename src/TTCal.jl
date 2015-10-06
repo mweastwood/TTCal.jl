@@ -53,6 +53,7 @@ include("subsrc.jl")
 include("calibration.jl")
 include("peel.jl")
 include("beammodel.jl")
+include("utm.jl")
 
 function run_gaincal(args)
     ms = Table(ascii(args["--input"]))

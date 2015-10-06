@@ -97,6 +97,7 @@ include("calibration.jl")
 include("ampcal.jl")
 include("gaincal.jl")
 include("polcal.jl")
+include("utm.jl")
 
 #=
 function test_fitvisibilities()
