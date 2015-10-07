@@ -56,7 +56,7 @@ function subsrc!(ms::Table,dir::Direction)
     data  = MeasurementSets.corrected_data(ms)
     flags = MeasurementSets.flags(ms)
 
-    j2000 = measure(frame,dir,Measures.J2000)
+    j2000 = measure(frame,dir,dir"J2000")
     l,m = dir2lm(frame,phase_dir,dir)
     I,Q,U,V = getspec_internal(data,flags,l,m,u,v,w,ν,ant1,ant2)
 

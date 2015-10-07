@@ -36,7 +36,6 @@ import Base: zero, one, rand, det, inv, norm
 
 using JSON
 using JLD
-using CasaCore.Quanta
 using CasaCore.Measures
 using CasaCore.Tables
 using MeasurementSets

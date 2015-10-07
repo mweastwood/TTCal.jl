@@ -1,6 +1,5 @@
 using TTCal
 using Base.Test
-using CasaCore.Quanta
 using CasaCore.Measures
 using CasaCore.Tables
 
@@ -48,10 +47,10 @@ function createms(Nant,Nfreq)
 
     frame = ReferenceFrame()
     pos = observatory("OVRO_MMA")
-    set!(frame,Epoch(Measures.UTC,Quantity(t,Second)))
+    set!(frame,Epoch(epoch"UTC",Quantity(t,"s")))
     set!(frame,pos)
-    zenith = Direction(Measures.AZEL,Quantity(0.0,Degree),Quantity(90.0,Degree))
-    phase_dir = measure(frame,zenith,Measures.J2000)
+    zenith = Direction(dir"AZEL",q"0.0deg",q"90.0deg")
+    phase_dir = measure(frame,zenith,dir"J2000")
 
     name  = tempname()*".ms"
     table = Table(name)
