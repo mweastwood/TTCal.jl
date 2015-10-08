@@ -68,6 +68,10 @@ function \(J1::JonesMatrix,J2::JonesMatrix)
     inv(J1)*J2
 end
 
+function conj(J::JonesMatrix)
+    JonesMatrix(conj(J.xx),conj(J.xy),conj(J.yx),conj(J.yy))
+end
+
 function ctranspose(J::JonesMatrix)
     JonesMatrix(conj(J.xx),conj(J.yx),conj(J.xy),conj(J.yy))
 end
@@ -82,7 +86,36 @@ function inv(J::JonesMatrix)
 end
 
 function norm(J::JonesMatrix)
-    # The Frobenius norm
+    # the Frobenius norm
     sqrt(abs2(J.xx)+abs2(J.xy)+abs2(J.yx)+abs2(J.yy))
 end
+
+function kron(J1::JonesMatrix,J2::JonesMatrix)
+    [J1.xx*J2.xx J1.xx*J2.xy J1.xy*J2.xx J1.xy*J2.xy;
+     J1.xx*J2.yx J1.xx*J2.yy J1.xy*J2.yx J1.xy*J2.yy;
+     J1.yx*J2.xx J1.yx*J2.xy J1.yy*J2.xx J1.yy*J2.xy;
+     J1.yx*J2.yx J1.yx*J2.yy J1.yy*J2.yx J1.yy*J2.yy]
+end
+
+"""
+    mueller(J1::JonesMatrix, J2::JonesMatrix)
+
+Create a Mueller matrix from the two Jones matrices.
+"""
+function mueller(J1::JonesMatrix,J2::JonesMatrix)
+    JJ = kron(conj(J2),J1)
+    i = 1im
+    A = [1  0  0  1;
+         1  0  0 -1;
+         0  1  1  0
+         0  i -i  0]
+    A*JJ/A
+end
+
+"""
+    mueller(J::JonesMatrix)
+
+Create a Mueller matrix from the given Jones matrix.
+"""
+mueller(J::JonesMatrix) = mueller(J,J)
 
