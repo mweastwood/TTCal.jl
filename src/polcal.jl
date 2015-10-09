@@ -83,7 +83,7 @@ function polcal(ms::Table,
     calibration = PolarizationCalibration(Nant,Nfreq)
 
     data  = MeasurementSets.corrected_data(ms)
-    model = genvis(frame,phase_dir,sources,u,v,w,ν)
+    model = genvis(frame,phase_dir,sources,ConstantBeam(),u,v,w,ν)
     flags = MeasurementSets.flags(ms)
 
     if force_imaging_columns || Tables.checkColumnExists(ms,"MODEL_DATA")

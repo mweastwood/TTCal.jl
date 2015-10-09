@@ -82,7 +82,7 @@ function createms(Nant,Nfreq)
     table["FLAG_ROW"] = zeros(Bool,Nbase)
     table["FLAG"] = zeros(Bool,4,Nfreq,Nbase)
     sources = readsources("sources.json")
-    table["DATA"] = genvis(frame,phase_dir,sources,u,v,w,ν)
+    table["DATA"] = genvis(frame,phase_dir,sources,TTCal.ConstantBeam(),u,v,w,ν)
 
     name,table
 end
@@ -91,7 +91,7 @@ srand(123)
 include("jones.jl")
 include("sourcemodel.jl")
 include("fringepattern.jl")
-include("subsrc.jl")
+#include("subsrc.jl") # pending fitvis rewrite
 include("calibration.jl")
 include("ampcal.jl")
 include("gaincal.jl")

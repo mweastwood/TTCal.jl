@@ -13,23 +13,52 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-####################################################################
-# Most basic of beam models
-"""
-Generate beam model to attenuate source model flux (to be used in genvis.jl).
-As an initial attempt, uses the naive sin(el)^1.6 beam, normalized to 1 at zenith.
-"""
-function beammodel(frame,phase_dir,l,m)
-    dir   = lm2dir(phase_dir,l,m)
-    az,el = dir2azel(frame,dir)
+abstract BeamModel
 
-    att   = sin(el)^1.6
-    att
+"""
+    ConstantBeam <: BeamModel
+
+In this beam model, the Jones matrix is assumed to be unity
+in every direction.
+"""
+immutable ConstantBeam <: BeamModel end
+call(::ConstantBeam,ν,az,el) = one(JonesMatrix)
+
+doc"""
+    SineBeam <: BeamModel
+
+This beam is azimuthally symmetric and independent of frequency.
+The gain of an individual dipole scales as $\sin(elevation)^\alpha$.
+"""
+immutable SineBeam <: BeamModel
+    α::Float64
 end
 
+function call(beam::SineBeam,ν,az,el)
+    # note that the factor of 1/2 in the exponent
+    # comes from the fact that the Jones matrix
+    # operates on electric fields, which must be
+    # squared to get the power
+    s = sin(el)^(beam.α/2)
+    JonesMatrix(s,0,0,s)
+end
 
-####################################################################
-# J. Dowell empirical beam model, function of frequency
+"""
+    Memo178Beam <: BeamModel
+
+This beam is based on the parametric fit to EM simulations
+presented in LWA memo 178 by Jayce Dowell.
+
+[http://www.faculty.ece.vt.edu/swe/lwa/memo/lwa0178a.pdf]
+"""
+immutable Memo178Beam <: BeamModel end
+
+function call(::Memo178Beam,ν,az,el)
+    # NOTE: I might have the x and y dipoles swapped here
+    x = P178(ν,az,el) |> sqrt
+    y = P178(ν,az+π/2,el) |> sqrt
+    JonesMatrix(x,0,0,y)
+end
 
 const _E178 = [-4.529931167425190e+01 -3.066691727279789e+01 +7.111192148086860e+01 +1.131338637814271e+01
                +1.723596273204143e+02 +1.372536555724785e+02 -2.664504470520252e+02 -3.493942140370373e+01
@@ -59,36 +88,26 @@ const _H178 = [+4.062920357822495e+02 +3.038713068453467e+01
                -1.740005497709271e-03 -1.908989166200470e-04
                +2.892116885178882e-05 +3.223985512686652e-06]
 
-"""
-Generate beam model to attenuate source model flux (to be used in genvis.jl).
-Using the J. Dowell beam model (http://www.faculty.ece.vt.edu/swe/lwa/memo/lwa0178a.pdf).
-"""
-function beammodel(frame,phase_dir,l,m,ν)
-    dir   = lm2dir(phase_dir,l,m)
-    az,el = dir2azel(frame,dir)
-    # zenith angle
-    ze    = π/2-el
-
-    px = sqrt( ( planeE(ze,ν) * cos(az) )^2 + ( planeH(ze,ν) * sin(az) )^2 )
-    py = sqrt( ( planeE(ze,ν) * sin(az) )^2 + ( planeH(ze,ν) * cos(az) )^2 )
-    p  = (px + py) / 2
-    p
-end
-
-@eval function planeE(ze,ν)
+@eval function E178(ν,el)
     x = ν / 10e6
+    θ = π/2 - el
     α = @evalpoly(x,$(_E178[:,1]...))
     β = @evalpoly(x,$(_E178[:,2]...))
     γ = @evalpoly(x,$(_E178[:,3]...))
     δ = @evalpoly(x,$(_E178[:,4]...))
-    (1-(ze/(π/2))^α)*cos(ze)^β + γ*(ze/(π/2))*cos(ze)^δ
+    (1-(θ/(π/2))^α)*cos(θ)^β + γ*(θ/(π/2))*cos(θ)^δ
 end
 
-@eval function planeH(ze,ν)
+@eval function H178(ν,el)
     x = ν / 10e6
+    θ = π/2 - el
     α = @evalpoly(x,$(_H178[:,1]...))
     β = @evalpoly(x,$(_H178[:,2]...))
     # γ and δ are neglected on the H plane
-    (1-(ze/(π/2))^α)*cos(ze)^β
+    (1-(θ/(π/2))^α)*cos(θ)^β
+end
+
+function P178(ν,az,el)
+    sqrt((E178(ν,el)*cos(az))^2 + (H178(ν,el)*sin(az))^2)
 end
 

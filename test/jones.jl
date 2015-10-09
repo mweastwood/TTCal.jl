@@ -34,6 +34,13 @@ let
 end
 
 let
+    stokes  = rand(4)
+    linear  = TTCal.linear(stokes)
+    stokes′ = TTCal.stokes(linear)
+    @test stokes ≈ stokes′
+end
+
+let
     # test the Mueller matrix generation from the
     # example Jones and Mueller matrices given on:
     # http://scienceworld.wolfram.com/physics/JonesMatrix.html

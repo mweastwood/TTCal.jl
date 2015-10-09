@@ -97,6 +97,30 @@ function kron(J1::JonesMatrix,J2::JonesMatrix)
      J1.yx*J2.yx J1.yx*J2.yy J1.yy*J2.yx J1.yy*J2.yy]
 end
 
+# Note the factor of 0.5 appears to be a convention
+# in radio astronomy (but not physics)
+const linear_to_stokes = 0.5*[1   0    0   1;
+                              1   0    0  -1;
+                              0   1    1   0;
+                              0  1im -1im  0]
+const stokes_to_linear = inv(linear_to_stokes)
+
+"""
+    stokes(correlations) -> [I,Q,U,V]
+
+Take the vector of correlations `[xx,xy,yx,yy]` and
+convert it to the Stokes parameters.
+"""
+stokes(correlations) = real(linear_to_stokes*correlations)
+
+"""
+    linear(stokes) -> [xx,xy,yx,yy]
+
+Take the vector of Stokes parameters `[I,Q,U,V` and
+convert it to the vector of linear correlations.
+"""
+linear(stokes) = stokes_to_linear*stokes
+
 """
     mueller(J1::JonesMatrix, J2::JonesMatrix)
 
@@ -104,12 +128,7 @@ Create a Mueller matrix from the two Jones matrices.
 """
 function mueller(J1::JonesMatrix,J2::JonesMatrix)
     JJ = kron(conj(J2),J1)
-    i = 1im
-    A = [1  0  0  1;
-         1  0  0 -1;
-         0  1  1  0
-         0  i -i  0]
-    A*JJ/A
+    linear_to_stokes*JJ/linear_to_stokes
 end
 
 """

@@ -13,10 +13,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-################################################################################
-# Source Definitions
-
 """
+    type PointSource
+
 These sources have a multi-component power-law spectrum
 such that:
 
@@ -39,9 +38,7 @@ end
 
 name(source::PointSource) = source.name
 Base.show(io::IO,source::PointSource) = print(io,name(source))
-
-################################################################################
-# Flux
+direction(source::PointSource) = source.dir
 
 function powerlaw(reference_flux,index,reference_frequency,frequency)
     s = sign(reference_flux)
@@ -53,23 +50,21 @@ function powerlaw(reference_flux,index,reference_frequency,frequency)
     s*10.0.^logflux
 end
 
-for param in (:I,:Q,:U,:V)
-    func = symbol("stokes",param)
-    @eval function $func{T<:AbstractFloat}(source::PointSource,frequency::T)
-        powerlaw(source.$param,source.index,source.reffreq,frequency)
-    end
-    @eval function $func{T<:AbstractFloat}(source::PointSource,frequencies::Vector{T})
-        [$func(source,frequency) for frequency in frequencies]
-    end
+function flux(source::PointSource, frequency::Number)
+    powerlaw(source.I,source.index,source.reffreq,frequency)
 end
 
-flux{T<:AbstractFloat}(source::PointSource,frequency::T) = stokesI(source,frequency)
-flux{T<:AbstractFloat}(source::PointSource,frequencies::Vector{T}) = stokesI(source,frequencies)
+function flux{T<:Number}(source::PointSource, frequencies::Vector{T})
+    T[flux(source,frequency) for frequency in frequencies]
+end
 
-################################################################################
-# Position
-
-direction(source::PointSource) = source.dir
+function stokes_flux(source::PointSource, frequency::Number)
+    I = powerlaw(source.I,source.index,source.reffreq,frequency)
+    Q = powerlaw(source.Q,source.index,source.reffreq,frequency)
+    U = powerlaw(source.U,source.index,source.reffreq,frequency)
+    V = powerlaw(source.V,source.index,source.reffreq,frequency)
+    [I,Q,U,V]
+end
 
 """
 Convert the direction into a right ascension and declination.
