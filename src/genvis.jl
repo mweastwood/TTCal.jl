@@ -14,7 +14,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 doc"""
-    genvis(ms::Table,
+    genvis(ms::MeasurementSet,
            sources::Vector{PointSource},
            beam::BeamModel)
 
@@ -24,40 +24,33 @@ and the given beam model.
 No gridding is performed, so the runtime of this naive
 algorithm scales as $O(N_{base} \times N_{source})$.
 """
-function genvis(ms::Table,
+function genvis(ms::MeasurementSet,
                 sources::Vector{PointSource},
                 beam::BeamModel)
-    phase_dir = MeasurementSets.phase_direction(ms)
-    u,v,w = MeasurementSets.uvw(ms)
-    ν = MeasurementSets.frequency(ms)
-
-    frame = ReferenceFrame()
-    set!(frame,MeasurementSets.position(ms))
-    set!(frame,MeasurementSets.time(ms))
-
-    genvis(frame,phase_dir,sources,beam,u,v,w,ν)
+    genvis(ms.frame,ms.phase_direction,
+           sources,beam,ms.u,ms.v,ms.w,ms.ν)
 end
 
 function genvis(frame::ReferenceFrame,
-                phase_dir::Direction,
+                phase_direction::Direction,
                 sources::Vector{PointSource},
                 beam::BeamModel,
                 u,v,w,ν)
     model = zeros(Complex64,4,length(ν),length(u))
     for source in sources
-        genvis!(model,frame,phase_dir,source,beam,u,v,w,ν)
+        genvis!(model,frame,phase_direction,source,beam,u,v,w,ν)
     end
     model
 end
 
 function genvis!(model::Array{Complex64,3},
                  frame::ReferenceFrame,
-                 phase_dir::Direction,
+                 phase_direction::Direction,
                  source::PointSource,
                  beam::BeamModel,
                  u,v,w,ν)
     az,el  = azel(frame,source)
-    l,m    = lm(frame,phase_dir,source)
+    l,m    = lm(frame,phase_direction,source)
     fringe = fringepattern(l,m,u,v,w,ν)
 
     # Get the Stokes parameters and apply the beam model

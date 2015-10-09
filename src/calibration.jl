@@ -18,20 +18,15 @@ abstract Calibration
 """
 Apply the calibration to the given measurement set.
 """
-function applycal!(ms::Table,
+function applycal!(ms::MeasurementSet,
                    calibration::Calibration;
                    apply_to_corrected::Bool = false,
                    force_imaging_columns::Bool = false)
-    data  = apply_to_corrected? ms["CORRECTED_DATA"] : ms["DATA"]
-    flags = MeasurementSets.flags(ms)
-    ant1,ant2 = MeasurementSets.antennas(ms)
-    applycal!(data,flags,calibration,ant1,ant2)
-    if force_imaging_columns || Tables.checkColumnExists(ms,"CORRECTED_DATA")
-        ms["CORRECTED_DATA"] = data
-    else
-        ms["DATA"] = data
-    end
-    ms["FLAG"] = flags
+    data  = apply_to_corrected? get_corrected_data(ms) : get_data(ms)
+    flags = get_flags(ms)
+    applycal!(data,flags,calibration,ms.ant1,ms.ant2)
+    set_corrected_data!(ms,data,force_imaging_columns)
+    set_flags!(ms,flags)
     data
 end
 

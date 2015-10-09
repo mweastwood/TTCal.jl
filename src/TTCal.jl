@@ -17,6 +17,8 @@ __precompile__()
 
 module TTCal
 
+export MeasurementSet
+
 export PointSource
 export readsources, writesources
 
@@ -38,9 +40,9 @@ using JSON
 using JLD
 using CasaCore.Measures
 using CasaCore.Tables
-using MeasurementSets
 
 const c = 2.99792e+8
+include("measurementsets.jl")
 include("rungekutta.jl")
 include("jones.jl")
 include("sourcemodel.jl")
@@ -55,7 +57,7 @@ include("peel.jl")
 include("utm.jl")
 
 function run_gaincal(args)
-    ms = Table(ascii(args["--input"]))
+    ms = MeasurementSet(ascii(args["--input"]))
     sources = readsources(args["--sources"])
     maxiter = haskey(args,"--maxiter")? args["--maxiter"] : 20
     tolerance = haskey(args,"--tolerance")? args["--tolerance"] : 1e-4
@@ -69,7 +71,7 @@ function run_gaincal(args)
 end
 
 function run_polcal(args)
-    ms = Table(ascii(args["--input"]))
+    ms = MeasurementSet(ascii(args["--input"]))
     sources = readsources(args["--sources"])
     maxiter = haskey(args,"--maxiter")? args["--maxiter"] : 20
     tolerance = haskey(args,"--tolerance")? args["--tolerance"] : 1e-4
@@ -83,7 +85,7 @@ function run_polcal(args)
 end
 
 function run_peel(args)
-    ms = Table(ascii(args["--input"]))
+    ms = MeasurementSet(ascii(args["--input"]))
     sources = readsources(args["--sources"])
     minuvw = haskey(args,"--minuvw")? args["--minuvw"] : 15.0
     peel!(GainCalibration,ms,sources,minuvw=minuvw)
@@ -94,7 +96,7 @@ function run_applycal(args)
     force_imaging_columns = haskey(args,"--force-imaging")
     apply_to_corrected = haskey(args,"--corrected")
     for input in args["--input"]
-        ms = Table(ascii(input))
+        ms = MeasurementSet(ascii(input))
         applycal!(ms,cal,
                   force_imaging_columns=force_imaging_columns,
                   apply_to_corrected=apply_to_corrected)

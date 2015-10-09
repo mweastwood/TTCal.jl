@@ -39,9 +39,9 @@ let
 
     # Run as `applycal(...)`
     name,ms = createms(Nant,Nfreq)
-    data  = ms["DATA"]
+    data  = TTCal.get_data(ms)
     applycal!(ms,cal)
-    data′ = ms["DATA"]
+    data′ = TTCal.get_data(ms)
     @test data/(g*conj(g)) ≈ data′
     unlock(ms)
 

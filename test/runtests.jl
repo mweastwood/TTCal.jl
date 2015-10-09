@@ -83,8 +83,9 @@ function createms(Nant,Nfreq)
     table["FLAG"] = zeros(Bool,4,Nfreq,Nbase)
     sources = readsources("sources.json")
     table["DATA"] = genvis(frame,phase_dir,sources,TTCal.ConstantBeam(),u,v,w,ν)
+    unlock(table)
 
-    name,table
+    name,MeasurementSet(name)
 end
 
 srand(123)
