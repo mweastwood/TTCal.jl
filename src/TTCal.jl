@@ -36,6 +36,7 @@ export peel!
 importall Base.Operators
 import Base: zero, one, rand, conj, det, inv, norm, kron
 
+using ArgParse
 using JSON
 using JLD
 using CasaCore.Measures
@@ -55,54 +56,7 @@ include("subsrc.jl")
 include("calibration.jl")
 include("peel.jl")
 include("utm.jl")
-
-function run_gaincal(args)
-    ms = MeasurementSet(ascii(args["--input"]))
-    sources = readsources(args["--sources"])
-    maxiter = haskey(args,"--maxiter")? args["--maxiter"] : 20
-    tolerance = haskey(args,"--tolerance")? args["--tolerance"] : 1e-4
-    force_imaging_columns = haskey(args,"--force-imaging")
-    cal = gaincal(ms,sources,
-                  maxiter=maxiter,
-                  tolerance=tolerance,
-                  force_imaging_columns=force_imaging_columns)
-    write(args["--output"],cal)
-    cal
-end
-
-function run_polcal(args)
-    ms = MeasurementSet(ascii(args["--input"]))
-    sources = readsources(args["--sources"])
-    maxiter = haskey(args,"--maxiter")? args["--maxiter"] : 20
-    tolerance = haskey(args,"--tolerance")? args["--tolerance"] : 1e-4
-    force_imaging_columns = haskey(args,"--force-imaging")
-    cal = polcal(ms,sources,
-                 maxiter=maxiter,
-                 tolerance=tolerance,
-                 force_imaging_columns=force_imaging_columns)
-    write(args["--output"],cal)
-    cal
-end
-
-function run_peel(args)
-    ms = MeasurementSet(ascii(args["--input"]))
-    sources = readsources(args["--sources"])
-    minuvw = haskey(args,"--minuvw")? args["--minuvw"] : 15.0
-    peel!(GainCalibration,ms,sources,minuvw=minuvw)
-end
-
-function run_applycal(args)
-    cal = read(args["--calibration"])
-    force_imaging_columns = haskey(args,"--force-imaging")
-    apply_to_corrected = haskey(args,"--corrected")
-    for input in args["--input"]
-        ms = MeasurementSet(ascii(input))
-        applycal!(ms,cal,
-                  force_imaging_columns=force_imaging_columns,
-                  apply_to_corrected=apply_to_corrected)
-    end
-    cal
-end
+include("commandline.jl")
 
 end
 
