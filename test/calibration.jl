@@ -45,11 +45,11 @@ let
     @test data/(g*conj(g)) ≈ data′
     unlock(ms)
 
-    # Run from the command line
+    # Run from `main(...)`
     cal_name = tempname()
     TTCal.write(cal_name,cal)
-    run(`$(Base.julia_cmd()) ../src/ttcal.jl applycal --input $name --calibration $cal_name`)
+    TTCal.main(["applycal","--input",name,"--calibration",cal_name])
     calibrated_ms = Table(name)
-    @test data/(g*conj(g)) ≈ calibrated_ms["DATA"]
+    @test data′/(g*conj(g)) ≈ calibrated_ms["DATA"]
 end
 
