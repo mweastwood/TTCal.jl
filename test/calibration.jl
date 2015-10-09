@@ -48,7 +48,7 @@ let
     # Run from the command line
     cal_name = tempname()
     TTCal.write(cal_name,cal)
-    run(`$JULIA_HOME/julia ../src/ttcal.jl applycal --input $name --calibration $cal_name`)
+    run(`$(Base.julia_cmd()) ../src/ttcal.jl applycal --input $name --calibration $cal_name`)
     calibrated_ms = Table(name)
     @test data/(g*conj(g)) ≈ calibrated_ms["DATA"]
 end
