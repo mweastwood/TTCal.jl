@@ -52,6 +52,7 @@ open(output,"w") do file
         write(file,"## $sym\n\n")
         sym = symbol(module_name,".",sym)
         write(file,docs[sym])
+        write(file,"\n")
     end
 end
 
