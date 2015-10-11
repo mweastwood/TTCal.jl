@@ -15,7 +15,7 @@
 
 doc"""
     genvis(ms::MeasurementSet,
-           sources::Vector{PointSource},
+           sources::Union{PointSource,Vector{PointSource}},
            beam::BeamModel)
 
 Generate model visibilities for the given list of sources
@@ -25,7 +25,7 @@ No gridding is performed, so the runtime of this naive
 algorithm scales as $O(N_{base} \times N_{source})$.
 """
 function genvis(ms::MeasurementSet,
-                sources::Vector{PointSource},
+                sources::Union{PointSource,Vector{PointSource}},
                 beam::BeamModel)
     genvis(ms.frame,ms.phase_direction,
            sources,beam,ms.u,ms.v,ms.w,ms.ν)
@@ -43,6 +43,16 @@ function genvis(frame::ReferenceFrame,
     model
 end
 
+function genvis(frame::ReferenceFrame,
+                phase_direction::Direction,
+                source::PointSource,
+                beam::BeamModel,
+                u,v,w,ν)
+    model = zeros(Complex64,4,length(ν),length(u))
+    genvis!(model,frame,phase_direction,source,beam,u,v,w,ν)
+    model
+end
+
 function genvis!(model::Array{Complex64,3},
                  frame::ReferenceFrame,
                  phase_direction::Direction,
@@ -54,24 +64,40 @@ function genvis!(model::Array{Complex64,3},
     fringe = fringepattern(l,m,u,v,w,ν)
 
     # Get the Stokes parameters and apply the beam model
-    correlations = zeros(Complex128,4,length(ν))
+    xx = zeros(length(ν))
+    xy = zeros(length(ν))
+    yx = zeros(length(ν))
+    yy = zeros(length(ν))
     for β = 1:length(ν)
         M = mueller(beam(ν,az,el))
         IQUV = stokes_flux(source,ν[β])
-        correlations[:,β] = linear(M*IQUV)
+        correlations = linear(M*IQUV)
+        xx[β] = correlations[1]
+        xy[β] = correlations[2]
+        yx[β] = correlations[3]
+        yy[β] = correlations[4]
     end
 
-    genvis!(model,fringe,correlations)
+    genvis!(model,xx,xy,yx,yy,l,m,u,v,w,ν)
+end
+
+function genvis(xx,xy,yx,yy,
+                l,m,u,v,w,ν)
+    model = zeros(Complex64,4,length(ν),length(u))
+    genvis!(model,xx,xy,yx,yy,l,m,u,v,w,ν)
+    model
 end
 
 function genvis!(model::Array{Complex64,3},
-                 fringe,correlations)
+                 xx,xy,yx,yy,
+                 l,m,u,v,w,ν)
+    fringe = fringepattern(l,m,u,v,w,ν)
     Nfreq,Nbase = size(fringe)
     @inbounds for α = 1:Nbase, β = 1:Nfreq
-        model[1,β,α] += correlations[1,β]*fringe[β,α] # xx
-        model[2,β,α] += correlations[2,β]*fringe[β,α] # xy
-        model[3,β,α] += correlations[3,β]*fringe[β,α] # yx
-        model[4,β,α] += correlations[4,β]*fringe[β,α] # yy
+        model[1,β,α] += xx[β]*fringe[β,α]
+        model[2,β,α] += xy[β]*fringe[β,α]
+        model[3,β,α] += yx[β]*fringe[β,α]
+        model[4,β,α] += yy[β]*fringe[β,α]
     end
     model
 end

@@ -22,10 +22,9 @@ export MeasurementSet
 export PointSource
 export readsources, writesources
 
-export genvis
 export getspec
+export genvis, subsrc!
 export fitvis
-export subsrc!
 
 export AmplitudeCalibration, ampcal
 export GainCalibration, gaincal
@@ -43,16 +42,17 @@ using CasaCore.Measures
 using CasaCore.Tables
 
 const c = 2.99792e+8
+
 include("measurementsets.jl")
 include("rungekutta.jl")
 include("jones.jl")
 include("sourcemodel.jl")
 include("beammodel.jl")
 include("fringepattern.jl")
-include("genvis.jl")
 include("getspec.jl")
-include("fitvis.jl")
+include("genvis.jl")
 include("subsrc.jl")
+include("fitvis.jl")
 include("calibration.jl")
 include("peel.jl")
 include("utm.jl")

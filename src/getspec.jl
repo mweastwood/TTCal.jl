@@ -13,57 +13,44 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-################################################################################
-# Public Interface
-
 """
+    getspec(ms::MeasurementSet, dir::Direction) -> xx,xy,yx,yy
+
 This function extracts the spectrum in a given direction by means of an
-inverse discrete Fourier transform. Note that no gridding is performed,
+inverse discrete Fourier transform.
+
+Note that no gridding is performed,
 so this does *not* use a fast Fourier transform. However, the inverse
 discrete Fourier transform *is* the least squares estimator for the flux
 in a given direction (if all baselines are weighted equally).
 """
-function getspec(ms::Table,
-                 dir::Direction)
-    phase_dir = MeasurementSets.phase_direction(ms)
-    u,v,w = MeasurementSets.uvw(ms)
-    ν = MeasurementSets.frequency(ms)
-    ant1,ant2 = MeasurementSets.antennas(ms)
-    l,m = dir2lm(phase_dir,dir)
-
-    frame = ReferenceFrame()
-    set!(frame,MeasurementSets.position(ms))
-    set!(frame,MeasurementSets.time(ms))
-
-    # Return a sensible default value if the source is below the horizon
-    if !isabovehorizon(frame,dir)
-        return zeros(length(ν)),zeros(length(ν)),zeros(length(ν)),zeros(length(ν))
+function getspec(ms::MeasurementSet, dir::Direction)
+    if !isabovehorizon(ms.frame,dir)
+        error("Direction is below the horizon.")
     end
 
+    l,m = dir2lm(ms.phase_dir,dir)
     data  = MeasurementSets.corrected_data(ms)
     flags = MeasurementSets.flags(ms)
 
-    getspec_internal(data,flags,l,m,u,v,w,ν,ant1,ant2)
+    getspec(data,flags,l,m,
+            ms.u,ms.v,ms.w,ms.ν,
+            ms.ant1,ms.ant2)
 end
 
-getspec(ms::Table,source::PointSource) = getspec(ms,direction(source))
+doc"""
+    getspec(data, flags, l, m, u, v, w, ν, ant1, ant2) -> xx,xy,yx,yy
 
-################################################################################
-# Internal Interface
-
-function getspec_internal(data::Array{Complex64,3},
-                          flags::Array{Bool,3},
-                          l::Float64,
-                          m::Float64,
-                          u::Vector{Float64},
-                          v::Vector{Float64},
-                          w::Vector{Float64},
-                          ν::Vector{Float64},
-                          ant1::Vector{Int32},
-                          ant2::Vector{Int32})
+Compute the spectrum of a source located at $(l,m)$ in all of the
+polarized correlation products.
+"""
+function getspec(data::Array{Complex64,3},
+                 flags::Array{Bool,3},
+                 l,m,u,v,w,ν,ant1,ant2)
     fringe = fringepattern(l,m,u,v,w,ν)
     xx = zeros(length(ν))
-    xy = zeros(Complex128,length(ν))
+    xy = zeros(length(ν))
+    yx = zeros(length(ν))
     yy = zeros(length(ν))
     count  = zeros(Int,length(ν)) # The number of baselines used in the calculation
     for α = 1:length(u)
@@ -74,26 +61,21 @@ function getspec_internal(data::Array{Complex64,3},
             # Taking the real part of A is equivalent to
             # computing (A + conj(A))/2. The conjugate of A,
             # in this case, is the baseline going in the
-            # opposite direction. Including this information
-            # constrains the spectrum to be real.
+            # opposite direction.
             z = conj(fringe[β,α])
-            xx[β] += real(data[1,β,α]*z) # xx
-            xy[β] += 0.5*(data[2,β,α]*z + conj(data[3,β,α]*z)) # xy
-            yy[β] += real(data[4,β,α]*z) # yy
+            xx[β] += real(data[1,β,α]*z)
+            xy[β] += real(data[2,β,α]*z)
+            yx[β] += real(data[3,β,α]*z)
+            yy[β] += real(data[4,β,α]*z)
             count[β] += 1
         end
     end
-    xx = xx ./ count
-    xy = xy ./ count
-    yy = yy ./ count
-    xy2stokes(xx,xy,yy)
-end
-
-function xy2stokes(xx,xy,yy)
-    I = 0.5*(xx+yy)
-    Q = 0.5*(yy-xx)
-    U = real(xy)
-    V = -imag(xy)
-    I,Q,U,V
+    for β = 1:length(ν)
+        xx[β] = xx[β]/count[β]
+        xy[β] = xy[β]/count[β]
+        yx[β] = yx[β]/count[β]
+        yy[β] = yy[β]/count[β]
+    end
+    xx,xy,yx,yy
 end
 

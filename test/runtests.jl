@@ -92,7 +92,7 @@ srand(123)
 include("jones.jl")
 include("sourcemodel.jl")
 include("fringepattern.jl")
-#include("subsrc.jl") # pending fitvis rewrite
+include("subsrc.jl")
 include("calibration.jl")
 include("ampcal.jl")
 include("gaincal.jl")

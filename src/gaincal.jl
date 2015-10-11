@@ -90,7 +90,7 @@ function gaincal(ms::MeasurementSet,
     sources = filter(source -> isabovehorizon(ms.frame,source),sources)
     calibration = GainCalibration(ms.Nant,ms.Nfreq)
     data  = get_data(ms)
-    model = genvis(ms.frame,ms.phase_direction,sources,ConstantBeam(),ms.u,ms.v,ms.w,ms.ν)
+    model = genvis(ms,sources,ConstantBeam())
     flags = get_flags(ms)
     set_model_data!(ms,model)
     gaincal!(calibration,data,model,flags,

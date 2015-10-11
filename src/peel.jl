@@ -39,7 +39,7 @@ function peel!{T<:Calibration}(::Type{T},
     data  = get_corrected_data(ms)
     flags = get_flags(ms)
     calibrations = [T(ms.Nant,ms.Nfreq) for source in sources]
-    coherencies  = [genvis(ms.frame,ms.phase_direction,[source],ms.u,ms.v,ms.w,ms.ν) for source in sources]
+    coherencies  = [genvis(ms,source,ConstantBeam()) for source in sources]
     peel!(calibrations,coherencies,data,flags,
           ms.u,ms.v,ms.w,ms.ν,ms.ant1,ms.ant2,
           maxiter,tolerance,minuvw)

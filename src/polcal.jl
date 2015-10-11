@@ -72,7 +72,7 @@ function polcal(ms::MeasurementSet,
     sources = filter(source -> isabovehorizon(ms.frame,source),sources)
     calibration = PolarizationCalibration(ms.Nant,ms.Nfreq)
     data  = get_corrected_data(ms)
-    model = genvis(frame,ms.phase_direction,sources,ConstantBeam(),ms.u,ms.v,ms.w,ms.ν)
+    model = genvis(ms,sources,ConstantBeam())
     flags = get_flags(ms)
     set_model_data!(ms,model)
     polcal!(calibration,data,model,flags,
