@@ -148,7 +148,7 @@ function readsources(filename::AbstractString)
     for parsed_source in parsed_sources
         name  = parsed_source["name"]
         if name == "Sun"
-            dir = Direction(Measures.SUN)
+            dir = Direction(dir"SUN")
         else
             ra  = parsed_source["ra"]
             dec = parsed_source["dec"]
