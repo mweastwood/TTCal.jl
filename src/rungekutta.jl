@@ -82,7 +82,7 @@ const RK4 = RK(4)
     end
 end
 
-"""
+@doc """
 Take a Runge-Kutta step.
 * `step(x,args...)` must return the list of steps to take from the given location `x`
 * `rk` is the order of the Runge-Kutta method to use (eg. `RK4`)

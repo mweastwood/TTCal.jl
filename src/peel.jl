@@ -17,7 +17,8 @@
     peel!{T<:Calibration}(::Type{T},
                           ms::MeasurementSet,
                           sources::Vector{PointSource};
-                          maxiter = 20, tolerance = 1e-3,
+                          maxiter = 20,
+                          tolerance = 1e-3,
                           minuvw = 0.0)
 
 Peel the given list of sources from the measurement set.

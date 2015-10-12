@@ -72,7 +72,7 @@ Convert the direction into a right ascension and declination.
 function dir2radec(frame::ReferenceFrame,dir::Direction)
     j2000 = measure(frame,dir,dir"J2000")
     ra  = longitude(j2000)
-    dec = latitude(j2000)
+    dec =  latitude(j2000)
     ra,dec
 end
 
@@ -82,7 +82,7 @@ Convert the direction into an azimuth and elevation.
 function dir2azel(frame::ReferenceFrame,dir::Direction)
     azel = measure(frame,dir,dir"AZEL")
     az = longitude(azel)
-    el = latitude(azel)
+    el =  latitude(azel)
     az,el
 end
 

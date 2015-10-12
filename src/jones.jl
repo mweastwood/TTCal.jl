@@ -116,7 +116,7 @@ stokes(correlations) = real(linear_to_stokes*correlations)
 """
     linear(stokes) -> [xx,xy,yx,yy]
 
-Take the vector of Stokes parameters `[I,Q,U,V` and
+Take the vector of Stokes parameters `[I,Q,U,V]` and
 convert it to the vector of linear correlations.
 """
 linear(stokes) = stokes_to_linear*stokes
