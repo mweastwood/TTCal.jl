@@ -73,43 +73,30 @@ function fixphase!(cal::GainCalibration,
 end
 
 """
-    gaincal(ms::Table, sources::Vector{PointSource};
+    gaincal(ms::MeasurementSet,
+            sources::Vector{PointSource},
+            beam::BeamModel;
             maxiter = 20, tolerance = 1e-5,
             force_imaging_columns = false,
             reference_antenna = 1)
 
 Solve for the interferometer's electronic gains.
 """
-function gaincal(ms::Table,
-                 sources::Vector{PointSource};
+function gaincal(ms::MeasurementSet,
+                 sources::Vector{PointSource},
+                 beam::BeamModel;
                  maxiter::Int = 20,
                  tolerance::Float64 = 1e-5,
                  force_imaging_columns::Bool = false,
                  reference_antenna::Int = 1)
-    phase_dir = MeasurementSets.phase_direction(ms)
-    u,v,w = MeasurementSets.uvw(ms)
-    ν = MeasurementSets.frequency(ms)
-    ant1,ant2 = MeasurementSets.antennas(ms)
-
-    frame = ReferenceFrame()
-    set!(frame,MeasurementSets.position(ms))
-    set!(frame,MeasurementSets.time(ms))
-    sources = filter(source -> isabovehorizon(frame,source),sources)
-
-    Nant  = numrows(Table(ms[kw"ANTENNA"]))
-    Nfreq = length(ν)
-    calibration = GainCalibration(Nant,Nfreq)
-
-    data  = ms["DATA"]
-    model = genvis(frame,phase_dir,sources,u,v,w,ν)
-    flags = MeasurementSets.flags(ms)
-
-    if force_imaging_columns || Tables.checkColumnExists(ms,"MODEL_DATA")
-        ms["MODEL_DATA"] = model
-    end
-
+    sources = filter(source -> isabovehorizon(ms.frame,source),sources)
+    calibration = GainCalibration(ms.Nant,ms.Nfreq)
+    data  = get_data(ms)
+    model = genvis(ms,sources,beam)
+    flags = get_flags(ms)
+    set_model_data!(ms,model)
     gaincal!(calibration,data,model,flags,
-             ant1,ant2,maxiter,tolerance,
+             ms.ant1,ms.ant2,maxiter,tolerance,
              reference_antenna)
     calibration
 end

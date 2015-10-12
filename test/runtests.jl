@@ -1,6 +1,5 @@
 using TTCal
 using Base.Test
-using CasaCore.Quanta
 using CasaCore.Measures
 using CasaCore.Tables
 
@@ -48,10 +47,10 @@ function createms(Nant,Nfreq)
 
     frame = ReferenceFrame()
     pos = observatory("OVRO_MMA")
-    set!(frame,Epoch(Measures.UTC,Quantity(t,Second)))
+    set!(frame,Epoch(epoch"UTC",Quantity(t,"s")))
     set!(frame,pos)
-    zenith = Direction(Measures.AZEL,Quantity(0.0,Degree),Quantity(90.0,Degree))
-    phase_dir = measure(frame,zenith,Measures.J2000)
+    zenith = Direction(dir"AZEL",q"0.0deg",q"90.0deg")
+    phase_dir = measure(frame,zenith,dir"J2000")
 
     name  = tempname()*".ms"
     table = Table(name)
@@ -83,45 +82,22 @@ function createms(Nant,Nfreq)
     table["FLAG_ROW"] = zeros(Bool,Nbase)
     table["FLAG"] = zeros(Bool,4,Nfreq,Nbase)
     sources = readsources("sources.json")
-    table["DATA"] = genvis(frame,phase_dir,sources,u,v,w,ν)
+    table["DATA"] = genvis(frame,phase_dir,sources,TTCal.ConstantBeam(),u,v,w,ν)
+    unlock(table)
 
-    name,table
+    name,MeasurementSet(name)
 end
 
 srand(123)
 include("jones.jl")
 include("sourcemodel.jl")
 include("fringepattern.jl")
+include("getspec.jl")
 include("subsrc.jl")
+include("fitvis.jl")
 include("calibration.jl")
 include("ampcal.jl")
 include("gaincal.jl")
 include("polcal.jl")
-
-#=
-function test_fitvisibilities()
-    data = TTCal.visibilities(frame,sources,u,v,w,ν)
-    @show sources[1] sources[2]
-    for i = 1:length(sources)
-        # Perturb each source position by about 0.1 degrees
-        dir = sources[i].dir
-        ra  = dir.m[1]
-        dec = dir.m[2]
-        Δra  = 0.1randn()*Degree
-        Δdec = 0.1randn()*Degree
-        sources[i].dir = Direction(dir.system,(ra+Δra,dec+Δdec))
-        # Perturb the flux by about 100 Jy, and the spectral index by about 0.1
-        sources[i].flux += 100randn()
-        sources[i].index += 0.1randn()
-    end
-    @show sources[1] sources[2]
-    newsources = TTCal.fitvis(frame,data,u,v,w,ν,sources,criteria)
-    @show newsources[1] newsources[2]
-    newsources = TTCal.fitvis(frame,data,u,v,w,ν,newsources,criteria)
-    @show newsources[1] newsources[2]
-    newsources = TTCal.fitvis(frame,data,u,v,w,ν,newsources,criteria)
-    @show newsources[1] newsources[2]
-end
-#test_fitvisibilities()
-=#
+include("utm.jl")
 

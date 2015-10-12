@@ -13,142 +13,86 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-################################################################################
-# Public Interface
+"""
+    fitvis(ms::MeasurementSet,
+           sources::Vector{PointSource};
+           maxiter::Int = 20,
+           tolerance::Float64 = 1e-3,
+           minuvw::Float64 = 0.0)
 
+Fit for the location of each point source.
 """
-Fit the visibilities to a model of point sources. The input model needs
-to have the positions of the point sources relatively close, but the flux
-can be wildly off.
-"""
-function fitvis(ms::Table,
+function fitvis(ms::MeasurementSet,
                 sources::Vector{PointSource};
+                maxiter::Int = 20,
+                tolerance::Float64 = 1e-3,
                 minuvw::Float64 = 0.0)
-    phase_dir = MeasurementSets.phase_direction(ms)
-    u,v,w = MeasurementSets.uvw(ms)
-    ν = MeasurementSets.frequency(ms)
-    ant1,ant2 = MeasurementSets.antennas(ms)
-
-    frame = ReferenceFrame()
-    set!(frame,MeasurementSets.position(ms))
-    set!(frame,MeasurementSets.time(ms))
-
-    data  = MeasurementSets.corrected_data(ms)
-    flags = MeasurementSets.flags(ms)
-
-    for i = 1:5
-        sources = fitvis(frame,phase_dir,data,flags,
-                         u,v,w,ν,ant1,ant2,sources,minuvw)
-    end
-    sources
-end
-
-################################################################################
-# Internal Interface
-
-function fitvis(frame::ReferenceFrame,
-                phase_dir::Direction,
-                data::Array{Complex64,3},
-                flags::Array{Bool,3},
-                u::Vector{Float64},
-                v::Vector{Float64},
-                w::Vector{Float64},
-                ν::Vector{Float64},
-                ant1::Vector{Int32},
-                ant2::Vector{Int32},
-                sources::Vector{PointSource},
-                minuvw)
-    Nfreq = size(data,2)
-    Nbase = size(data,3)
+    sources = filter(source -> isabovehorizon(ms.frame,source),sources)
+    Nsource = length(sources)
+    data  = get_corrected_data(ms)
+    flags = get_flags(ms)
 
     # Flag all of the short baselines
-    # (so that they do not contribute to the fit)
-    for α = 1:Nbase, β = 1:Nfreq
-        if sqrt(u[α]^2 + v[α]^2 + w[α]^2) < minuvw*c/ν[β]
+    for α = 1:ms.Nbase, β = 1:ms.Nfreq
+        if sqrt(ms.u[α]^2 + ms.v[α]^2 + ms.w[α]^2) < minuvw*c/ms.ν[β]
             flags[:,β,α] = true
         end
     end
 
-    # 1. Discard sources that are below the horizon.
-    sources = filter(sources) do source
-        isabovehorizon(frame,source)
+    l = zeros(Nsource)
+    m = zeros(Nsource)
+    for i = 1:Nsource
+        l′,m′ = lm(ms.frame,ms.phase_direction,sources[i])
+        l[i],m[i] = fitvis_onesource(data,flags,l′,m′,
+                                     ms.u,ms.v,ms.w,ms.ν,
+                                     ms.ant1,ms.ant2,
+                                     maxiter,tolerance)
     end
-
-    # 2. Get the flux of each source.
-    # (This first pass is necessary to make sure a poor initial estimate of the source
-    # flux doesn't impact the results. This can happen if the source is low in the beam
-    # and is much fainter than it otherwise would be.)
-    for (i,source) in enumerate(sources)
-        l,m = lm(frame,phase_dir,source)
-        I,Q,U,V,reffreq,index = fitvis_spec(data,flags,l,m,u,v,w,ν,ant1,ant2)
-        sources[i] = PointSource(source.name,source.dir,I,Q,U,V,reffreq,index)
-    end
-
-    # 3. Sort by order of decreasing flux.
-    # (This ensures we fit and remove the bright sources first, preventing their sidelobes
-    # from contaminating the faint sources.)
-    sort!(sources,by=source->source.I,rev=true)
-
-    # 3. Fit for the position and flux of each source, subtracting each source from the
-    #    data in turn.
-    for (i,source) in enumerate(sources)
-        l,m = lm(frame,phase_dir,source)
-
-        # a) Solve for the source's position
-        l,m = fitvis_lm(data,flags,l,m,u,v,w,ν,ant1,ant2)
-        dir = lm2dir(phase_dir,l,m)
-
-        # b) Solve for the source's spectrum
-        I,Q,U,V,reffreq,index = fitvis_spec(data,flags,l,m,u,v,w,ν,ant1,ant2)
-
-        # c) Subtract the source from the data
-        sources[i] = PointSource(source.name,dir,I,Q,U,V,reffreq,index)
-        data = subsrc(frame,phase_dir,data,u,v,w,ν,[sources[i]])
-    end
-    sources
+    l,m
 end
 
-function fitvis_lm(data::Array{Complex64,3},
-                   flags::Array{Bool,3},
-                   l::Float64,
-                   m::Float64,
-                   u::Vector{Float64},
-                   v::Vector{Float64},
-                   w::Vector{Float64},
-                   ν::Vector{Float64},
-                   ant1::Vector{Int32},
-                   ant2::Vector{Int32})
+function fitvis_onesource(data,flags,l,m,
+                          u,v,w,ν,ant1,ant2,
+                          maxiter,tolerance)
+    lm = [l;m]
+    converged = @iterate(FitVisStep(),RK4,maxiter,tolerance,
+                         lm,data,flags,u,v,w,ν,ant1,ant2)
+    lm[1],lm[2]
+end
+
+function fitvis_step(lm,data,flags,
+                     u,v,w,ν,ant1,ant2)
+    l = lm[1]
+    m = lm[2]
     Nfreq = length(ν)
     Nbase = length(u)
-    λ = [c/ν[β] for β = 1:Nfreq]
-
-    # Calculate the angular resolution of the interferometer
-    resolution = minimum(λ) / maximum(sqrt(u.^2+v.^2))
 
     # Calculate the flux in the given direction
-    # (and its derivatives with respect to direction)
+    # and its derivatives with respect to direction.
     fringe = fringepattern(l,m,u,v,w,ν)
     F   = zeros(Nfreq)     # flux at each frequency
     dF  = zeros(2,Nfreq)   # [ ∂F/∂l ∂F/∂m ]
     d2F = zeros(2,2,Nfreq) # [ ∂²F/∂l²  ∂²F/∂l∂m
                            #   ∂²F/∂l∂m ∂²F/∂m² ]
-    count  = zeros(Int,Nfreq) # The number of baselines used in the calculation
+    count = zeros(Int,Nfreq) # The number of baselines used in the calculation
+
+    πi = π*1im
+    λ = [c/ν[β] for β = 1:Nfreq]
     @inbounds for α = 1:Nbase
-        # Don't use auto-correlations
-        ant1[α] == ant2[α] && continue
+        ant1[α] == ant2[α] && continue # Don't use auto-correlations
         for β = 1:Nfreq
             any(slice(flags,:,β,α)) && continue
             z = conj(fringe[β,α])
-            V = 0.5*(data[1,β,α]+data[4,β,α])*z
+            V = 0.5*(data[1,β,α]+data[4,β,α])*z # Stokes I only
             uu = u[α]/λ[β]
             vv = v[α]/λ[β]
             F[β]       += real(V)
-            dF[1,β]    += real(V * -2im*π * uu)
-            dF[2,β]    += real(V * -2im*π * vv)
-            d2F[1,1,β] += real(V * (-2im*π)^2 * uu^2)
-            d2F[2,1,β] += real(V * (-2im*π)^2 * uu*vv)
-            d2F[1,2,β] += real(V * (-2im*π)^2 * uu*vv)
-            d2F[2,2,β] += real(V * (-2im*π)^2 * vv^2)
+            dF[1,β]    += real(V * -2πi * uu)
+            dF[2,β]    += real(V * -2πi * vv)
+            d2F[1,1,β] += real(V * (-2πi)^2 * uu^2)
+            d2F[2,1,β] += real(V * (-2πi)^2 * uu*vv)
+            d2F[1,2,β] += real(V * (-2πi)^2 * uu*vv)
+            d2F[2,2,β] += real(V * (-2πi)^2 * vv^2)
             count[β] += 1
         end
     end
@@ -159,88 +103,40 @@ function fitvis_lm(data::Array{Complex64,3},
     end
 
     # Calculate how far to step in each direction
-    # (weight by 1/wavelength because resolution scales as 1/wavelength)
+    # TODO: weight using `count` and wavelength appropriately
+    # (higher frequencies should be given more weight)
     dl = 0.0
     dm = 0.0
     normalization = 0.0
     for β = 1:Nfreq
         count[β] .== 0 && continue
-        if det(slice(d2F,:,:,β)) > 0
-            # If the determinant of the Hessian is positive,
-            # take a Newton step towards where the gradient is zero.
-            δ = -slice(d2F,:,:,β) \ slice(dF,:,β)
-        else
-            # If the determinant of the Hessian is negative,
-            # the above step will take us away from the flux maximum.
-            # Therefore we'll just step in the direction of the
-            # gradient.
-            δ = slice(dF,:,β) * resolution
-        end
-        weight = count[β]/λ[β]
-        dl += δ[1] * weight
-        dm += δ[2] * weight
-        normalization += weight
+        δ = -slice(d2F,:,:,β) \ slice(dF,:,β)
+        dl += δ[1]
+        dm += δ[2]
+        normalization += 1
     end
     dl /= normalization
     dm /= normalization
 
-    # Restrict the step size to one resolution element
-    jump_size  = sqrt(dl^2+dm^2)
-    if jump_size > resolution
-        correction = resolution/jump_size
-        dl *= correction
-        dm *= correction
-    end
-
-    # Furthermore, don't let the source lie beyond the horizon
-    force_to_horizon(l+dl,m+dm)
+    # Don't let the source lie beyond the horizon
+    l_horizon,m_horizon = force_to_horizon(l+dl,m+dm)
+    [l_horizon-l;m_horizon-m]
 end
 
-function fitvis_spec(data::Array{Complex64,3},
-                     flags::Array{Bool,3},
-                     l::Float64,
-                     m::Float64,
-                     u::Vector{Float64},
-                     v::Vector{Float64},
-                     w::Vector{Float64},
-                     ν::Vector{Float64},
-                     ant1::Vector{Int32},
-                     ant2::Vector{Int32})
-    I,Q,U,V = getspec_internal(data,flags,l,m,u,v,w,ν,ant1,ant2)
+immutable FitVisStep <: StepFunction end
+call(::FitVisStep,lm,data,flags,u,v,w,ν,ant1,ant2) = fitvis_step(lm,data,flags,u,v,w,ν,ant1,ant2)
 
-    # power law fit
-    mask = (!isnan(I)) .* (I .> 0)
-    reffreq = 47e6
-    if sum(mask) < 5
-        # Give a reasonable answer if there are too many channels masked
-        α = [0.0;0.0]
-        fQ = 0.0
-        fU = 0.0
-        fV = 0.0
-    else
-        x = log10(ν[mask]/reffreq)
-        y = log10(I[mask])
-        α = [ones(length(x)) x]\y
-        # polarization fractions
-        fQ = mean(Q[mask]./I[mask])
-        fU = mean(U[mask]./I[mask])
-        fV = mean(V[mask]./I[mask])
-    end
+doc"""
+    force_to_horizon(l,m)
 
-    flux = 10^α[1]
-    flux,fQ*flux,fU*flux,fV*flux,reffreq,α[2:end]
-end
+This function forces the coordinates $(l,m)$ to be above the horizon.
 
-"""
-This function forces l and m to be above the horizon.
 Although this is a nasty hack, it is necessary for fitting
 some sources that are near the horizon.
 """
 function force_to_horizon(l,m)
-    # (check to make sure we're still above the horizon)
     r2 = l^2+m^2
     if r2 > 1
-        # (move l and m back inside the horizon)
         θ = atan2(l,m)
         l = (1.0-1e-12)*sin(θ)
         m = (1.0-1e-12)*cos(θ)

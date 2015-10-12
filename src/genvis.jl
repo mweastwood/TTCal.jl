@@ -13,102 +13,91 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-################################################################################
-# Public Interface
+doc"""
+    genvis(ms::MeasurementSet,
+           sources::Union{PointSource,Vector{PointSource}},
+           beam::BeamModel)
 
-"""
-Generate model visibilities for a given point source model.
+Generate model visibilities for the given list of sources
+and the given beam model.
+
 No gridding is performed, so the runtime of this naive
-algorithm scales as O(Nbase×Nsource).
+algorithm scales as $O(N_{base} \times N_{source})$.
 """
-function genvis(ms::Table,sources::Vector{PointSource})
-    phase_dir = MeasurementSets.phase_direction(ms)
-    u,v,w = MeasurementSets.uvw(ms)
-    ν = MeasurementSets.frequency(ms)
-
-    frame = ReferenceFrame()
-    set!(frame,MeasurementSets.position(ms))
-    set!(frame,MeasurementSets.time(ms))
-
-    genvis(frame,phase_dir,sources,u,v,w,ν)
+function genvis(ms::MeasurementSet,
+                sources::Union{PointSource,Vector{PointSource}},
+                beam::BeamModel)
+    genvis(ms.frame,ms.phase_direction,
+           sources,beam,ms.u,ms.v,ms.w,ms.ν)
 end
-
-genvis(ms::Table,source::PointSource) = genvis(ms,[source])
-
-################################################################################
-# Internal Interface
-
-genvis(phase_dir::Direction,source::PointSource,u,v,w,ν) = genvis(phase_dir,[source],u,v,w,ν)
 
 function genvis(frame::ReferenceFrame,
-                phase_dir::Direction,
+                phase_direction::Direction,
                 sources::Vector{PointSource},
-                u::Vector{Float64},
-                v::Vector{Float64},
-                w::Vector{Float64},
-                ν::Vector{Float64})
+                beam::BeamModel,
+                u,v,w,ν)
     model = zeros(Complex64,4,length(ν),length(u))
-    genvis!(model,frame,phase_dir,sources,u,v,w,ν)
-    model
-end
-
-function genvis!(model::Array{Complex64,3},
-                 frame::ReferenceFrame,
-                 phase_dir::Direction,
-                 sources::Vector{PointSource},
-                 u::Vector{Float64},
-                 v::Vector{Float64},
-                 w::Vector{Float64},
-                 ν::Vector{Float64})
     for source in sources
-        genvis!(model,frame,phase_dir,source,u,v,w,ν)
+        genvis!(model,frame,phase_direction,source,beam,u,v,w,ν)
     end
     model
 end
 
-function genvis!(model::Array{Complex64,3},
-                 frame::ReferenceFrame,
-                 phase_dir::Direction,
-                 source::PointSource,
-                 u::Vector{Float64},
-                 v::Vector{Float64},
-                 w::Vector{Float64},
-                 ν::Vector{Float64})
-    l,m = lm(frame,phase_dir,source)
-    # att = beammodel(frame,phase_dir,l,m,mean(ν)) # currently using J.Dowell beam model
-    att = beammodel(frame,phase_dir,l,m)
-    I = stokesI(source,ν) * att
-    Q = stokesQ(source,ν) * att
-    U = stokesU(source,ν) * att
-    V = stokesV(source,ν) * att
-    genvis!(model,I,Q,U,V,l,m,u,v,w,ν)
+function genvis(frame::ReferenceFrame,
+                phase_direction::Direction,
+                source::PointSource,
+                beam::BeamModel,
+                u,v,w,ν)
+    model = zeros(Complex64,4,length(ν),length(u))
+    genvis!(model,frame,phase_direction,source,beam,u,v,w,ν)
+    model
 end
 
 function genvis!(model::Array{Complex64,3},
-                 I::Vector{Float64},
-                 Q::Vector{Float64},
-                 U::Vector{Float64},
-                 V::Vector{Float64},
-                 l::Float64,
-                 m::Float64,
-                 u::Vector{Float64},
-                 v::Vector{Float64},
-                 w::Vector{Float64},
-                 ν::Vector{Float64})
+                 frame::ReferenceFrame,
+                 phase_direction::Direction,
+                 source::PointSource,
+                 beam::BeamModel,
+                 u,v,w,ν)
+    az,el  = azel(frame,source)
+    l,m    = lm(frame,phase_direction,source)
     fringe = fringepattern(l,m,u,v,w,ν)
-    for α = 1:length(u), β = 1:length(ν)
-        # Based on experiments imaging model visibilities with wsclean
-        # it appears that in order to have the model flux be equal to
-        # the flux in the image, there is no factor of 0.5 in the
-        # following statements.
-        #
-        # The implication of this is that you need the factor of 0.5
-        # in the definition of the Stokes parameters such that, for
-        # example I = 0.5*(xx+yy)
-        model[1,β,α] += (I[β]-Q[β])*fringe[β,α] # xx
-        model[2,β,α] += (U[β]-1im*V[β])*fringe[β,α] # xy
-        model[3,β,α] += (U[β]+1im*V[β])*fringe[β,α] # yx
-        model[4,β,α] += (I[β]+Q[β])*fringe[β,α] # yy
+
+    # Get the Stokes parameters and apply the beam model
+    xx = zeros(length(ν))
+    xy = zeros(length(ν))
+    yx = zeros(length(ν))
+    yy = zeros(length(ν))
+    for β = 1:length(ν)
+        M = mueller(beam(ν,az,el))
+        IQUV = stokes_flux(source,ν[β])
+        correlations = linear(M*IQUV)
+        xx[β] = correlations[1]
+        xy[β] = correlations[2]
+        yx[β] = correlations[3]
+        yy[β] = correlations[4]
+    end
+
+    genvis!(model,xx,xy,yx,yy,l,m,u,v,w,ν)
+end
+
+function genvis(xx,xy,yx,yy,
+                l,m,u,v,w,ν)
+    model = zeros(Complex64,4,length(ν),length(u))
+    genvis!(model,xx,xy,yx,yy,l,m,u,v,w,ν)
+    model
+end
+
+function genvis!(model::Array{Complex64,3},
+                 xx,xy,yx,yy,
+                 l,m,u,v,w,ν)
+    fringe = fringepattern(l,m,u,v,w,ν)
+    Nfreq,Nbase = size(fringe)
+    @inbounds for α = 1:Nbase, β = 1:Nfreq
+        model[1,β,α] += xx[β]*fringe[β,α]
+        model[2,β,α] += xy[β]*fringe[β,α]
+        model[3,β,α] += yx[β]*fringe[β,α]
+        model[4,β,α] += yy[β]*fringe[β,α]
     end
     model
 end

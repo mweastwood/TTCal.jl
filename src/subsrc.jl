@@ -14,78 +14,43 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 """
-    subsrc!(ms::Table,sources::Vector{PointSource}
+    subsrc!(ms::MeasurementSet,
+            sources::Vector{PointSource},
+            beam::BeamModel)
 
 Remove the list of sources from the measurement set.
 """
-function subsrc!(ms::Table,sources::Vector{PointSource})
-    phase_dir = MeasurementSets.phase_direction(ms)
-    u,v,w = MeasurementSets.uvw(ms)
-    ν = MeasurementSets.frequency(ms)
-
-    frame = ReferenceFrame()
-    set!(frame,MeasurementSets.position(ms))
-    set!(frame,MeasurementSets.time(ms))
-    sources = filter(source -> isabovehorizon(frame,source),sources)
-
-    data  = MeasurementSets.corrected_data(ms)
-
-    subtracted = subsrc(frame,phase_dir,data,u,v,w,ν,sources)
-    ms["CORRECTED_DATA"] = subtracted
-    subtracted
+function subsrc!(ms::MeasurementSet,
+                 sources::Vector{PointSource},
+                 beam::BeamModel)
+    sources = filter(source -> isabovehorizon(ms.frame,source),sources)
+    data  = get_corrected_data(ms)
+    model = genvis(ms,sources,beam)
+    subsrc!(data,model)
+    set_corrected_data!(ms,data)
+    data
 end
 
 """
-    subsrc!(ms::Table,dir::Direction)
+    subsrc!(ms::MeasurementSet, dir::Direction)
 
 Subtract all of the measured flux from a given direction.
 
 This can be used to remove RFI sources provided they have
 a known direction.
 """
-function subsrc!(ms::Table,dir::Direction)
-    phase_dir = MeasurementSets.phase_direction(ms)
-    u,v,w = MeasurementSets.uvw(ms)
-    ν = MeasurementSets.frequency(ms)
-    ant1,ant2 = MeasurementSets.antennas(ms)
+function subsrc!(ms::MeasurementSet, dir::Direction)
+    data  = get_corrected_data(ms)
+    flags = get_flags(ms)
 
-    frame = ReferenceFrame()
-    set!(frame,MeasurementSets.position(ms))
-    set!(frame,MeasurementSets.time(ms))
+    j2000 = measure(ms.frame,dir,dir"J2000")
+    l,m = dir2lm(ms.frame,ms.phase_dir,dir)
+    xx,xy,yx,yy = getspec(data,flags,l,m,u,v,w,ν,ant1,ant2)
 
-    data  = MeasurementSets.corrected_data(ms)
-    flags = MeasurementSets.flags(ms)
-
-    j2000 = measure(frame,dir,Measures.J2000)
-    l,m = dir2lm(frame,phase_dir,dir)
-    I,Q,U,V = getspec_internal(data,flags,l,m,u,v,w,ν,ant1,ant2)
-
-    model = zeros(Complex64,4,length(ν),length(u))
-    genvis!(model,I,Q,U,V,l,m,u,v,w,ν)
-    subtracted = model # (just a rename, subtracted and model are the same array)
-    for i in eachindex(model)
-        subtracted[i] = data[i] - model[i]
-    end
-    ms["CORRECTED_DATA"] = subtracted
-    subtracted
-end
-
-function subsrc(frame::ReferenceFrame,
-                phase_dir::Direction,
-                data::Array{Complex64,3},
-                u::Vector{Float64},
-                v::Vector{Float64},
-                w::Vector{Float64},
-                ν::Vector{Float64},
-                sources::Vector{PointSource})
-    sources = filter(sources) do source
-        isabovehorizon(frame,source)
-    end
-
-    model = genvis(frame,phase_dir,sources,u,v,w,ν)
-    subtracted = copy(data)
-    subsrc!(subtracted,model)
-    subtracted
+    model = genvis(xx,xy,yx,yy,l,m,ms.u,ms.v,ms.w,ms.ν)
+    subsrc!(data,model)
+    set_corrected_data!(ms,data)
+    data
 end
 
 function subsrc!(data,model)

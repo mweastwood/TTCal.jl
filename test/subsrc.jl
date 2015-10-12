@@ -7,8 +7,8 @@ let
     # note that the ms is created with sources already
     # added to the measurement set
     sources = readsources("sources.json")
-    subsrc!(ms,sources)
+    subsrc!(ms,sources,TTCal.ConstantBeam())
 
-    @test ms["CORRECTED_DATA"] ≈ zeros(Complex64,4,Nfreq,Nbase)
+    @test TTCal.get_corrected_data(ms) ≈ zeros(Complex64,4,Nfreq,Nbase)
 end
 

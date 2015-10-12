@@ -6,8 +6,8 @@ let
     cas_a = sources[1]
     @test name(cas_a) == "Cas A"
     dir1 = direction(cas_a)
-    dir2 = Direction(Measures.J2000,ra"23h23m24s",dec"58d48m54s")
-    @test Measures.reference(dir1) == Measures.reference(dir2)
+    dir2 = Direction(dir"J2000",q"23h23m24s",q"58d48m54s")
+    @test coordinate_system(dir1) == coordinate_system(dir2)
     @test longitude(dir1) ≈ longitude(dir2)
     @test latitude(dir1) ≈ latitude(dir2)
     @test cas_a.I == 555904.26
@@ -20,8 +20,8 @@ let
     cyg_a = sources[2]
     @test name(cyg_a) == "Cyg A"
     dir1 = direction(cyg_a)
-    dir2 = Direction(Measures.J2000,ra"19h59m28.35663s",dec"+40d44m02.0970s")
-    @test Measures.reference(dir1) == Measures.reference(dir2)
+    dir2 = Direction(dir"J2000",q"19h59m28.35663s",q"+40d44m02.0970s")
+    @test coordinate_system(dir1) == coordinate_system(dir2)
     @test longitude(dir1) ≈ longitude(dir2)
     @test latitude(dir1) ≈ latitude(dir2)
     @test cyg_a.I == 49545.02
@@ -33,11 +33,11 @@ let
 end
 
 let
-    sources1 = [PointSource("S1",Direction(Measures.J2000,ra"1h",dec"0d"),
+    sources1 = [PointSource("S1",Direction(dir"J2000",q"1h",q"0d"),
                             1.0,2.0,3.0,4.0,10e6,[0.0]),
-                PointSource("S2",Direction(Measures.J2000,ra"2h",dec"0d"),
+                PointSource("S2",Direction(dir"J2000",q"2h",q"0d"),
                             1.0,2.0,3.0,4.0,10e6,[0.0]),
-                PointSource("S3",Direction(Measures.J2000,ra"3h",dec"0d"),
+                PointSource("S3",Direction(dir"J2000",q"3h",q"0d"),
                             1.0,2.0,3.0,4.0,10e6,[0.0])]
     filename = tempname()
     writesources(filename,sources1)
@@ -46,7 +46,7 @@ let
         @test name(sources1[i]) == name(sources2[i])
         dir1 = direction(sources1[i])
         dir2 = direction(sources2[i])
-        @test Measures.reference(dir1) == Measures.reference(dir2)
+        @test coordinate_system(dir1) == coordinate_system(dir2)
         @test longitude(dir1) ≈ longitude(dir2)
         @test latitude(dir1) ≈ latitude(dir2)
         @test sources1[i].I == sources2[i].I
@@ -59,7 +59,7 @@ let
 end
 
 let
-    source = PointSource("S",Direction(Measures.J2000,ra"1h",dec"0d"),
+    source = PointSource("S",Direction(dir"J2000",q"1h",q"0d"),
                          1.0,2.0,3.0,4.0,10e6,[0.0])
     @test name(source) == "S"
     @test repr(source) == "S"
@@ -70,9 +70,9 @@ end
 let
     frame = ReferenceFrame()
     t = (2015.-1858.)*365.*24.*60.*60. # a rough, current Julian date (in seconds)
-    set!(frame,Epoch(Measures.UTC,Quantity(t,Second)))
+    set!(frame,Epoch(epoch"UTC",Quantity(t,"s")))
     set!(frame,observatory("OVRO_MMA"))
-    phase_dir = Direction(Measures.J2000,ra"19h59m28.35663s",dec"+40d44m02.0970s")
+    phase_dir = Direction(dir"J2000",q"19h59m28.35663s",q"+40d44m02.0970s")
 
     for iteration = 1:5
         l = 2rand()-1

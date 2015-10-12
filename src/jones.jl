@@ -29,6 +29,8 @@ end
 JonesMatrix() = one(JonesMatrix)
 zero(::Type{JonesMatrix}) = JonesMatrix(0,0,0,0)
 one(::Type{JonesMatrix}) = JonesMatrix(1,0,0,1) # the identity matrix
+rand(::Type{JonesMatrix}) = JonesMatrix(rand(Complex64),rand(Complex64),
+                                        rand(Complex64),rand(Complex64))
 
 function JonesMatrix(mat::Matrix)
     size(mat) == (2,2) || throw(DimensionMismatch("A Jones matrix must be 2x2."))
@@ -66,6 +68,10 @@ function \(J1::JonesMatrix,J2::JonesMatrix)
     inv(J1)*J2
 end
 
+function conj(J::JonesMatrix)
+    JonesMatrix(conj(J.xx),conj(J.xy),conj(J.yx),conj(J.yy))
+end
+
 function ctranspose(J::JonesMatrix)
     JonesMatrix(conj(J.xx),conj(J.yx),conj(J.xy),conj(J.yy))
 end
@@ -80,7 +86,55 @@ function inv(J::JonesMatrix)
 end
 
 function norm(J::JonesMatrix)
-    # The Frobenius norm
+    # the Frobenius norm
     sqrt(abs2(J.xx)+abs2(J.xy)+abs2(J.yx)+abs2(J.yy))
 end
+
+function kron(J1::JonesMatrix,J2::JonesMatrix)
+    [J1.xx*J2.xx J1.xx*J2.xy J1.xy*J2.xx J1.xy*J2.xy;
+     J1.xx*J2.yx J1.xx*J2.yy J1.xy*J2.yx J1.xy*J2.yy;
+     J1.yx*J2.xx J1.yx*J2.xy J1.yy*J2.xx J1.yy*J2.xy;
+     J1.yx*J2.yx J1.yx*J2.yy J1.yy*J2.yx J1.yy*J2.yy]
+end
+
+# Note the factor of 0.5 appears to be a convention
+# in radio astronomy (but not physics)
+const linear_to_stokes = 0.5*[1   0    0   1;
+                              1   0    0  -1;
+                              0   1    1   0;
+                              0  1im -1im  0]
+const stokes_to_linear = inv(linear_to_stokes)
+
+"""
+    stokes(correlations) -> [I,Q,U,V]
+
+Take the vector of correlations `[xx,xy,yx,yy]` and
+convert it to the Stokes parameters.
+"""
+stokes(correlations) = real(linear_to_stokes*correlations)
+
+"""
+    linear(stokes) -> [xx,xy,yx,yy]
+
+Take the vector of Stokes parameters `[I,Q,U,V]` and
+convert it to the vector of linear correlations.
+"""
+linear(stokes) = stokes_to_linear*stokes
+
+"""
+    mueller(J1::JonesMatrix, J2::JonesMatrix)
+
+Create a Mueller matrix from the two Jones matrices.
+"""
+function mueller(J1::JonesMatrix,J2::JonesMatrix)
+    JJ = kron(conj(J2),J1)
+    linear_to_stokes*JJ/linear_to_stokes
+end
+
+"""
+    mueller(J::JonesMatrix)
+
+Create a Mueller matrix from the given Jones matrix.
+"""
+mueller(J::JonesMatrix) = mueller(J,J)
 

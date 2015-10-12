@@ -11,6 +11,7 @@ cd(dirname(@__FILE__))
 
 exports = names(TTCal)
 meta    = Docs.meta(TTCal)
+@show exports
 
 # Get the plain text docs corresponding to each type and function.
 docs = Dict{Any,UTF8String}()
@@ -20,8 +21,13 @@ function add_docs(obj,doc::FuncDoc)
     docs[symbol(obj)] = plain(md)
 end
 function add_docs(obj,doc::TypeDoc)
-    md = doc.main
-    docs[symbol(obj)] = plain(md)
+    md  = doc.main
+    str = plain(md)
+    # search for all the constructors
+    for signature in doc.order
+        str = string(str,"\n",plain(doc.meta[signature]))
+    end
+    docs[symbol(obj)] = str
 end
 add_docs(obj,doc) = nothing
 
@@ -52,6 +58,7 @@ open(output,"w") do file
         write(file,"## $sym\n\n")
         sym = symbol(module_name,".",sym)
         write(file,docs[sym])
+        write(file,"\n")
     end
 end
 

@@ -15,9 +15,11 @@
 
 """
     peel!{T<:Calibration}(::Type{T},
-                          ms::Table,
-                          sources::Vector{PointSource};
-                          maxiter = 20, tolerance = 1e-3,
+                          ms::MeasurementSet,
+                          sources::Vector{PointSource},
+                          beam::BeamModel;
+                          maxiter = 20,
+                          tolerance = 1e-3,
                           minuvw = 0.0)
 
 Peel the given list of sources from the measurement set.
@@ -30,33 +32,21 @@ manner in which the sources are peeled:
 * `AmplitudeCalibration` - each source receives a full set of gain amplitudes
 """
 function peel!{T<:Calibration}(::Type{T},
-                               ms::Table,
-                               sources::Vector{PointSource};
+                               ms::MeasurementSet,
+                               sources::Vector{PointSource},
+                               beam::BeamModel;
                                maxiter::Int = 20,
                                tolerance::Float64 = 1e-3,
                                minuvw::Float64 = 0.0)
-    phase_dir = MeasurementSets.phase_direction(ms)
-    u,v,w = MeasurementSets.uvw(ms)
-    ν = MeasurementSets.frequency(ms)
-    ant1,ant2 = MeasurementSets.antennas(ms)
-
-    frame = ReferenceFrame()
-    set!(frame,MeasurementSets.position(ms))
-    set!(frame,MeasurementSets.time(ms))
-    sources = filter(source -> isabovehorizon(frame,source),sources)
-
-    Nant    = numrows(Table(ms[kw"ANTENNA"]))
-    Nfreq   = length(ν)
-
-    data  = MeasurementSets.corrected_data(ms)
-    flags = MeasurementSets.flags(ms)
-
-    calibrations = [T(Nant,Nfreq) for source in sources]
-    coherencies  = [genvis(frame,phase_dir,[source],u,v,w,ν) for source in sources]
-
+    sources = filter(source -> isabovehorizon(ms.frame,source),sources)
+    data  = get_corrected_data(ms)
+    flags = get_flags(ms)
+    calibrations = [T(ms.Nant,ms.Nfreq) for source in sources]
+    coherencies  = [genvis(ms,source,beam) for source in sources]
     peel!(calibrations,coherencies,data,flags,
-          u,v,w,ν,ant1,ant2,maxiter,tolerance,minuvw)
-    ms["CORRECTED_DATA"] = data
+          ms.u,ms.v,ms.w,ms.ν,ms.ant1,ms.ant2,
+          maxiter,tolerance,minuvw)
+    set_corrected_data!(ms,data,true)
     calibrations
 end
 

@@ -13,10 +13,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-################################################################################
-# Source Definitions
-
 """
+    type PointSource
+
 These sources have a multi-component power-law spectrum
 such that:
 
@@ -39,9 +38,7 @@ end
 
 name(source::PointSource) = source.name
 Base.show(io::IO,source::PointSource) = print(io,name(source))
-
-################################################################################
-# Flux
+direction(source::PointSource) = source.dir
 
 function powerlaw(reference_flux,index,reference_frequency,frequency)
     s = sign(reference_flux)
@@ -53,31 +50,29 @@ function powerlaw(reference_flux,index,reference_frequency,frequency)
     s*10.0.^logflux
 end
 
-for param in (:I,:Q,:U,:V)
-    func = symbol("stokes",param)
-    @eval function $func{T<:AbstractFloat}(source::PointSource,frequency::T)
-        powerlaw(source.$param,source.index,source.reffreq,frequency)
-    end
-    @eval function $func{T<:AbstractFloat}(source::PointSource,frequencies::Vector{T})
-        [$func(source,frequency) for frequency in frequencies]
-    end
+function flux(source::PointSource, frequency::Number)
+    powerlaw(source.I,source.index,source.reffreq,frequency)
 end
 
-flux{T<:AbstractFloat}(source::PointSource,frequency::T) = stokesI(source,frequency)
-flux{T<:AbstractFloat}(source::PointSource,frequencies::Vector{T}) = stokesI(source,frequencies)
+function flux{T<:Number}(source::PointSource, frequencies::Vector{T})
+    T[flux(source,frequency) for frequency in frequencies]
+end
 
-################################################################################
-# Position
-
-direction(source::PointSource) = source.dir
+function stokes_flux(source::PointSource, frequency::Number)
+    I = powerlaw(source.I,source.index,source.reffreq,frequency)
+    Q = powerlaw(source.Q,source.index,source.reffreq,frequency)
+    U = powerlaw(source.U,source.index,source.reffreq,frequency)
+    V = powerlaw(source.V,source.index,source.reffreq,frequency)
+    [I,Q,U,V]
+end
 
 """
 Convert the direction into a right ascension and declination.
 """
 function dir2radec(frame::ReferenceFrame,dir::Direction)
-    j2000 = measure(frame,dir,Measures.J2000)
+    j2000 = measure(frame,dir,dir"J2000")
     ra  = longitude(j2000)
-    dec = latitude(j2000)
+    dec =  latitude(j2000)
     ra,dec
 end
 
@@ -85,23 +80,23 @@ end
 Convert the direction into an azimuth and elevation.
 """
 function dir2azel(frame::ReferenceFrame,dir::Direction)
-    azel = measure(frame,dir,Measures.AZEL)
+    azel = measure(frame,dir,dir"AZEL")
     az = longitude(azel)
-    el = latitude(azel)
+    el =  latitude(azel)
     az,el
 end
 
 """
 Convert the direction into the standard radio coordinate system.
 """
-function dir2lm{ref}(frame::ReferenceFrame,phase_dir::Direction{Measures.J2000},dir::Direction{ref})
+function dir2lm{ref}(frame::ReferenceFrame,phase_dir::Direction{dir"J2000"},dir::Direction{ref})
     long = longitude(phase_dir)
     lat  = latitude(phase_dir)
     θ1 = π/2 - long
     θ2 = π/2 - lat
     sin_θ1 = sin(θ1); cos_θ1 = cos(θ1)
     sin_θ2 = sin(θ2); cos_θ2 = cos(θ2)
-    x,y,z = Measures.xyz_in_meters(measure(frame,dir,Measures.J2000))
+    x,y,z = Measures.xyz_in_meters(measure(frame,dir,dir"J2000"))
     # - Rotate first by θ1 about the z-axis
     # - Then rotate by θ2 about the x-axis
     # ⌈    -l    ⌉   ⌈1    0        0    ⌉   ⌈+cos(θ1) -sin(θ1) 0⌉   ⌈x⌉
@@ -112,7 +107,7 @@ function dir2lm{ref}(frame::ReferenceFrame,phase_dir::Direction{Measures.J2000},
     l,m
 end
 
-function lm2dir(phase_dir::Direction{Measures.J2000},l,m)
+function lm2dir(phase_dir::Direction{dir"J2000"},l,m)
     long = longitude(phase_dir)
     lat  = latitude(phase_dir)
     θ1 = π/2 - long
@@ -128,7 +123,7 @@ function lm2dir(phase_dir::Direction{Measures.J2000},l,m)
     x = -cos_θ1*l - sin_θ1*cos_θ2*m + sin_θ1*sin_θ2*n
     y = +sin_θ1*l - cos_θ1*cos_θ2*m + cos_θ1*sin_θ2*n
     z =                    sin_θ2*m +        cos_θ2*n
-    Measures.from_xyz_in_meters(Measures.J2000,x,y,z)
+    Measures.from_xyz_in_meters(dir"J2000",x,y,z)
 end
 
 radec(frame::ReferenceFrame,source::PointSource) = dir2radec(frame,direction(source))
@@ -157,7 +152,8 @@ function readsources(filename::AbstractString)
         else
             ra  = parsed_source["ra"]
             dec = parsed_source["dec"]
-            dir = Direction(Measures.J2000,Quanta.parse_ra(ra),Quanta.parse_dec(dec))
+            dir = Direction(dir"J2000",Quantity(Measures.sexagesimal(ra),"deg"),
+                                       Quantity(Measures.sexagesimal(dec),"deg"))
         end
         if haskey(parsed_source,"flux")
             I = parsed_source["flux"]
@@ -180,14 +176,14 @@ end
 function writesources(filename::AbstractString,sources::Vector{PointSource})
     dicts = Dict{UTF8String,Any}[]
     for source in sources
-        ra  = longitude(source.dir,Degree)
-        dec =  latitude(source.dir,Degree)
+        ra  = longitude(source.dir,"deg")
+        dec =  latitude(source.dir,"deg")
         dict = Dict{UTF8String,Any}()
         dict["ref"]   = "TTCal"
         dict["name"]  = source.name
         if name != "Sun"
-            dict["ra"]    = Quanta.format_ra(ra)
-            dict["dec"]   = Quanta.format_dec(dec)
+            dict["ra"]  = format_ra(ra)
+            dict["dec"] = format_dec(dec)
         end
         dict["I"]     = source.I
         dict["Q"]     = source.Q
@@ -201,5 +197,28 @@ function writesources(filename::AbstractString,sources::Vector{PointSource})
     JSON.print(file,dicts)
     close(file)
     nothing
+end
+
+function format_ra(ra::Float64)
+    ra /= 15
+    ra  = mod(ra,24)
+    hrs = floor(Integer,ra)
+    ra  = (ra-hrs)*60
+    min = floor(Integer,ra)
+    ra  = (ra-min)*60
+    sec = ra
+    @sprintf("%dh%02dm%07.4fs",hrs,min,sec)
+end
+
+function format_dec(dec::Float64)
+    s = sign(dec)
+    dec *= s
+    dec = mod(dec,90)
+    deg = floor(Integer,dec)
+    dec = (dec-deg)*60
+    min = floor(Integer,dec)
+    dec = (dec-min)*60
+    sec = dec
+    @sprintf("%+dd%02dm%07.4fs",s*deg,min,sec)
 end
 
