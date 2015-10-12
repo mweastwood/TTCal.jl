@@ -69,7 +69,7 @@ function genvis!(model::Array{Complex64,3},
     yx = zeros(length(ν))
     yy = zeros(length(ν))
     for β = 1:length(ν)
-        M = mueller(beam(ν,az,el))
+        M = mueller(beam(ν[β],az,el))
         IQUV = stokes_flux(source,ν[β])
         correlations = linear(M*IQUV)
         xx[β] = correlations[1]
