@@ -77,7 +77,8 @@ Create a calibration table for `Nant` antennas with `Nfreq` frequency channels w
 
 ```
 ampcal(ms::MeasurementSet,
-       sources::Vector{PointSource};
+       sources::Vector{PointSource},
+       beam::BeamModel;
        maxiter = 30, tolerance = 1e-3,
        force_imaging_columns = false)
 ```
@@ -108,7 +109,8 @@ Fit for the location of each point source.
 
 ```
 gaincal(ms::MeasurementSet,
-        sources::Vector{PointSource};
+        sources::Vector{PointSource},
+        beam::BeamModel;
         maxiter = 20, tolerance = 1e-5,
         force_imaging_columns = false,
         reference_antenna = 1)
@@ -131,12 +133,6 @@ No gridding is performed, so the runtime of this naive algorithm scales as $O(N_
 ## getspec
 
 ```
-getspec(data, flags, l, m, u, v, w, ν, ant1, ant2) -> xx,xy,yx,yy
-```
-
-Compute the spectrum of a source located at $(l,m)$ in all of the polarized correlation products.
-
-```
 getspec(ms::MeasurementSet, dir::Direction) -> xx,xy,yx,yy
 ```
 
@@ -144,12 +140,19 @@ This function extracts the spectrum in a given direction by means of an inverse 
 
 Note that no gridding is performed, so this does *not* use a fast Fourier transform. However, the inverse discrete Fourier transform *is* the least squares estimator for the flux in a given direction (if all baselines are weighted equally).
 
+```
+getspec(data, flags, l, m, u, v, w, ν, ant1, ant2) -> xx,xy,yx,yy
+```
+
+Compute the spectrum of a source located at $(l,m)$ in all of the polarized correlation products.
+
 ## peel!
 
 ```
 peel!{T<:Calibration}(::Type{T},
                       ms::MeasurementSet,
-                      sources::Vector{PointSource};
+                      sources::Vector{PointSource},
+                      beam::BeamModel;
                       maxiter = 20,
                       tolerance = 1e-3,
                       minuvw = 0.0)
@@ -167,7 +170,8 @@ The type supplied as the first argument determines the manner in which the sourc
 
 ```
 polcal(ms::MeasurementSet,
-       sources::Vector{PointSources};
+       sources::Vector{PointSources},
+       beam::BeamModel;
        maxiter = 20, tolerance = 1e-5,
        force_imaging_columns = false)
 ```

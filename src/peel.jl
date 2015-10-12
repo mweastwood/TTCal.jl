@@ -16,7 +16,8 @@
 """
     peel!{T<:Calibration}(::Type{T},
                           ms::MeasurementSet,
-                          sources::Vector{PointSource};
+                          sources::Vector{PointSource},
+                          beam::BeamModel;
                           maxiter = 20,
                           tolerance = 1e-3,
                           minuvw = 0.0)
@@ -32,7 +33,8 @@ manner in which the sources are peeled:
 """
 function peel!{T<:Calibration}(::Type{T},
                                ms::MeasurementSet,
-                               sources::Vector{PointSource};
+                               sources::Vector{PointSource},
+                               beam::BeamModel;
                                maxiter::Int = 20,
                                tolerance::Float64 = 1e-3,
                                minuvw::Float64 = 0.0)
@@ -40,7 +42,7 @@ function peel!{T<:Calibration}(::Type{T},
     data  = get_corrected_data(ms)
     flags = get_flags(ms)
     calibrations = [T(ms.Nant,ms.Nfreq) for source in sources]
-    coherencies  = [genvis(ms,source,ConstantBeam()) for source in sources]
+    coherencies  = [genvis(ms,source,beam) for source in sources]
     peel!(calibrations,coherencies,data,flags,
           ms.u,ms.v,ms.w,ms.ν,ms.ant1,ms.ant2,
           maxiter,tolerance,minuvw)

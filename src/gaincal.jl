@@ -74,7 +74,8 @@ end
 
 """
     gaincal(ms::MeasurementSet,
-            sources::Vector{PointSource};
+            sources::Vector{PointSource},
+            beam::BeamModel;
             maxiter = 20, tolerance = 1e-5,
             force_imaging_columns = false,
             reference_antenna = 1)
@@ -82,7 +83,8 @@ end
 Solve for the interferometer's electronic gains.
 """
 function gaincal(ms::MeasurementSet,
-                 sources::Vector{PointSource};
+                 sources::Vector{PointSource},
+                 beam::BeamModel;
                  maxiter::Int = 20,
                  tolerance::Float64 = 1e-5,
                  force_imaging_columns::Bool = false,
@@ -90,7 +92,7 @@ function gaincal(ms::MeasurementSet,
     sources = filter(source -> isabovehorizon(ms.frame,source),sources)
     calibration = GainCalibration(ms.Nant,ms.Nfreq)
     data  = get_data(ms)
-    model = genvis(ms,sources,ConstantBeam())
+    model = genvis(ms,sources,beam)
     flags = get_flags(ms)
     set_model_data!(ms,model)
     gaincal!(calibration,data,model,flags,

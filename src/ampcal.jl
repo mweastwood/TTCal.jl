@@ -58,21 +58,23 @@ end
 
 """
     ampcal(ms::MeasurementSet,
-           sources::Vector{PointSource};
+           sources::Vector{PointSource},
+           beam::BeamModel;
            maxiter = 30, tolerance = 1e-3,
            force_imaging_columns = false)
 
 Solve for the amplitude of the interferometer's gains.
 """
 function ampcal(ms::MeasurementSet,
-                sources::Vector{PointSource};
+                sources::Vector{PointSource},
+                beam::BeamModel;
                 maxiter::Int = 30,
                 tolerance::Float64 = 1e-3,
                 force_imaging_columns::Bool = false)
     sources = filter(source -> isabovehorizon(ms.frame,source),sources)
     calibration = AmplitudeCalibration(ms.Nant,ms.Nfreq)
     data  = get_data(ms)
-    model = genvis(ms,sources,ConstantBeam())
+    model = genvis(ms,sources,beam)
     flags = get_flags(ms)
     set_model_data!(ms,model)
     ampcal!(calibration,data,model,flags,

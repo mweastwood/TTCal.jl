@@ -58,21 +58,23 @@ end
 
 """
     polcal(ms::MeasurementSet,
-           sources::Vector{PointSources};
+           sources::Vector{PointSources},
+           beam::BeamModel;
            maxiter = 20, tolerance = 1e-5,
            force_imaging_columns = false)
 
 Solve for the polarization properties of the interferometer.
 """
 function polcal(ms::MeasurementSet,
-                sources::Vector{PointSource};
+                sources::Vector{PointSource},
+                beam::BeamModel;
                 maxiter::Int = 20,
                 tolerance::Float64 = 1e-5,
                 force_imaging_columns::Bool = false)
     sources = filter(source -> isabovehorizon(ms.frame,source),sources)
     calibration = PolarizationCalibration(ms.Nant,ms.Nfreq)
     data  = get_corrected_data(ms)
-    model = genvis(ms,sources,ConstantBeam())
+    model = genvis(ms,sources,beam)
     flags = get_flags(ms)
     set_model_data!(ms,model)
     polcal!(calibration,data,model,flags,
