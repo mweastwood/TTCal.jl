@@ -15,15 +15,15 @@
 
 """
     fitvis(ms::MeasurementSet,
-           sources::Vector{PointSource},
-           beam::BeamModel;
+           sources::Vector{PointSource};
+           maxiter::Int = 20,
+           tolerance::Float64 = 1e-3,
            minuvw::Float64 = 0.0)
 
 Fit for the location of each point source.
 """
 function fitvis(ms::MeasurementSet,
-                sources::Vector{PointSource},
-                beam::BeamModel;
+                sources::Vector{PointSource};
                 maxiter::Int = 20,
                 tolerance::Float64 = 1e-3,
                 minuvw::Float64 = 0.0)

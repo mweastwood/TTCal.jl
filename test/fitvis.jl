@@ -17,8 +17,7 @@ let
     sources[1].dir = Direction(dir"AZEL",Quantity(az,"rad"),
                                          Quantity(el,"rad"))
 
-    l,m = fitvis(ms,sources,TTCal.ConstantBeam(),
-                 maxiter = 100, tolerance = sqrt(eps(Float64)))
+    l,m = fitvis(ms,sources,maxiter = 100, tolerance = sqrt(eps(Float64)))
 
     @test l[1] ≈ lold
     @test m[1] ≈ mold
