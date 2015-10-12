@@ -34,6 +34,8 @@ immutable SineBeam <: BeamModel
     α::Float64
 end
 
+SineBeam() = SineBeam(1.6)
+
 function call(beam::SineBeam,ν,az,el)
     # note that the factor of 1/2 in the exponent
     # comes from the fact that the Jones matrix
@@ -110,4 +112,8 @@ end
 function P178(ν,az,el)
     sqrt((E178(ν,el)*cos(az))^2 + (H178(ν,el)*sin(az))^2)
 end
+
+const beam_dictionary = Dict("constant" => ConstantBeam,
+                             "sine"     => SineBeam,
+                             "memo178"  => Memo178Beam)
 

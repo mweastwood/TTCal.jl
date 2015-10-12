@@ -118,7 +118,8 @@ let
     # Run as `gaincal(...)`
     name,ms = createms(Nant,Nfreq)
     sources = readsources("sources.json")
-    mycal = gaincal(ms,sources,maxiter=100,tolerance=Float64(eps(Float32)))
+    mycal = gaincal(ms,sources,TTCal.ConstantBeam(),
+                    maxiter=100,tolerance=Float64(eps(Float32)))
     @test !any(mycal.flags)
     @test mycal.gains ≈ ones(Complex64,Nant,Nfreq,2)
     unlock(ms)

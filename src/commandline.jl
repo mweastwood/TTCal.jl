@@ -43,6 +43,10 @@ end
         help = "A JSON file describing the sources to be used for the sky model."
         arg_type = ASCIIString
         required = true
+    "--beam"
+        help = "The name of the beam model to use ($(join(keys(beam_dictionary),",")))."
+        arg_type = ASCIIString
+        default = "constant"
     "--maxiter"
         help = "Set the maximum number of (Mitch|Stef)Cal iterations to take on each frequency channel."
         arg_type = Int
@@ -69,6 +73,10 @@ end
         help = "A JSON file describing the sources to be used for the sky model."
         arg_type = ASCIIString
         required = true
+    "--beam"
+        help = "The name of the beam model to use ($(join(keys(beam_dictionary),",")))."
+        arg_type = ASCIIString
+        default = "constant"
     "--maxiter"
         help = "Set the maximum number of (Mitch|Stef)Cal iterations to take on each frequency channel."
         arg_type = Int
@@ -91,6 +99,10 @@ end
         help = "A JSON file describing the sources to be peeled from the given measurement set."
         arg_type = ASCIIString
         required = true
+    "--beam"
+        help = "The name of the beam model to use ($(join(keys(beam_dictionary),",")))."
+        arg_type = ASCIIString
+        default = "constant"
     "--minuvw"
         help = "The minimum baseline length (measured in wavelengths) to use while peeling sources. This parameter can be used to mitigate sensitivity to unmodeled diffuse emission."
         arg_type = Float64
@@ -132,7 +144,8 @@ function run_gaincal(args)
     println("Running `gaincal` on $(args["input"])")
     ms = MeasurementSet(ascii(args["input"]))
     sources = readsources(args["sources"])
-    cal = gaincal(ms,sources,
+    beam = beam_dictionary[args["beam"]]()
+    cal = gaincal(ms,sources,beam,
                   maxiter=args["maxiter"],
                   tolerance=args["tolerance"],
                   force_imaging_columns=args["force-imaging"])
@@ -144,7 +157,8 @@ function run_polcal(args)
     println("Running `polcal` on $(args["input"])")
     ms = MeasurementSet(ascii(args["input"]))
     sources = readsources(args["sources"])
-    cal = polcal(ms,sources,
+    beam = beam_dictionary[args["beam"]]()
+    cal = polcal(ms,sources,beam,
                  maxiter=args["maxiter"],
                  tolerance=args["tolerance"],
                  force_imaging_columns=args["force-imaging"])
@@ -156,7 +170,8 @@ function run_peel(args)
     println("Running `peel` on $(args["input"])")
     ms = MeasurementSet(ascii(args["input"]))
     sources = readsources(args["sources"])
-    peel!(GainCalibration,ms,sources,minuvw=args["minuvw"])
+    beam = beam_dictionary[args["beam"]]()
+    peel!(GainCalibration,ms,sources,beam,minuvw=args["minuvw"])
 end
 
 function run_applycal(args)
