@@ -13,108 +13,108 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+const s = ArgParseSettings(description = "A calibration routine developed for the OVRO LWA.")
+
+@add_arg_table s begin
+    "gaincal"
+        help = "Solve for a gain calibration."
+        action = :command
+    "polcal"
+        help = "Solve for a polarization calibration."
+        action = :command
+    "peel"
+        help = "Peel sources from the dataset."
+        action = :command
+    "applycal"
+        help = "Apply a calibration."
+        action = :command
+end
+
+@add_arg_table s["gaincal"] begin
+    "--input"
+        help = "The measurement set used to solve for the calibration."
+        arg_type = ASCIIString
+        required = true
+    "--output"
+        help = "The output file to which the calibration will be written. This output file will be overwritten if it already exists."
+        arg_type = ASCIIString
+        required = true
+    "--sources"
+        help = "A JSON file describing the sources to be used for the sky model."
+        arg_type = ASCIIString
+        required = true
+    "--maxiter"
+        help = "Set the maximum number of (Mitch|Stef)Cal iterations to take on each frequency channel."
+        arg_type = Int
+        default  = 20
+    "--tolerance"
+        help = "Set the relative tolerance used to determine convergence."
+        arg_type = Float64
+        default  = 1e-3
+    "--force-imaging"
+        help = "Create and use the MODEL_DATA and CORRECTED_DATA columns even if they do not already exist in the measurement set."
+        action = :store_true
+end
+
+@add_arg_table s["polcal"] begin
+    "--input"
+        help = "The measurement set used to solve for the calibration."
+        arg_type = ASCIIString
+        required = true
+    "--output"
+        help = "The output file to which the calibration will be written. This output file will be overwritten if it already exists."
+        arg_type = ASCIIString
+        required = true
+    "--sources"
+        help = "A JSON file describing the sources to be used for the sky model."
+        arg_type = ASCIIString
+        required = true
+    "--maxiter"
+        help = "Set the maximum number of (Mitch|Stef)Cal iterations to take on each frequency channel."
+        arg_type = Int
+        default  = 20
+    "--tolerance"
+        help = "Set the relative tolerance used to determine convergence."
+        arg_type = Float64
+        default  = 1e-3
+    "--force-imaging"
+        help = "Create and use the MODEL_DATA and CORRECTED_DATA columns even if they do not already exist in the measurement set."
+        action = :store_true
+end
+
+@add_arg_table s["peel"] begin
+    "--input"
+        help = "The measurement set that will have sources peeled."
+        arg_type = ASCIIString
+        required = true
+    "--sources"
+        help = "A JSON file describing the sources to be peeled from the given measurement set."
+        arg_type = ASCIIString
+        required = true
+    "--minuvw"
+        help = "The minimum baseline length (measured in wavelengths) to use while peeling sources. This parameter can be used to mitigate sensitivity to unmodeled diffuse emission."
+        arg_type = Float64
+        default  = 15.0
+end
+
+@add_arg_table s["applycal"] begin
+    "--input"
+        help = "The measurement set that the calibration will be applied to."
+        arg_type = ASCIIString
+        required = true
+    "--calibration"
+        help = "The file containing the calibration solution."
+        arg_type = ASCIIString
+        required = true
+    "--force-imaging"
+        help = "Write the calibrated visibilities to the CORRECTED_DATA column regardless of whether or not the measurement set already has this column (it will be created if it doesn't exist)."
+        action = :store_true
+    "--corrected"
+        help = "Apply the calibration to the CORRECTED_DATA column instead of the DATA column."
+        action = :store_true
+end
+
 function main(args)
-    s = ArgParseSettings(description = "A calibration routine developed for the OVRO LWA.")
-
-    @add_arg_table s begin
-        "gaincal"
-            help = "Solve for a gain calibration."
-            action = :command
-        "polcal"
-            help = "Solve for a polarization calibration."
-            action = :command
-        "peel"
-            help = "Peel sources from the dataset."
-            action = :command
-        "applycal"
-            help = "Apply a calibration."
-            action = :command
-    end
-
-    @add_arg_table s["gaincal"] begin
-        "--input"
-            help = "The measurement set used to solve for the calibration."
-            arg_type = ASCIIString
-            required = true
-        "--output"
-            help = "The output file to which the calibration will be written. This output file will be overwritten if it already exists."
-            arg_type = ASCIIString
-            required = true
-        "--sources"
-            help = "A JSON file describing the sources to be used for the sky model."
-            arg_type = ASCIIString
-            required = true
-        "--maxiter"
-            help = "Set the maximum number of (Mitch|Stef)Cal iterations to take on each frequency channel."
-            arg_type = Int
-            default  = 20
-        "--tolerance"
-            help = "Set the relative tolerance used to determine convergence."
-            arg_type = Float64
-            default  = 1e-3
-        "--force-imaging"
-            help = "Create and use the MODEL_DATA and CORRECTED_DATA columns even if they do not already exist in the measurement set."
-            action = :store_true
-    end
-
-    @add_arg_table s["polcal"] begin
-        "--input"
-            help = "The measurement set used to solve for the calibration."
-            arg_type = ASCIIString
-            required = true
-        "--output"
-            help = "The output file to which the calibration will be written. This output file will be overwritten if it already exists."
-            arg_type = ASCIIString
-            required = true
-        "--sources"
-            help = "A JSON file describing the sources to be used for the sky model."
-            arg_type = ASCIIString
-            required = true
-        "--maxiter"
-            help = "Set the maximum number of (Mitch|Stef)Cal iterations to take on each frequency channel."
-            arg_type = Int
-            default  = 20
-        "--tolerance"
-            help = "Set the relative tolerance used to determine convergence."
-            arg_type = Float64
-            default  = 1e-3
-        "--force-imaging"
-            help = "Create and use the MODEL_DATA and CORRECTED_DATA columns even if they do not already exist in the measurement set."
-            action = :store_true
-    end
-
-    @add_arg_table s["peel"] begin
-        "--input"
-            help = "The measurement set that will have sources peeled."
-            arg_type = ASCIIString
-            required = true
-        "--sources"
-            help = "A JSON file describing the sources to be peeled from the given measurement set."
-            arg_type = ASCIIString
-            required = true
-        "--minuvw"
-            help = "The minimum baseline length (measured in wavelengths) to use while peeling sources. This parameter can be used to mitigate sensitivity to unmodeled diffuse emission."
-            arg_type = Float64
-            default  = 15.0
-    end
-
-    @add_arg_table s["applycal"] begin
-        "--input"
-            help = "The measurement set that the calibration will be applied to."
-            arg_type = ASCIIString
-            required = true
-        "--calibration"
-            help = "The file containing the calibration solution."
-            arg_type = ASCIIString
-            required = true
-        "--force-imaging"
-            help = "Write the calibrated visibilities to the CORRECTED_DATA column regardless of whether or not the measurement set already has this column (it will be created if it doesn't exist)."
-            action = :store_true
-        "--corrected"
-            help = "Apply the calibration to the CORRECTED_DATA column instead of the DATA column."
-            action = :store_true
-    end
-
     parsed_args = parse_args(args,s)
     command = parsed_args["%COMMAND%"]
     if     command == "gaincal"
