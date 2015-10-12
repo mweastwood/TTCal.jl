@@ -11,7 +11,7 @@ let
 
     flux = TTCal.flux(sources[1],ms.ν)
     xx,xy,yx,yy = getspec(ms,TTCal.direction(sources[1]))
-    @test xx ≈ flux
-    @test yy ≈ flux
+    @test isapprox(xx,flux,rtol=1e-7)
+    @test isapprox(yy,flux,rtol=1e-7)
 end
 
