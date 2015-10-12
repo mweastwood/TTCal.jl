@@ -29,9 +29,9 @@ function getspec(ms::MeasurementSet, dir::Direction)
         error("Direction is below the horizon.")
     end
 
-    l,m = dir2lm(ms.phase_dir,dir)
-    data  = MeasurementSets.corrected_data(ms)
-    flags = MeasurementSets.flags(ms)
+    l,m = dir2lm(ms.frame,ms.phase_direction,dir)
+    data  = get_corrected_data(ms)
+    flags = get_flags(ms)
 
     getspec(data,flags,l,m,
             ms.u,ms.v,ms.w,ms.ν,
