@@ -199,6 +199,25 @@ function writesources(filename::AbstractString,sources::Vector{PointSource})
     nothing
 end
 
+"""
+    write_ds9_regions(filename,sources::Vector{PointSource})
+
+Write the list of sources to a DS9 region file. This file can then be loaded
+into DS9 to highlight sources within images.
+"""
+function write_ds9_regions(filename,sources::Vector{PointSource})
+    open(filename,"w") do f
+        Base.write(f,"global color=red edit=0 move=0 delete=1\n")
+        Base.write(f,"fk5\n")
+        for source in sources
+            source.name == "Sun" && continue
+            ra  = longitude(source.dir,"deg")
+            dec =  latitude(source.dir,"deg")
+            Base.write(f,"circle($(format_ra(ra)),$(format_dec(dec)),1000\") # text = {$(source.name)}\n")
+        end
+    end
+end
+
 function format_ra(ra::Float64)
     ra /= 15
     ra  = mod(ra,24)
@@ -219,6 +238,7 @@ function format_dec(dec::Float64)
     min = floor(Integer,dec)
     dec = (dec-min)*60
     sec = dec
-    @sprintf("%+dd%02dm%07.4fs",s*deg,min,sec)
+    sign_str = s < 0? "-" : "+"
+    @sprintf("%s%dd%02dm%07.4fs",sign_str,deg,min,sec)
 end
 

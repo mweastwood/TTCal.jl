@@ -20,6 +20,7 @@ let
     @test all(cal.flags .== false)
 
     # The inverse of a calibration with unity amplitudes should be itself.
+    rand!(cal.flags)
     inverse = TTCal.invert(cal)
     @test cal.amplitudes == inverse.amplitudes
     @test cal.flags == inverse.flags

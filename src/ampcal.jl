@@ -50,8 +50,9 @@ The gain amplitude $a$ of each antenna is set to $1/a$.
 """
 function invert(cal::AmplitudeCalibration)
     output = AmplitudeCalibration(Nant(cal),Nfreq(cal))
-    for i in eachindex(cal.amplitudes)
+    for i in eachindex(output.amplitudes,output.flags,cal.amplitudes,cal.flags)
         output.amplitudes[i] = inv(cal.amplitudes[i])
+        output.flags[i] = cal.flags[i]
     end
     output
 end

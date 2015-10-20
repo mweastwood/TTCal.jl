@@ -50,8 +50,9 @@ The complex gain $g$ of each antenna is set to $1/g$.
 """
 function invert(cal::GainCalibration)
     output = GainCalibration(Nant(cal),Nfreq(cal))
-    for i in eachindex(cal.gains)
+    for i in eachindex(output.gains,output.flags,cal.gains,cal.flags)
         output.gains[i] = inv(cal.gains[i])
+        output.flags[i] = cal.flags[i]
     end
     output
 end

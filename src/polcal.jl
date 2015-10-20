@@ -50,8 +50,9 @@ The Jones matrix $J$ of each antenna is set to $J^{-1}$.
 """
 function invert(cal::PolarizationCalibration)
     output = PolarizationCalibration(Nant(cal),Nfreq(cal))
-    for i in eachindex(cal.jones)
+    for i in eachindex(output.jones,output.flags,cal.jones,cal.flags)
         output.jones[i] = inv(cal.jones[i])
+        output.flags[i] = cal.flags[i]
     end
     output
 end

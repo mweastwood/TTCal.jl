@@ -42,7 +42,7 @@ function createms(Nant,Nfreq)
     z = randn(Nant)
     u,v,w = xyz2uvw(x,y,z)
     ν = linspace(40e6,60e6,Nfreq) |> collect
-    t = (2015.-1858.)*365.*24.*60.*60. # a rough, current Julian date (in seconds)
+    t = (2015.-1858.)*365.*24.*60.*60. # a rough current Julian date (in seconds)
     ant1,ant2 = ant1ant2(Nant)
 
     frame = ReferenceFrame()
