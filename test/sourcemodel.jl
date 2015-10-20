@@ -95,3 +95,12 @@ let
     @test m ≈ m′
 end
 
+let
+    ra = get(q"0h12m34s","deg")
+    @test TTCal.format_ra(ra) == "0h12m34.0000s"
+    dec = get(q"+0d12m34s","deg")
+    @test TTCal.format_dec(dec) == "+0d12m34.0000s"
+    dec = get(q"-0d12m34s","deg")
+    @test TTCal.format_dec(dec) == "-0d12m34.0000s"
+end
+

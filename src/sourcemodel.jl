@@ -238,6 +238,7 @@ function format_dec(dec::Float64)
     min = floor(Integer,dec)
     dec = (dec-min)*60
     sec = dec
-    @sprintf("%+dd%02dm%07.4fs",s*deg,min,sec)
+    sign_str = s < 0? "-" : "+"
+    @sprintf("%s%dd%02dm%07.4fs",sign_str,deg,min,sec)
 end
 
