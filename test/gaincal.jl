@@ -26,6 +26,7 @@ let
     @test all(cal.flags .== false)
 
     # The inverse of a calibration with unity gains should be itself.
+    rand!(cal.flags)
     inverse = TTCal.invert(cal)
     @test cal.gains == inverse.gains
     @test cal.flags == inverse.flags

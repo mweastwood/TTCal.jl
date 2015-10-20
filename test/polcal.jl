@@ -20,6 +20,7 @@ let
     @test all(cal.flags .== false)
 
     # The inverse of a calibration with identity Jones matrices should be itself.
+    rand!(cal.flags)
     inverse = TTCal.invert(cal)
     @test vecnorm(cal.jones-inverse.jones,Inf) < sqrt(eps(Float32))
     @test cal.flags == inverse.flags
