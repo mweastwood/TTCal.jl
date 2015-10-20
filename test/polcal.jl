@@ -6,7 +6,7 @@ let
     # Test that the step is zero when the
     # Jones matrices are already at the optimal value.
     jones = ones(JonesMatrix,N)
-    @test norm(TTCal.polcal_step(jones,data,model),Inf) < 5eps(Float32)
+    @test norm(TTCal.polcal_step(jones,data,model),Inf) < sqrt(eps(Float32))
 end
 
 let
@@ -21,7 +21,7 @@ let
 
     # The inverse of a calibration with identity Jones matrices should be itself.
     inverse = TTCal.invert(cal)
-    @test vecnorm(cal.jones-inverse.jones,Inf) < 5eps(Float32)
+    @test vecnorm(cal.jones-inverse.jones,Inf) < sqrt(eps(Float32))
     @test cal.flags == inverse.flags
 end
 
