@@ -9,8 +9,8 @@ import Base.Docs: FuncDoc, TypeDoc
 
 cd(dirname(@__FILE__))
 
-exports = names(TTCal)
-meta    = Docs.meta(TTCal)
+exports = @eval names($module_name)
+meta    = @eval Docs.meta($module_name)
 @show exports
 
 # Get the plain text docs corresponding to each type and function.
