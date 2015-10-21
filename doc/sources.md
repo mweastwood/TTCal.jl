@@ -43,6 +43,7 @@ using the published spectra for Baars et al. 1977.
 ```
 
 **Fields:**
+
 * `ref` is not used by TTCal, but is intended to be a record of the origin
   of the information used to define the source.
 * `name` is the name of the source.
