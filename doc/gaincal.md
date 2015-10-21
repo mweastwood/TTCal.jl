@@ -1,17 +1,23 @@
-## Gain Calibration
+# Gain Calibration
 
-With this calibration, TTCal will solve for one complex gain per antenna polarization
-per frequency channel. TTCal assumes that the measurement set contains all baselines
+With this calibration TTCal will solve for one complex gain (amplitude and phase)
+per antenna polarization per frequency channel.
+TTCal assumes that the measurement set contains all baselines
 for a single integration (multiple frequency channels are allowed though).
+
 TTCal uses the iterative routine described by Mitchell et al. 2008 and
 Salvini & Wijnholds 2014 to solve for the complex gains.
+
+## Running from a Julia script
+
+## Running from the command line
 
 For example, to calibrate a standard OVRO LWA dataset:
 ```
 ttcal.jl gaincal --input data.ms --output calibration.tt --sources sources.json
 ttcal.jl applycal --input data.ms --calibration calibration.ttb
 ```
-See the "Sky Models" section for an example `sources.json` file.
+See the [Sky Models]("sources.md") section for an example `sources.json` file.
 For a list of all available options, run:
 ```
 ttcal.jl gaincal

@@ -1,11 +1,17 @@
-## Sky Models
+# Sky Models
 
-TTCal expects the sky model to be specified as a list of point sources in a JSON file.
-Each source receives a name (`name`), J2000 position (`ra` and `dec`), and power-law spectrum.
-The Stokes parameters (`I`, `Q`, `U`, and `V`) must be given at the reference frequency
-(`freq`, measured in Hz). The spectral index is specified by `index`. Higher order terms
-may also be specified. See the following example for Cas A and Cyg A using the published
-spectra for Baars et al. 1977.
+## Point Sources
+
+For the OVRO LWA, the two most important point sources for calibration are
+[Cas A](https://en.wikipedia.org/wiki/Cassiopeia_A) and
+[Cyg A](https://en.wikipedia.org/wiki/Cygnus_A), which are the two brightest
+sources on the sky. The optimal time to solve for a calibration is when both
+of these sources are above the horizon.
+
+Currently TTCal expects the sky model to be specified as a list of point sources.
+This is accomplished by listing the sources in a [JSON](http://www.json.org/) file.
+For example, the following file defines a sky model consisting of Cas A and Cyg A
+using the published spectra for Baars et al. 1977.
 
 ```
 [
@@ -35,4 +41,17 @@ spectra for Baars et al. 1977.
     }
 ]
 ```
+
+**Fields:**
+* `ref` is not used by TTCal, but is intended to be a record of the origin
+  of the information used to define the source.
+* `name` is the name of the source.
+* `ra` and `dec` define the J2000 location of the source.
+* `I`, `Q`, `U`, and `V` define the Stokes parameters (in Jy) at the frequency `freq` (in Hz).
+* `index` defines the spectral index of the source.
+
+## Diffuse Emission
+
+Diffuse emission is currently not supported within TTCal. Eventual support is on the
+horizon.
 

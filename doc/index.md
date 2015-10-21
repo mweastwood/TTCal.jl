@@ -15,7 +15,7 @@ essentially amounts to zeroing the phase on all baselines.
 Low frequency telescopes (<300 MHz) tend to occupy an entirely different
 region of phase space. That is they are usually composed of numerous
 cheap dipole antennas with very broad beams ([LOFAR](http://www.lofar.org/),
-[MWA](http://www.mwatelescope.org/). Furthermore, the low frequency sky
+[MWA](http://www.mwatelescope.org/)). Furthermore, the low frequency sky
 is corrupted by propagation through the ionosphere. Until the field matures,
 the demand for a new and effective calibration technique
 is best met by a simple, adaptable, and relatively fast software package.
@@ -80,4 +80,10 @@ commands:
 optional arguments:
   -h, --help  show this help message and exit
 ```
+
+Note that every time Julia is restarted there is overhead
+associated with reloading and recompiling the code. While
+Julia version 0.4 introduced code caching to help mitigate this,
+running TTCal will always be faster from a Julia script
+than from the command line.
 
