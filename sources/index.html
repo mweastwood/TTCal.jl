@@ -27,6 +27,7 @@
   <script src="../js/modernizr-2.8.3.min.js"></script>
   <script type="text/javascript" src="../js/highlight.pack.js"></script>
   <script src="../js/theme.js"></script> 
+  <script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML"></script>
   <script src="../mathjaxhelper.js"></script>
 
   
@@ -105,10 +106,32 @@
 <li>
           
             <li>
+    <ul class="subnav">
+    <li><span>Developer Documentation</span></li>
+
+        
+            
     <li class="toctree-l1 ">
         <a class="" href="../api/">API</a>
         
     </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../contributing/">Contributing</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../docs/">Building this Website</a>
+        
+    </li>
+
+        
+    </ul>
 <li>
           
         </ul>
@@ -151,8 +174,8 @@
           <div role="main">
             <div class="section">
               
-                <h1 id="sky-models">Sky Models</h1>
-<h2 id="point-sources">Point Sources</h2>
+                <h2 id="sky-models">Sky Models</h2>
+<h3 id="point-sources">Point Sources</h3>
 <p>For the OVRO LWA, the two most important point sources for calibration are
 <a href="https://en.wikipedia.org/wiki/Cassiopeia_A">Cas A</a> and
 <a href="https://en.wikipedia.org/wiki/Cygnus_A">Cyg A</a>, which are the two brightest
@@ -199,7 +222,13 @@ using the published spectra for <a href="http://adsabs.harvard.edu/abs/1977A%26A
 <li><code>I</code>, <code>Q</code>, <code>U</code>, and <code>V</code> define the Stokes parameters (in Jy) at the frequency <code>freq</code> (in Hz).</li>
 <li><code>index</code> defines the spectral index of the source.</li>
 </ul>
-<h2 id="diffuse-emission">Diffuse Emission</h2>
+<p>Higher order terms are defined such that
+<script type="math/tex; mode=display">
+    \log S = \log S_0 + \sum_{n=1}^N \alpha_n \log\left(\frac{\nu}{\nu_0}\right)^n
+</script>
+where $S$ is the value of a given Stokes parameter and $\alpha_n$ represents
+the values contained in <code>index</code>.</p>
+<h3 id="diffuse-emission">Diffuse Emission</h3>
 <p>Diffuse emission is currently not supported within TTCal. Eventual support is on the
 horizon.</p>
               

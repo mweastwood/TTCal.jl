@@ -27,6 +27,7 @@
   <script src="../js/modernizr-2.8.3.min.js"></script>
   <script type="text/javascript" src="../js/highlight.pack.js"></script>
   <script src="../js/theme.js"></script> 
+  <script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML"></script>
   <script src="../mathjaxhelper.js"></script>
 
   
@@ -75,9 +76,6 @@
         
             <ul>
             
-                <li class="toctree-l3"><a href="#polarization-calibration">Polarization Calibration</a></li>
-                
-            
             </ul>
         
     </li>
@@ -101,10 +99,32 @@
 <li>
           
             <li>
+    <ul class="subnav">
+    <li><span>Developer Documentation</span></li>
+
+        
+            
     <li class="toctree-l1 ">
         <a class="" href="../api/">API</a>
         
     </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../contributing/">Contributing</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../docs/">Building this Website</a>
+        
+    </li>
+
+        
+    </ul>
 <li>
           
         </ul>
@@ -147,14 +167,7 @@
           <div role="main">
             <div class="section">
               
-                <h2 id="polarization-calibration">Polarization Calibration</h2>
-<p>For a polarization calibration, TTCal solves for one Jones matrix per antenna per
-frequency channel. This is accomplished by using the fully polarized version of
-the iterative routine described by Mitchell et al. 2008 and Salvini &amp; Wijnholds 2014.</p>
-<p>A standard OVRO LWA dataset can be calibrated with:</p>
-<pre><code>ttcal.jl polcal --input data.ms --output calibration.tt --sources sources.json
-ttcal.jl applycal --input data.ms --calibration calibration.tt
-</code></pre>
+                
               
             </div>
           </div>

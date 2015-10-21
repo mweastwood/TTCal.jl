@@ -27,6 +27,7 @@
   <script src="../js/modernizr-2.8.3.min.js"></script>
   <script type="text/javascript" src="../js/highlight.pack.js"></script>
   <script src="../js/theme.js"></script> 
+  <script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML"></script>
   <script src="../mathjaxhelper.js"></script>
 
   
@@ -105,10 +106,32 @@
 <li>
           
             <li>
+    <ul class="subnav">
+    <li><span>Developer Documentation</span></li>
+
+        
+            
     <li class="toctree-l1 ">
         <a class="" href="../api/">API</a>
         
     </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../contributing/">Contributing</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../docs/">Building this Website</a>
+        
+    </li>
+
+        
+    </ul>
 <li>
           
         </ul>
@@ -151,29 +174,47 @@
           <div role="main">
             <div class="section">
               
-                <h1 id="gain-calibration">Gain Calibration</h1>
+                <h2 id="gain-calibration">Gain Calibration</h2>
 <p>With this calibration TTCal will solve for one complex gain (amplitude and phase)
-per antenna polarization per frequency channel.
-TTCal assumes that the measurement set contains all baselines
-for a single integration (multiple frequency channels are allowed though).</p>
-<p>TTCal uses the iterative routine described by Mitchell et al. 2008 and
-Salvini &amp; Wijnholds 2014 to solve for the complex gains.</p>
-<h2 id="running-from-a-julia-script">Running from a Julia script</h2>
-<h2 id="running-from-the-command-line">Running from the command line</h2>
-<p>For example, to calibrate a standard OVRO LWA dataset:</p>
-<pre><code>ttcal.jl gaincal --input data.ms --output calibration.tt --sources sources.json
-ttcal.jl applycal --input data.ms --calibration calibration.ttb
-</code></pre>
-
-<p>See the <a href="" title="sources.md">Sky Models</a> section for an example <code>sources.json</code> file.
-For a list of all available options, run:</p>
-<pre><code>ttcal.jl gaincal
-</code></pre>
-
-<p>TTCal will flag frequency channels that do converge within the specified maximum
+per antenna polarization per frequency channel. That is for complex $g_i$ and
+$i$, $j$ labeling the pair of antennas composing the baseline, TTCal seeks to minimize</p>
+<p>
+<script type="math/tex; mode=display">
+    \sum_{i,j} \left\| V_{i,j} - g_i g_j^* M_{i,j} \right\|^2
+</script>
+</p>
+<p>where $V_{i,j}$ is the measured visibility and $M_{i,j}$ is the model visibility
+measured on the baseline $i$, $j$.</p>
+<p>TTCal uses the iterative routine independently described by
+<a href="http://adsabs.harvard.edu/abs/2008ISTSP...2..707M">Mitchell et al. 2008</a> and
+<a href="http://adsabs.harvard.edu/abs/2014A%26A...571A..97S">Salvini &amp; Wijnholds 2014</a>
+to solve for the complex gains.</p>
+<p>For more information on defining a sky model see <a href="../sources/">Sky Models</a>.</p>
+<p>TTCal will flag frequency channels that do not converge within the specified maximum
 number of iterations. However, TTCal will not attempt to identify bad antennas
 that may be poisoning the calibration. These antennas must be flagged ahead of
 time.</p>
+<p><em>TTCal assumes that the measurement set contains all baselines, multiple
+frequency channels, but only a single integration.</em></p>
+<h3 id="running-from-a-julia-script">Running from a Julia script</h3>
+<pre><code class="julia">using TTCal
+ms      = MeasurementSet(&quot;data.ms&quot;)
+sources = readsources(&quot;sources.json&quot;)
+beam    = TTCal.SineBeam()
+cal = gaincal(ms, sources, beam, maxiter = 20, tolerance = 1e-3)
+applycal!(ms, cal, force_imaging_columns = true)
+unlock(ms)
+</code></pre>
+
+<h3 id="running-from-the-command-line">Running from the command line</h3>
+<p>For a list of all available options, run:</p>
+<pre><code>ttcal.jl gaincal --help
+</code></pre>
+
+<p>To calibrate a standard OVRO LWA dataset:</p>
+<pre><code>ttcal.jl gaincal --input data.ms --output calibration.jld --sources sources.json
+ttcal.jl applycal --input data.ms --calibration calibration.jld
+</code></pre>
               
             </div>
           </div>

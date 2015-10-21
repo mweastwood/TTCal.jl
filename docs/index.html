@@ -5,28 +5,30 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>TTCal</title>
+  <title>Building this Website - TTCal</title>
   
 
-  <link rel="shortcut icon" href="./img/favicon.ico">
+  <link rel="shortcut icon" href="../img/favicon.ico">
 
   
   <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
 
-  <link rel="stylesheet" href="./css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="./css/theme_extra.css" type="text/css" />
-  <link rel="stylesheet" href="./css/highlight.css">
+  <link rel="stylesheet" href="../css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../css/theme_extra.css" type="text/css" />
+  <link rel="stylesheet" href="../css/highlight.css">
 
   
-  <script src="./js/jquery-2.1.1.min.js"></script>
-  <script src="./js/modernizr-2.8.3.min.js"></script>
-  <script type="text/javascript" src="./js/highlight.pack.js"></script>
-  <script src="./js/theme.js"></script>
-  <script>var base_url = '.';</script>
-  <script data-main="./mkdocs/js/search.js" src="./mkdocs/js/require.js"></script>
-
+  <script>
+    // Current page data
+    var mkdocs_page_name = "Building this Website";
+  </script>
+  
+  <script src="../js/jquery-2.1.1.min.js"></script>
+  <script src="../js/modernizr-2.8.3.min.js"></script>
+  <script type="text/javascript" src="../js/highlight.pack.js"></script>
+  <script src="../js/theme.js"></script> 
   <script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML"></script>
-  <script src="./mathjaxhelper.js"></script>
+  <script src="../mathjaxhelper.js"></script>
 
   
 </head>
@@ -38,9 +40,9 @@
     
     <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
       <div class="wy-side-nav-search">
-        <a href="." class="icon icon-home"> TTCal</a>
+        <a href=".." class="icon icon-home"> TTCal</a>
         <div role="search">
-  <form id ="rtd-search-form" class="wy-form" action="./search.html" method="get">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
     <input type="text" name="q" placeholder="Search docs" />
   </form>
 </div>
@@ -51,7 +53,7 @@
           
             <li>
     <li class="toctree-l1 ">
-        <a class="" href=".">Home</a>
+        <a class="" href="..">Home</a>
         
     </li>
 <li>
@@ -63,28 +65,28 @@
         
             
     <li class="toctree-l1 ">
-        <a class="" href="gaincal/">Gain Calibration</a>
+        <a class="" href="../gaincal/">Gain Calibration</a>
         
     </li>
 
         
             
     <li class="toctree-l1 ">
-        <a class="" href="polcal/">Polarization Calibration</a>
+        <a class="" href="../polcal/">Polarization Calibration</a>
         
     </li>
 
         
             
     <li class="toctree-l1 ">
-        <a class="" href="ampcal/">Amplitude Calibration</a>
+        <a class="" href="../ampcal/">Amplitude Calibration</a>
         
     </li>
 
         
             
     <li class="toctree-l1 ">
-        <a class="" href="sources/">Sky Models</a>
+        <a class="" href="../sources/">Sky Models</a>
         
     </li>
 
@@ -99,21 +101,28 @@
         
             
     <li class="toctree-l1 ">
-        <a class="" href="api/">API</a>
+        <a class="" href="../api/">API</a>
         
     </li>
 
         
             
     <li class="toctree-l1 ">
-        <a class="" href="contributing/">Contributing</a>
+        <a class="" href="../contributing/">Contributing</a>
         
     </li>
 
         
             
-    <li class="toctree-l1 ">
-        <a class="" href="docs/">Building this Website</a>
+    <li class="toctree-l1 current">
+        <a class="current" href="./">Building this Website</a>
+        
+            <ul>
+            
+                <li class="toctree-l3"><a href="#building-this-website">Building this Website</a></li>
+                
+            
+            </ul>
         
     </li>
 
@@ -131,7 +140,7 @@
       
       <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
         <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-        <a href=".">TTCal</a>
+        <a href="..">TTCal</a>
       </nav>
 
       
@@ -139,9 +148,15 @@
         <div class="rst-content">
           <div role="navigation" aria-label="breadcrumbs navigation">
   <ul class="wy-breadcrumbs">
-    <li><a href=".">Docs</a> &raquo;</li>
+    <li><a href="..">Docs</a> &raquo;</li>
     
+      
+        
+          <li>Developer Documentation &raquo;</li>
+        
+      
     
+    <li>Building this Website</li>
     <li class="wy-breadcrumbs-aside">
       
         
@@ -155,22 +170,33 @@
           <div role="main">
             <div class="section">
               
-
-  <h1 id="search">Search Results</h1>
-
-  <form id="content_search" action="search.html">
-    <span role="status" aria-live="polite" class="ui-helper-hidden-accessible"></span>
-    <input name="q" id="mkdocs-search-query" type="text" class="search_input search-query ui-autocomplete-input" placeholder="Search the Docs" autocomplete="off" autofocus>
-  </form>
-
-  <div id="mkdocs-search-results">
-    Sorry, page not found.
-  </div>
-
-
+                <h2 id="building-this-website">Building this Website</h2>
+<p>This website is built using <a href="http://www.mkdocs.org/">MkDocs</a> and hosted
+on <a href="https://pages.github.com/">Github Pages</a>. Building and deploying the
+documentation will require a little bit of setup.</p>
+<ol>
+<li>Run <code>pip install --user mkdocs</code> to obtain MkDocs.</li>
+<li>Run <code>pip install --user python-markdown-math</code> to obtain the markdown
+   extension that allows LaTeX-style math.</li>
+<li>Run <code>docs/gendocs.jl</code> to extract the documentation from the Julia
+   source code into the relevant Markdown files.</li>
+<li>Run <code>mkdocs serve</code> and navigate your web browser to
+   <a href="http://127.0.0.1:8000">http://127.0.0.1:8000</a>
+   to check that everything looks correct.</li>
+<li>Run <code>mkdocs gh-deploy</code> to deploy the new documentation to Github Pages.</li>
+<li>Commit all your changes.</li>
+</ol>
+              
             </div>
           </div>
           <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+      
+        <a href="../contributing/" class="btn btn-neutral" title="Contributing"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+      
+    </div>
   
 
   <hr/>
@@ -195,6 +221,8 @@
       
           <a class="icon icon-github" style="float: left; color: #fcfcfc"> GitHub</a>
       
+      
+        <span><a href="../contributing/" style="color: #fcfcfc;">&laquo; Previous</a></span>
       
       
     </span>
