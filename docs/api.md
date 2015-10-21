@@ -185,20 +185,20 @@ Solve for the polarization properties of the interferometer.
 ## subsrc!
 
 ```
-subsrc!(ms::MeasurementSet,
-        sources::Vector{PointSource},
-        beam::BeamModel)
-```
-
-Remove the list of sources from the measurement set.
-
-```
 subsrc!(ms::MeasurementSet, dir::Direction)
 ```
 
 Subtract all of the measured flux from a given direction.
 
 This can be used to remove RFI sources provided they have a known direction.
+
+```
+subsrc!(ms::MeasurementSet,
+        sources::Vector{PointSource},
+        beam::BeamModel)
+```
+
+Remove the list of sources from the measurement set.
 
 ## writesources
 

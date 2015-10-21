@@ -1,6 +1,6 @@
-# Sky Models
+## Sky Models
 
-## Point Sources
+### Point Sources
 
 For the OVRO LWA, the two most important point sources for calibration are
 [Cas A](https://en.wikipedia.org/wiki/Cassiopeia_A) and
@@ -11,7 +11,7 @@ of these sources are above the horizon.
 Currently TTCal expects the sky model to be specified as a list of point sources.
 This is accomplished by listing the sources in a [JSON](http://www.json.org/) file.
 For example, the following file defines a sky model consisting of Cas A and Cyg A
-using the published spectra for Baars et al. 1977.
+using the published spectra for [Baars et al. 1977](http://adsabs.harvard.edu/abs/1977A%26A....61...99B).
 
 ```
 [
@@ -51,7 +51,14 @@ using the published spectra for Baars et al. 1977.
 * `I`, `Q`, `U`, and `V` define the Stokes parameters (in Jy) at the frequency `freq` (in Hz).
 * `index` defines the spectral index of the source.
 
-## Diffuse Emission
+Higher order terms are defined such that
+\[
+    \log S = \log S_0 + \sum_{n=1}^N \alpha_n \log\left(\frac{\nu}{\nu_0}\right)^n
+\]
+where $S$ is the value of a given Stokes parameter and $\alpha_n$ represents
+the values contained in `index`.
+
+### Diffuse Emission
 
 Diffuse emission is currently not supported within TTCal. Eventual support is on the
 horizon.

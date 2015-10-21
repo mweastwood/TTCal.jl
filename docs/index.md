@@ -87,3 +87,12 @@ Julia version 0.4 introduced code caching to help mitigate this,
 running TTCal will always be faster from a Julia script
 than from the command line.
 
+## Bugs
+
+If you encounter any problems, please
+[open an issue](https://github.com/mweastwood/TTCal.jl/issues/new)
+on Github.
+
+Known problems are listed as
+[open issues](https://github.com/mweastwood/TTCal.jl/issues).
+
