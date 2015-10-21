@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>TTCal</title>
+  
+
+  <link rel="shortcut icon" href="./img/favicon.ico">
+
+  
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  <link rel="stylesheet" href="./css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="./css/theme_extra.css" type="text/css" />
+  <link rel="stylesheet" href="./css/highlight.css">
+
+  
+  <script>
+    // Current page data
+    var mkdocs_page_name = "None";
+  </script>
+  
+  <script src="./js/jquery-2.1.1.min.js"></script>
+  <script src="./js/modernizr-2.8.3.min.js"></script>
+  <script type="text/javascript" src="./js/highlight.pack.js"></script>
+  <script src="./js/theme.js"></script> 
+  <script src="./mathjaxhelper.js"></script>
+
+  
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+      <div class="wy-side-nav-search">
+        <a href="." class="icon icon-home"> TTCal</a>
+        <div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="./search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+        <ul class="current">
+          
+            <li>
+    <li class="toctree-l1 current">
+        <a class="current" href=".">Home</a>
+        
+            <ul>
+            
+                <li class="toctree-l3"><a href="#ttcal">TTCal</a></li>
+                
+                    <li><a class="toctree-l4" href="#overview">Overview</a></li>
+                
+                    <li><a class="toctree-l4" href="#getting-started">Getting Started</a></li>
+                
+            
+            </ul>
+        
+    </li>
+<li>
+          
+            <li>
+    <ul class="subnav">
+    <li><span>Usage</span></li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="gaincal/">Gain Calibration</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="polcal/">Polarization Calibration</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="ampcal/">Amplitude Calibration</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="sources/">Sky Models</a>
+        
+    </li>
+
+        
+    </ul>
+<li>
+          
+            <li>
+    <li class="toctree-l1 ">
+        <a class="" href="api/">API</a>
+        
+    </li>
+<li>
+          
+        </ul>
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href=".">TTCal</a>
+      </nav>
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".">Docs</a> &raquo;</li>
+    
+      
+    
+    <li>Home</li>
+    <li class="wy-breadcrumbs-aside">
+      
+        
+          <a href="https://github.com/mweastwood/TTCal.jl" class="icon icon-github"> Edit on GitHub</a>
+        
+      
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main">
+            <div class="section">
+              
+                <h1 id="ttcal">TTCal</h1>
+<p><img alt="TTCal" src="./ttcal.png" /></p>
+<p>TTCal is a calibration routine developed for the OVRO LWA.</p>
+<h2 id="overview">Overview</h2>
+<p>The standard procedure for phase calibrating a radio interferometer
+usually involves slewing a small number of large dishes to stare at
+a known point source. A point source at the phase center of the
+interferometer has zero phase on all baselines, so phase calibration
+essentially amounts to zeroing the phase on all baselines.</p>
+<p>Low frequency telescopes (&lt;300 MHz) tend to occupy an entirely different
+region of phase space. That is they are usually composed of numerous
+cheap dipole antennas with very broad beams (<a href="http://www.lofar.org/">LOFAR</a>,
+<a href="http://www.mwatelescope.org/">MWA</a>). Furthermore, the low frequency sky
+is corrupted by propagation through the ionosphere. Until the field matures,
+the demand for a new and effective calibration technique
+is best met by a simple, adaptable, and relatively fast software package.
+This is why I wrote TTCal.</p>
+<h2 id="getting-started">Getting Started</h2>
+<p>TTCal requires version 0.4 of the <a href="http://julialang.org/">Julia</a> programming
+language. Julia is a dynamic language designed for scientific computing with
+a just-in-time compiler based on <a href="http://llvm.org/">LLVM</a>. The syntax
+should be familiar to users of <a href="http://www.mathworks.com/products/matlab/">Matlab</a>
+and <a href="https://www.python.org/">Python</a>, but Python users should be aware
+that the first element of an array is accessed with <code>x[1]</code>.</p>
+<p>Once Julia is installed, the REPL (read-eval-print loop) can be started by
+typing <code>julia</code> from the command line. Try running the following examples:</p>
+<pre><code>julia&gt; 1+1
+2
+
+julia&gt; for i = 1:3
+           println(rand())
+       end
+0.8165122957881887
+0.8315752097289137
+0.6558156424738537
+</code></pre>
+
+<p>TTCal depends on the <a href="https://github.com/mweastwood/CasaCore.jl">CasaCore.jl</a>
+package, which is a Julia wrapper of the <a href="http://casacore.github.io/casacore/">casacore</a>
+library. It is used to interface with measurement sets and perform
+coordinate conversions.</p>
+<p>To install TTCal, run:</p>
+<pre><code># Get the latest version of CasaCore.jl and build the wrapper
+julia&gt; Pkg.clone(&quot;CasaCore&quot;)
+julia&gt; Pkg.build(&quot;CasaCore&quot;)
+# Get the latest version of TTCal
+julia&gt; Pkg.clone(&quot;https://github.com/mweastwood/TTCal.jl.git&quot;)
+julia&gt; Pkg.update()
+julia&gt; Pkg.test(&quot;TTCal&quot;)
+</code></pre>
+
+<p>If all the tests pass, you are ready to begin using TTCal.</p>
+<p>While the most powerful interface to TTCal involves writing small
+Julia scripts, a limited command line interface is available.
+Simply add the <code>ttcal.jl</code> file to your <code>PATH</code> environment variable.
+You can see the list of available commands by running:</p>
+<pre><code>$ ttcal.jl --help
+usage: ttcal.jl [-h] {gaincal|polcal|peel|applycal}
+
+A calibration routine developed for the OVRO LWA.
+
+commands:
+  gaincal     Solve for a gain calibration.
+  polcal      Solve for a polarization calibration.
+  peel        Peel sources from the dataset.
+  applycal    Apply a calibration.
+
+optional arguments:
+  -h, --help  show this help message and exit
+</code></pre>
+
+<p>Note that every time Julia is restarted there is overhead
+associated with reloading and recompiling the code. While
+Julia version 0.4 introduced code caching to help mitigate this,
+running TTCal will always be faster from a Julia script
+than from the command line.</p>
+              
+            </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="gaincal/" class="btn btn-neutral float-right" title="Gain Calibration"/>Next <span class="icon icon-circle-arrow-right"></span></a>
+      
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+    
+  </div>
+
+  Built with <a href="http://www.mkdocs.org">MkDocs</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+	  
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+<div class="rst-versions" role="note" style="cursor: pointer">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+      
+          <a class="icon icon-github" style="float: left; color: #fcfcfc"> GitHub</a>
+      
+      
+      
+        <span style="margin-left: 15px"><a href="gaincal/" style="color: #fcfcfc">Next &raquo;</a></span>
+      
+    </span>
+</div>
+
+</body>
+</html>
+
+<!--
+MkDocs version : 0.14.0
+Build Date UTC : 2015-10-21 22:00:24.737063
+-->

@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>API - TTCal</title>
+  
+
+  <link rel="shortcut icon" href="../img/favicon.ico">
+
+  
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  <link rel="stylesheet" href="../css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../css/theme_extra.css" type="text/css" />
+  <link rel="stylesheet" href="../css/highlight.css">
+
+  
+  <script>
+    // Current page data
+    var mkdocs_page_name = "API";
+  </script>
+  
+  <script src="../js/jquery-2.1.1.min.js"></script>
+  <script src="../js/modernizr-2.8.3.min.js"></script>
+  <script type="text/javascript" src="../js/highlight.pack.js"></script>
+  <script src="../js/theme.js"></script> 
+  <script src="../mathjaxhelper.js"></script>
+
+  
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+      <div class="wy-side-nav-search">
+        <a href=".." class="icon icon-home"> TTCal</a>
+        <div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+        <ul class="current">
+          
+            <li>
+    <li class="toctree-l1 ">
+        <a class="" href="..">Home</a>
+        
+    </li>
+<li>
+          
+            <li>
+    <ul class="subnav">
+    <li><span>Usage</span></li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../gaincal/">Gain Calibration</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../polcal/">Polarization Calibration</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../ampcal/">Amplitude Calibration</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../sources/">Sky Models</a>
+        
+    </li>
+
+        
+    </ul>
+<li>
+          
+            <li>
+    <li class="toctree-l1 current">
+        <a class="current" href="./">API</a>
+        
+            <ul>
+            
+                <li class="toctree-l3"><a href="#amplitudecalibration">AmplitudeCalibration</a></li>
+                
+            
+                <li class="toctree-l3"><a href="#gaincalibration">GainCalibration</a></li>
+                
+            
+                <li class="toctree-l3"><a href="#measurementset">MeasurementSet</a></li>
+                
+            
+                <li class="toctree-l3"><a href="#pointsource">PointSource</a></li>
+                
+            
+                <li class="toctree-l3"><a href="#polarizationcalibration">PolarizationCalibration</a></li>
+                
+            
+                <li class="toctree-l3"><a href="#ampcal">ampcal</a></li>
+                
+            
+                <li class="toctree-l3"><a href="#applycal">applycal!</a></li>
+                
+            
+                <li class="toctree-l3"><a href="#corrupt">corrupt!</a></li>
+                
+            
+                <li class="toctree-l3"><a href="#fitvis">fitvis</a></li>
+                
+            
+                <li class="toctree-l3"><a href="#gaincal">gaincal</a></li>
+                
+            
+                <li class="toctree-l3"><a href="#genvis">genvis</a></li>
+                
+            
+                <li class="toctree-l3"><a href="#getspec">getspec</a></li>
+                
+            
+                <li class="toctree-l3"><a href="#peel">peel!</a></li>
+                
+            
+                <li class="toctree-l3"><a href="#polcal">polcal</a></li>
+                
+            
+                <li class="toctree-l3"><a href="#readsources">readsources</a></li>
+                
+            
+                <li class="toctree-l3"><a href="#subsrc">subsrc!</a></li>
+                
+            
+                <li class="toctree-l3"><a href="#writesources">writesources</a></li>
+                
+            
+            </ul>
+        
+    </li>
+<li>
+          
+        </ul>
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="..">TTCal</a>
+      </nav>
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="..">Docs</a> &raquo;</li>
+    
+      
+    
+    <li>API</li>
+    <li class="wy-breadcrumbs-aside">
+      
+        
+          <a href="https://github.com/mweastwood/TTCal.jl" class="icon icon-github"> Edit on GitHub</a>
+        
+      
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main">
+            <div class="section">
+              
+                <!---
+This is an auto-generated file and should not be edited directly.
+-->
+
+<h2 id="amplitudecalibration">AmplitudeCalibration</h2>
+<pre><code>AmplitudeCalibration &lt;: Calibration
+</code></pre>
+
+<p>This type stores the information for calibrating only the amplitude of the electronic gains. It stores the gain amplitudes and flags for each antenna, frequency channel, and polarization.</p>
+<pre><code>AmplitudeCalibration(Nant,Nfreq)
+</code></pre>
+
+<p>Create a calibration table for <code>Nant</code> antennas with <code>Nfreq</code> frequency channels where all the amplitudes are initially set to unity.</p>
+<h2 id="gaincalibration">GainCalibration</h2>
+<pre><code>GainCalibration &lt;: Calibration
+</code></pre>
+
+<p>This type stores the information for calibrating the electronic gains of the interferometer. That is, it stores complex gains and flags for each antenna, frequency channel, and polarization.</p>
+<pre><code>GainCalibration(Nant,Nfreq)
+</code></pre>
+
+<p>Create a calibration table for <code>Nant</code> antennas with <code>Nfreq</code> frequency channels where all the gains are initially set to unity.</p>
+<h2 id="measurementset">MeasurementSet</h2>
+<pre><code>immutable MeasurementSet
+</code></pre>
+
+<p>This type is a wrapper around <code>CasaCore.Tables.Table</code> that is intended to simplify most of the common interactions between TTCal and measurement sets.</p>
+<pre><code>MeasurementSet(name)
+</code></pre>
+
+<p>Open the measurement set at the given location. Assorted quantities that are commonly used by TTCal are automatically loaded and stored in fields.</p>
+<h2 id="pointsource">PointSource</h2>
+<pre><code>type PointSource
+</code></pre>
+
+<p>These sources have a multi-component power-law spectrum such that:</p>
+<pre><code>log(flux) = log(I) + index[1]*log(ν/reffreq)
+                   + index[2]*log²(ν/reffreq) + ...
+</code></pre>
+
+<p>Polarized fluxes are obtained in a similar manner by substituting Q/U/V for I in the above expression.</p>
+<h2 id="polarizationcalibration">PolarizationCalibration</h2>
+<pre><code>PolarizationCalibration &lt;: Calibration
+</code></pre>
+
+<p>This type stores the information for calibrating the polarization of the interferometer. That is, it stores Jones matrices and flags for each antenna and each frequency channel.</p>
+<pre><code>PolarizationCalibration(Nant,Nfreq)
+</code></pre>
+
+<p>Create a calibration table for <code>Nant</code> antennas with <code>Nfreq</code> frequency channels where all the Jones matrices are initially set to the identity matrix.</p>
+<h2 id="ampcal">ampcal</h2>
+<pre><code>ampcal(ms::MeasurementSet,
+       sources::Vector{PointSource},
+       beam::BeamModel;
+       maxiter = 30, tolerance = 1e-3,
+       force_imaging_columns = false)
+</code></pre>
+
+<p>Solve for the amplitude of the interferometer's gains.</p>
+<h2 id="applycal">applycal!</h2>
+<p>Apply the calibration to the given measurement set.</p>
+<h2 id="corrupt">corrupt!</h2>
+<p>Corrupt the model data as if it had been observed with an instrument with the given calibration.</p>
+<h2 id="fitvis">fitvis</h2>
+<pre><code>fitvis(ms::MeasurementSet,
+       sources::Vector{PointSource};
+       maxiter::Int = 20,
+       tolerance::Float64 = 1e-3,
+       minuvw::Float64 = 0.0)
+</code></pre>
+
+<p>Fit for the location of each point source.</p>
+<h2 id="gaincal">gaincal</h2>
+<pre><code>gaincal(ms::MeasurementSet,
+        sources::Vector{PointSource},
+        beam::BeamModel;
+        maxiter = 20, tolerance = 1e-5,
+        force_imaging_columns = false,
+        reference_antenna = 1)
+</code></pre>
+
+<p>Solve for the interferometer's electronic gains.</p>
+<h2 id="genvis">genvis</h2>
+<pre><code>genvis(ms::MeasurementSet,
+       sources::Union{PointSource,Vector{PointSource}},
+       beam::BeamModel)
+</code></pre>
+
+<p>Generate model visibilities for the given list of sources and the given beam model.</p>
+<p>No gridding is performed, so the runtime of this naive algorithm scales as $O(N_{base} \times N_{source})$.</p>
+<h2 id="getspec">getspec</h2>
+<pre><code>getspec(ms::MeasurementSet, dir::Direction) -&gt; xx,xy,yx,yy
+</code></pre>
+
+<p>This function extracts the spectrum in a given direction by means of an inverse discrete Fourier transform.</p>
+<p>Note that no gridding is performed, so this does <em>not</em> use a fast Fourier transform. However, the inverse discrete Fourier transform <em>is</em> the least squares estimator for the flux in a given direction (if all baselines are weighted equally).</p>
+<pre><code>getspec(data, flags, l, m, u, v, w, ν, ant1, ant2) -&gt; xx,xy,yx,yy
+</code></pre>
+
+<p>Compute the spectrum of a source located at $(l,m)$ in all of the polarized correlation products.</p>
+<h2 id="peel">peel!</h2>
+<pre><code>peel!{T&lt;:Calibration}(::Type{T},
+                      ms::MeasurementSet,
+                      sources::Vector{PointSource},
+                      beam::BeamModel;
+                      maxiter = 20,
+                      tolerance = 1e-3,
+                      minuvw = 0.0)
+</code></pre>
+
+<p>Peel the given list of sources from the measurement set.</p>
+<p>The type supplied as the first argument determines the manner in which the sources are peeled:</p>
+<ul>
+<li><code>PolarizationCalibration</code> - each source receives a full set of Jones matrices</li>
+<li><code>GainCalibration</code> - each source receives a full set of complex gains</li>
+<li><code>AmplitudeCalibration</code> - each source receives a full set of gain amplitudes</li>
+</ul>
+<h2 id="polcal">polcal</h2>
+<pre><code>polcal(ms::MeasurementSet,
+       sources::Vector{PointSources},
+       beam::BeamModel;
+       maxiter = 20, tolerance = 1e-5,
+       force_imaging_columns = false)
+</code></pre>
+
+<p>Solve for the polarization properties of the interferometer.</p>
+<h2 id="readsources">readsources</h2>
+<h2 id="subsrc">subsrc!</h2>
+<pre><code>subsrc!(ms::MeasurementSet,
+        sources::Vector{PointSource},
+        beam::BeamModel)
+</code></pre>
+
+<p>Remove the list of sources from the measurement set.</p>
+<pre><code>subsrc!(ms::MeasurementSet, dir::Direction)
+</code></pre>
+
+<p>Subtract all of the measured flux from a given direction.</p>
+<p>This can be used to remove RFI sources provided they have a known direction.</p>
+<h2 id="writesources">writesources</h2>
+              
+            </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+      
+        <a href="../sources/" class="btn btn-neutral" title="Sky Models"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+    
+  </div>
+
+  Built with <a href="http://www.mkdocs.org">MkDocs</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+	  
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+<div class="rst-versions" role="note" style="cursor: pointer">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+      
+          <a class="icon icon-github" style="float: left; color: #fcfcfc"> GitHub</a>
+      
+      
+        <span><a href="../sources/" style="color: #fcfcfc;">&laquo; Previous</a></span>
+      
+      
+    </span>
+</div>
+
+</body>
+</html>
