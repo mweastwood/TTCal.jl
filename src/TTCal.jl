@@ -19,6 +19,8 @@ module TTCal
 
 export MeasurementSet
 
+export ConstantBeam, SineBeam, Memo178Beam
+
 export PointSource
 export readsources, writesources
 
