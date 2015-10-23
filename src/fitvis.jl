@@ -14,11 +14,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 """
-    fitvis(ms::MeasurementSet,
-           sources::Vector{PointSource};
-           maxiter::Int = 20,
-           tolerance::Float64 = 1e-3,
-           minuvw::Float64 = 0.0)
+    fitvis(ms::MeasurementSet, sources::Vector{PointSource};
+           maxiter::Int = 20, tolerance::Float64 = 1e-3,
+           minuvw::Float64 = 0.0) -> l,m
 
 Fit for the location of each point source.
 """
@@ -27,22 +25,18 @@ function fitvis(ms::MeasurementSet,
                 maxiter::Int = 20,
                 tolerance::Float64 = 1e-3,
                 minuvw::Float64 = 0.0)
-    sources = filter(source -> isabovehorizon(ms.frame,source),sources)
+    sources = abovehorizon(ms.frame,sources)
     Nsource = length(sources)
     data  = get_corrected_data(ms)
     flags = get_flags(ms)
 
-    # Flag all of the short baselines
-    for α = 1:ms.Nbase, β = 1:ms.Nfreq
-        if sqrt(ms.u[α]^2 + ms.v[α]^2 + ms.w[α]^2) < minuvw*c/ms.ν[β]
-            flags[:,β,α] = true
-        end
-    end
+    flag_short_baselines!(flags,minuvw,ms.u,ms.v,ms.w,ms.ν)
 
     l = zeros(Nsource)
     m = zeros(Nsource)
     for i = 1:Nsource
-        l′,m′ = lm(ms.frame,ms.phase_direction,sources[i])
+        dir = measure(ms.frame,direction(sources[i]),dir"J2000")
+        l′,m′ = dir2lm(ms.phase_direction,dir)
         l[i],m[i] = fitvis_onesource(data,flags,l′,m′,
                                      ms.u,ms.v,ms.w,ms.ν,
                                      ms.ant1,ms.ant2,

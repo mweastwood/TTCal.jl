@@ -14,7 +14,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 """
-    getspec(ms::MeasurementSet, dir::Direction) -> xx,xy,yx,yy
+    getspec(ms::MeasurementSet, dir::Direction;
+            minuvw::Float64 = 0.0) -> xx,xy,yx,yy
 
 This function extracts the spectrum in a given direction by means of an
 inverse discrete Fourier transform.
@@ -24,14 +25,17 @@ so this does *not* use a fast Fourier transform. However, the inverse
 discrete Fourier transform *is* the least squares estimator for the flux
 in a given direction (if all baselines are weighted equally).
 """
-function getspec(ms::MeasurementSet, dir::Direction)
+function getspec(ms::MeasurementSet, dir::Direction;
+                 minuvw::Float64 = 0.0)
     if !isabovehorizon(ms.frame,dir)
         error("Direction is below the horizon.")
     end
 
-    l,m = dir2lm(ms.frame,ms.phase_direction,dir)
+    l,m = dir2lm(ms.phase_direction,dir)
     data  = get_corrected_data(ms)
     flags = get_flags(ms)
+
+    flag_short_baselines!(flags,minuvw,ms.u,ms.v,ms.w,ms.ν)
 
     getspec(data,flags,l,m,
             ms.u,ms.v,ms.w,ms.ν,

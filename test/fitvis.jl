@@ -11,7 +11,7 @@ let
 
     # Perturb the source position
     az,el = TTCal.azel(ms.frame,sources[1])
-    lold,mold = TTCal.lm(ms.frame,ms.phase_direction,sources[1])
+    lold,mold = TTCal.lm(ms.phase_direction,sources[1])
     az += 0.1 * π/180
     el += 0.1 * π/180
     sources[1].dir = Direction(dir"AZEL",Quantity(az,"rad"),

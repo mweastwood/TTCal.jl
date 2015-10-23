@@ -60,7 +60,7 @@ function genvis!(model::Array{Complex64,3},
                  beam::BeamModel,
                  u,v,w,ν)
     az,el  = azel(frame,source)
-    l,m    = lm(frame,phase_direction,source)
+    l,m    = lm(phase_direction,source)
     fringe = fringepattern(l,m,u,v,w,ν)
 
     # Get the Stokes parameters and apply the beam model

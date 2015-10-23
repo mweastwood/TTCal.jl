@@ -138,3 +138,22 @@ function set_corrected_data!(ms::MeasurementSet, data,
     end
 end
 
+"""
+    flag_short_baselines!(flags, minuvw, u, v, w, ν)
+
+Flag all of the baselines whose length is less than `minuvw` wavelengths.
+
+This is a common operation that can mitigate contamination by unmodeled
+diffuse emission.
+"""
+function flag_short_baselines!(flags, minuvw, u, v, w, ν)
+    Nbase = length(u)
+    Nfreq = length(ν)
+    for α = 1:Nbase, β = 1:Nfreq
+        if u[α]^2 + v[α]^2 + w[α]^2 < (minuvw*c/ν[β])^2
+            flags[:,β,α] = true
+        end
+    end
+    flags
+end
+

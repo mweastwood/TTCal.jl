@@ -1,6 +1,31 @@
 import TTCal: name, direction
 
 let
+    reference_flux = 10.0
+    index = [1.0]
+    reference_frequency = 123.0
+
+    frequency = 123.0
+    @test TTCal.powerlaw(reference_flux,index,reference_frequency,frequency) == 10.0
+    frequency = 1230.0
+    @test TTCal.powerlaw(reference_flux,index,reference_frequency,frequency) == 100.0
+end
+
+let
+    frame   = ReferenceFrame()
+    sources = [PointSource("S1",Direction(dir"AZEL",Quantity(0.0,"deg"),Quantity(+45.0,"deg")),
+                           1.0,2.0,3.0,4.0,10e6,[0.0]),
+               PointSource("S2",Direction(dir"AZEL",Quantity(0.0,"deg"),Quantity(-45.0,"deg")),
+                           1.0,2.0,3.0,4.0,10e6,[0.0])]
+    @test TTCal.isabovehorizon(frame,sources[1]) == true
+    @test TTCal.isabovehorizon(frame,sources[2]) == false
+
+    sources′ = TTCal.abovehorizon(frame,sources)
+    @test length(sources′) == 1
+    @test name(sources′[1]) == "S1"
+end
+
+let
     sources = readsources("sources.json")
 
     cas_a = sources[1]
@@ -82,7 +107,7 @@ let
             m = 2rand()-1
         end
         dir = TTCal.lm2dir(phase_dir,l,m)
-        l′,m′ = TTCal.dir2lm(frame,phase_dir,dir)
+        l′,m′ = TTCal.dir2lm(phase_dir,dir)
         @test l ≈ l′
         @test m ≈ m′
     end
@@ -90,7 +115,7 @@ let
     # z should be negative in lm2dir
     l,m = (-0.26521340920368575,-0.760596242177856)
     dir = TTCal.lm2dir(phase_dir,l,m)
-    l′,m′ = TTCal.dir2lm(frame,phase_dir,dir)
+    l′,m′ = TTCal.dir2lm(phase_dir,dir)
     @test l ≈ l′
     @test m ≈ m′
 end

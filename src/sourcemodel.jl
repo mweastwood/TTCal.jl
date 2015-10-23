@@ -67,9 +67,11 @@ function stokes_flux(source::PointSource, frequency::Number)
 end
 
 """
-Convert the direction into a right ascension and declination.
+    dir2radec(frame::ReferenceFrame, dir::Direction)
+
+Convert the direction into a J2000 right ascension and declination.
 """
-function dir2radec(frame::ReferenceFrame,dir::Direction)
+function dir2radec(frame::ReferenceFrame, dir::Direction)
     j2000 = measure(frame,dir,dir"J2000")
     ra  = longitude(j2000)
     dec =  latitude(j2000)
@@ -77,9 +79,11 @@ function dir2radec(frame::ReferenceFrame,dir::Direction)
 end
 
 """
-Convert the direction into an azimuth and elevation.
+    dir2azel(frame::ReferenceFrame, dir::Direction)
+
+Convert the direction into a local azimuth and elevation.
 """
-function dir2azel(frame::ReferenceFrame,dir::Direction)
+function dir2azel(frame::ReferenceFrame, dir::Direction)
     azel = measure(frame,dir,dir"AZEL")
     az = longitude(azel)
     el =  latitude(azel)
@@ -87,18 +91,20 @@ function dir2azel(frame::ReferenceFrame,dir::Direction)
 end
 
 """
+    dir2lm(phase_dir::Direction{dir"J2000"}, dir::Direction{dir"J2000"})
+
 Convert the direction into the standard radio coordinate system.
 """
-function dir2lm{ref}(frame::ReferenceFrame,phase_dir::Direction{dir"J2000"},dir::Direction{ref})
+function dir2lm(phase_dir::Direction{dir"J2000"}, dir::Direction{dir"J2000"})
     long = longitude(phase_dir)
-    lat  = latitude(phase_dir)
+    lat  =  latitude(phase_dir)
     θ1 = π/2 - long
     θ2 = π/2 - lat
     sin_θ1 = sin(θ1); cos_θ1 = cos(θ1)
     sin_θ2 = sin(θ2); cos_θ2 = cos(θ2)
-    x,y,z = Measures.xyz_in_meters(measure(frame,dir,dir"J2000"))
-    # - Rotate first by θ1 about the z-axis
-    # - Then rotate by θ2 about the x-axis
+    x,y,z = Measures.xyz_in_meters(dir)
+    # Rotate first by θ1 about the z-axis
+    # Then rotate by θ2 about the x-axis
     # ⌈    -l    ⌉   ⌈1    0        0    ⌉   ⌈+cos(θ1) -sin(θ1) 0⌉   ⌈x⌉
     # |    -m    | = |0 +cos(θ2) -sin(θ2)| * |+sin(θ1) +cos(θ1) 0| * |y|
     # ⌊√(1-l²-m²)⌋   ⌊0 +sin(θ2) +cos(θ2)⌋   ⌊   0        0     1⌋   ⌊z⌋
@@ -109,7 +115,7 @@ end
 
 function lm2dir(phase_dir::Direction{dir"J2000"},l,m)
     long = longitude(phase_dir)
-    lat  = latitude(phase_dir)
+    lat  =  latitude(phase_dir)
     θ1 = π/2 - long
     θ2 = π/2 - lat
     sin_θ1 = sin(θ1); cos_θ1 = cos(θ1)
@@ -128,21 +134,57 @@ end
 
 radec(frame::ReferenceFrame,source::PointSource) = dir2radec(frame,direction(source))
 azel(frame::ReferenceFrame,source::PointSource) = dir2azel(frame,direction(source))
-lm(frame::ReferenceFrame,phase_dir::Direction,source::PointSource) = dir2lm(frame,phase_dir,direction(source))
+lm(phase_dir::Direction,source::PointSource) = dir2lm(phase_dir,direction(source))
 
-function isabovehorizon(frame::ReferenceFrame,direction::Direction)
+function isabovehorizon(frame::ReferenceFrame, direction::Direction)
     az,el = dir2azel(frame,direction)
     el > 0
 end
 
-function isabovehorizon(frame::ReferenceFrame,source::PointSource)
+function isabovehorizon(frame::ReferenceFrame, source::PointSource)
     isabovehorizon(frame,direction(source))
 end
 
-################################################################################
-# I/O
+function abovehorizon(frame::ReferenceFrame, sources::Vector{PointSource})
+    filter(sources) do source
+        isabovehorizon(frame,source)
+    end
+end
 
-function readsources(filename::AbstractString)
+"""
+    readsources(filename) -> Vector{PointSource}
+
+Read the list of point sources from the given JSON file.
+The format must be as follows:
+
+    [
+        {
+            "ref": "Baars et al. 1977",
+            "name": "Cas A",
+            "ra": "23h23m24s",
+            "dec": "58d48m54s",
+            "I": 555904.26,
+            "Q": 0.0,
+            "U": 0.0,
+            "V": 0.0,
+            "freq": 1.0e6,
+            "index": [-0.770]
+        },
+        {
+            "ref": "Baars et al. 1977",
+            "name": "Cyg A",
+            "ra": "19h59m28.35663s",
+            "dec": "+40d44m02.0970s",
+            "I": 49545.02,
+            "Q": 0.0,
+            "U": 0.0,
+            "V": 0.0,
+            "freq": 1.0e6,
+            "index": [+0.085,-0.178]
+        }
+    ]
+"""
+function readsources(filename)
     sources = PointSource[]
     parsed_sources = JSON.parsefile(filename)
     for parsed_source in parsed_sources
@@ -156,6 +198,8 @@ function readsources(filename::AbstractString)
                                        Quantity(Measures.sexagesimal(dec),"deg"))
         end
         if haskey(parsed_source,"flux")
+            # for compatibility with old sources.json files,
+            # which used "flux" in place of the Stokes parameters.
             I = parsed_source["flux"]
             Q = 0.0
             U = 0.0
@@ -173,7 +217,13 @@ function readsources(filename::AbstractString)
     sources
 end
 
-function writesources(filename::AbstractString,sources::Vector{PointSource})
+"""
+    writesources(filename, sources::Vector{PointSource})
+
+Write the list of sources to the given location as a JSON file.
+These sources can be read back in again using the `readsources` function.
+"""
+function writesources(filename, sources::Vector{PointSource})
     dicts = Dict{UTF8String,Any}[]
     for source in sources
         ra  = longitude(source.dir,"deg")
@@ -196,11 +246,11 @@ function writesources(filename::AbstractString,sources::Vector{PointSource})
     file = open(filename,"w")
     JSON.print(file,dicts)
     close(file)
-    nothing
+    sources
 end
 
 """
-    write_ds9_regions(filename,sources::Vector{PointSource})
+    write_ds9_regions(filename, sources::Vector{PointSource})
 
 Write the list of sources to a DS9 region file. This file can then be loaded
 into DS9 to highlight sources within images.

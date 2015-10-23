@@ -44,7 +44,7 @@ function subsrc!(ms::MeasurementSet, dir::Direction)
     flags = get_flags(ms)
 
     j2000 = measure(ms.frame,dir,dir"J2000")
-    l,m = dir2lm(ms.frame,ms.phase_direction,dir)
+    l,m = dir2lm(ms.phase_direction,j2000)
     xx,xy,yx,yy = getspec(data,flags,l,m,ms.u,ms.v,ms.w,ms.ν,ms.ant1,ms.ant2)
 
     model = genvis(xx,xy,yx,yy,l,m,ms.u,ms.v,ms.w,ms.ν)

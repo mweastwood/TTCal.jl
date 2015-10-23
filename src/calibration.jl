@@ -16,7 +16,23 @@
 abstract Calibration
 
 """
+    applycal!(ms::MeasurementSet, calibration::Calibration;
+              apply_to_corrected = false, force_imaging_columns = false)
+
 Apply the calibration to the given measurement set.
+
+**Arguments:**
+
+* `ms` - the measurement set to which the calibration will be applied
+* `calibration` - the calibration that will be applied
+
+**Keyword Arguments:**
+
+* `apply_to_corrected` - if this is set to true, the calibration will be
+    applied to the CORRECTED_DATA column instead of the DATA column
+* `force_imaging_columns` - if this is set to true, the calibrated data
+    will be written to the CORRECTED_DATA column regardless of whether
+    or not the column already exists
 """
 function applycal!(ms::MeasurementSet,
                    calibration::Calibration;
@@ -40,6 +56,8 @@ function applycal!(data::Array{Complex64,3},
 end
 
 """
+    corrupt!(data::Array{Complex64,3}, cal::Calibration, ant1, ant2)
+
 Corrupt the model data as if it had been observed
 with an instrument with the given calibration.
 """
@@ -52,8 +70,4 @@ end
 
 write(filename,calibration::Calibration) = JLD.save(filename,"cal",calibration)
 read(filename) = JLD.load(filename,"cal")
-
-include("ampcal.jl")
-include("gaincal.jl")
-include("polcal.jl")
 

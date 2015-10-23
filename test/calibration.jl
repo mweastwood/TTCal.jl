@@ -9,23 +9,13 @@ let
     data′ = copy(data)
     flags = zeros(Bool,4,Nfreq,Nbase)
 
-    # ampcal
-    cal = TTCal.AmplitudeCalibration(Nant,Nfreq)
-    for i in eachindex(cal.amplitudes)
-        cal.amplitudes[i] = rand()
+    for T in (GainCalibration,AmplitudeCalibration)
+        cal = T(Nant,Nfreq)
+        rand!(cal.gains)
+        corrupt!(data,flags,cal,ant1,ant2)
+        applycal!(data,flags,cal,ant1,ant2)
+        @test data ≈ data′
     end
-    corrupt!(data,flags,cal,ant1,ant2)
-    applycal!(data,flags,cal,ant1,ant2)
-    @test data ≈ data′
-
-    # gaincal
-    cal = TTCal.GainCalibration(Nant,Nfreq)
-    for i in eachindex(cal.gains)
-        cal.gains[i] = complex(randn(),randn())
-    end
-    corrupt!(data,flags,cal,ant1,ant2)
-    applycal!(data,flags,cal,ant1,ant2)
-    @test data ≈ data′
 end
 
 # Test the interface for interacting with measurement sets
@@ -34,7 +24,7 @@ let
     Nfreq = 2
 
     g = 2
-    cal = TTCal.GainCalibration(Nant,Nfreq)
+    cal = GainCalibration(Nant,Nfreq)
     cal.gains[:] = g
 
     # Run as `applycal(...)`
