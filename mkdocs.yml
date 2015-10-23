@@ -17,7 +17,8 @@ pages:
         - Amplitude Calibration: ampcal.md
         - Sky Models: sources.md
     - Developer Documentation:
-        - API: api.md
+        - API: external.md
+        - Internal Documentation: internal.md
         - Contributing: contributing.md
         - Building this Website: docs.md
 theme: readthedocs
