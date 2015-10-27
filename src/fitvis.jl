@@ -64,53 +64,44 @@ function fitvis_step(lm,data,flags,
     # Calculate the flux in the given direction
     # and its derivatives with respect to direction.
     fringe = fringepattern(l,m,u,v,w,ν)
-    F   = zeros(Nfreq)     # flux at each frequency
-    dF  = zeros(2,Nfreq)   # [ ∂F/∂l ∂F/∂m ]
-    d2F = zeros(2,2,Nfreq) # [ ∂²F/∂l²  ∂²F/∂l∂m
-                           #   ∂²F/∂l∂m ∂²F/∂m² ]
-    count = zeros(Int,Nfreq) # The number of baselines used in the calculation
+    F   = 0.0        # flux
+    dF  = [0.0, 0.0] # [ ∂F/∂l ∂F/∂m ]
+    d2F = [0.0 0.0;  # [ ∂²F/∂l²  ∂²F/∂l∂m
+           0.0 0.0]  #   ∂²F/∂l∂m ∂²F/∂m² ]
+    count = 0 # the number of baselines used in the calculation
 
     πi = π*1im
     λ = [c/ν[β] for β = 1:Nfreq]
     @inbounds for α = 1:Nbase
-        ant1[α] == ant2[α] && continue # Don't use auto-correlations
+        ant1[α] == ant2[α] && continue # don't use auto-correlations
         for β = 1:Nfreq
             any(slice(flags,:,β,α)) && continue
-            z = conj(fringe[β,α])
-            V = 0.5*(data[1,β,α]+data[4,β,α])*z # Stokes I only
-            uu = u[α]/λ[β]
-            vv = v[α]/λ[β]
-            F[β]       += real(V)
-            dF[1,β]    += real(V * -2πi * uu)
-            dF[2,β]    += real(V * -2πi * vv)
-            d2F[1,1,β] += real(V * (-2πi)^2 * uu^2)
-            d2F[2,1,β] += real(V * (-2πi)^2 * uu*vv)
-            d2F[1,2,β] += real(V * (-2πi)^2 * uu*vv)
-            d2F[2,2,β] += real(V * (-2πi)^2 * vv^2)
-            count[β] += 1
+            # use the Stokes I visibilities only
+            V = 0.5*(data[1,β,α]+data[4,β,α])*conj(fringe[β,α])
+            uλ = u[α]/λ[β]
+            vλ = v[α]/λ[β]
+            F        += real(V)
+            dF[1]    += real(V * -2πi * uλ)
+            dF[2]    += real(V * -2πi * vλ)
+            d2F[1,1] += real(V * (-2πi)^2 * uλ^2)
+            d2F[2,1] += real(V * (-2πi)^2 * uλ*vλ)
+            d2F[1,2] += real(V * (-2πi)^2 * uλ*vλ)
+            d2F[2,2] += real(V * (-2πi)^2 * vλ^2)
+            count += 1
         end
     end
-    @inbounds for β = 1:Nfreq
-        F[β] /= count[β]
-        dF[:,β] /= count[β]
-        d2F[:,:,β] /= count[β]
-    end
+
+    # Normalizing isn't strictly necessary because we care
+    # about the ratio of the Hessian to the gradient, but
+    # we do it here just to avoid confusion later in life
+    F /= count
+    dF /= count
+    d2F /= count
 
     # Calculate how far to step in each direction
-    # TODO: weight using `count` and wavelength appropriately
-    # (higher frequencies should be given more weight)
-    dl = 0.0
-    dm = 0.0
-    normalization = 0.0
-    for β = 1:Nfreq
-        count[β] .== 0 && continue
-        δ = -slice(d2F,:,:,β) \ slice(dF,:,β)
-        dl += δ[1]
-        dm += δ[2]
-        normalization += 1
-    end
-    dl /= normalization
-    dm /= normalization
+    δ = -d2F \ dF
+    dl = δ[1]
+    dm = δ[2]
 
     # Don't let the source lie beyond the horizon
     l_horizon,m_horizon = force_to_horizon(l+dl,m+dm)
