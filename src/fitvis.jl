@@ -15,8 +15,7 @@
 
 """
     fitvis(ms::MeasurementSet, sources::Vector{PointSource};
-           maxiter::Int = 20, tolerance::Float64 = 1e-3,
-           minuvw::Float64 = 0.0) -> l,m
+           maxiter = 20, tolerance = 1e-3, minuvw = 0.0) -> l,m
 
 Fit for the location of each point source.
 """
@@ -102,10 +101,22 @@ function fitvis_step(lm,data,flags,
     δ = -d2F \ dF
     dl = δ[1]
     dm = δ[2]
+    l′,m′ = force_to_horizon(l+dl,m+dm)
 
-    # Don't let the source lie beyond the horizon
-    l_horizon,m_horizon = force_to_horizon(l+dl,m+dm)
-    [l_horizon-l;m_horizon-m]
+    # If the step size is larger than a resolution element
+    # we will stay put because the fitting process is about
+    # to diverge.
+    n  = sqrt(1-l^2-m^2)
+    n′ = sqrt(1-l′^2-m′^2)
+    dθ = acos(l*l′+m*m′+n*n′)
+    baseline_length = [sqrt(u[α]^2+v[α]^2+w[α]^2) for α = 1:Nbase]
+    resolution = minimum(λ) / maximum(baseline_length)
+    if dθ > resolution
+        l′ = l
+        m′ = m
+    end
+
+    [l′-l, m′-m]
 end
 
 immutable FitVisStep <: StepFunction end
