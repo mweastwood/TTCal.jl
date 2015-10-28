@@ -14,8 +14,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 """
-    getspec(ms::MeasurementSet, dir::Direction;
-            minuvw::Float64 = 0.0) -> xx,xy,yx,yy
+    getspec(ms::MeasurementSet, dir::Direction; minuvw = 0.0) -> xx,xy,yx,yy
 
 This function extracts the spectrum in a given direction by means of an
 inverse discrete Fourier transform.

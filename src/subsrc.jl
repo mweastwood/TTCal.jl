@@ -32,16 +32,19 @@ function subsrc!(ms::MeasurementSet,
 end
 
 """
-    subsrc!(ms::MeasurementSet, dir::Direction)
+    subsrc!(ms::MeasurementSet, dir::Direction; minuvw = 0.0)
 
 Subtract all of the measured flux from a given direction.
 
 This can be used to remove RFI sources provided they have
 a known direction.
 """
-function subsrc!(ms::MeasurementSet, dir::Direction)
+function subsrc!(ms::MeasurementSet, dir::Direction;
+                 minuvw::Float64 = 0.0)
     data  = get_corrected_data(ms)
     flags = get_flags(ms)
+
+    flag_short_baselines!(flags,minuvw,ms.u,ms.v,ms.w,ms.ν)
 
     j2000 = measure(ms.frame,dir,dir"J2000")
     l,m = dir2lm(ms.phase_direction,j2000)
