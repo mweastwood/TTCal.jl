@@ -52,7 +52,7 @@ function MeasurementSet(name)
     time  = ms["TIME",1]
     position = antenna_table["POSITION",1]
     set!(frame,Epoch(epoch"UTC",Quantity(time,"s")))
-    set!(frame,Measures.from_xyz_in_meters(pos"ITRF",position[1],position[2],position[3]))
+    set!(frame,Position(pos"ITRF",position[1],position[2],position[3]))
 
     dir = field_table["PHASE_DIR"]
     phase_direction = Direction(dir"J2000",Quantity(dir[1],"rad"),

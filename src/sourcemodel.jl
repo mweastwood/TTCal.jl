@@ -102,7 +102,7 @@ function dir2lm(phase_dir::Direction{dir"J2000"}, dir::Direction{dir"J2000"})
     θ2 = π/2 - lat
     sin_θ1 = sin(θ1); cos_θ1 = cos(θ1)
     sin_θ2 = sin(θ2); cos_θ2 = cos(θ2)
-    x,y,z = Measures.xyz_in_meters(dir)
+    x,y,z = vector(dir)
     # Rotate first by θ1 about the z-axis
     # Then rotate by θ2 about the x-axis
     # ⌈    -l    ⌉   ⌈1    0        0    ⌉   ⌈+cos(θ1) -sin(θ1) 0⌉   ⌈x⌉
@@ -129,7 +129,7 @@ function lm2dir(phase_dir::Direction{dir"J2000"},l,m)
     x = -cos_θ1*l - sin_θ1*cos_θ2*m + sin_θ1*sin_θ2*n
     y = +sin_θ1*l - cos_θ1*cos_θ2*m + cos_θ1*sin_θ2*n
     z =                    sin_θ2*m +        cos_θ2*n
-    Measures.from_xyz_in_meters(dir"J2000",x,y,z)
+    Direction(dir"J2000",x,y,z)
 end
 
 radec(frame::ReferenceFrame,source::PointSource) = dir2radec(frame,direction(source))
