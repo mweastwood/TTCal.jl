@@ -22,6 +22,11 @@ export MeasurementSet
 export PointSource
 export readsources, writesources
 
+export BeamModel, mueller
+export ConstantBeam
+export SineBeam
+export Memo178Beam
+
 export getspec
 export genvis, subsrc!
 export fitvis
