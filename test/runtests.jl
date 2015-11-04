@@ -62,7 +62,7 @@ function createms(Nant,Nfreq)
 
     subtable = Table("$name/ANTENNA")
     Tables.addRows!(subtable,Nant)
-    x,y,z = Measures.xyz_in_meters(pos)
+    x,y,z = vector(pos)
     subtable["POSITION"] = [x;y;z]*ones(1,Nant)
     unlock(subtable)
 
