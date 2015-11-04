@@ -36,7 +36,7 @@ let
     unlock(ms)
 
     # Run from `main(...)`
-    cal_name = tempname()
+    cal_name = tempname()*".jld"
     TTCal.write(cal_name,cal)
     TTCal.main(["applycal","--input",name,"--calibration",cal_name])
     calibrated_ms = Table(name)

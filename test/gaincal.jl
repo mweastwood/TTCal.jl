@@ -133,7 +133,7 @@ let
     unlock(ms)
 
     # Run from `main(...)`
-    output_name = tempname()
+    output_name = tempname()*".jld"
     TTCal.main(["gaincal","--input",name,"--output",output_name,"--sources","sources.json","--maxiter","100","--tolerance","$(eps(Float32))"])
     mycal = TTCal.read(output_name)
     @test !any(mycal.flags)
