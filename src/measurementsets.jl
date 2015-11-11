@@ -109,7 +109,7 @@ function get_data(ms::MeasurementSet)
     ms.table["DATA"]
 end
 
-function set_model_data!(ms::MeasurementSet, data,
+function set_model_data!(ms::MeasurementSet, model,
                          force_imaging_columns = false)
     if force_imaging_columns || Tables.checkColumnExists(ms.table,"MODEL_DATA")
         ms.table["MODEL_DATA"] = model
