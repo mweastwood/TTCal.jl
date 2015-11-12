@@ -113,6 +113,8 @@ end
 *(a::Number,J::DiagonalJonesMatrix) = DiagonalJonesMatrix(a*J.xx,a*J.yy)
 *(J::DiagonalJonesMatrix,a::Number) = *(a,J)
 
+/(J::HermitianJonesMatrix,a::Number) = HermitianJonesMatrix(J.xx/a,J.xy/a,J.yy/a)
+
 function *(J1::JonesMatrix,J2::JonesMatrix)
     JonesMatrix(J1.xx*J2.xx + J1.xy*J2.yx,
                 J1.xx*J2.xy + J1.xy*J2.yy,

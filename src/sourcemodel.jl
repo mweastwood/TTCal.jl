@@ -34,7 +34,7 @@ end
 
 Spectrum(I,Q,U,V,ν,index) = Spectrum(StokesVector(I,Q,U,V),ν,index)
 
-function call(spectrum::Spectrum, ν)
+function call(spectrum::Spectrum, ν::AbstractFloat)
     s = sign(spectrum.stokes.I)
     log_I = log10(abs(spectrum.stokes.I))
     log_ν = log10(ν/spectrum.ν0)
@@ -46,6 +46,10 @@ function call(spectrum::Spectrum, ν)
     U = spectrum.stokes.U / spectrum.stokes.I * I
     V = spectrum.stokes.V / spectrum.stokes.I * I
     StokesVector(I,Q,U,V)
+end
+
+function call(spectrum::Spectrum, ν::AbstractVector)
+    [spectrum(ν[β]) for β = 1:length(ν)]
 end
 
 abstract Component
@@ -83,8 +87,10 @@ end
 
 Compute the J2000 right ascension and declination of the component (in radians).
 """
-function j2000_radec(frame::ReferenceFrame, component::Component)
-    j2000 = measure(frame,component.direction,dir"J2000")
+j2000_radec(frame::ReferenceFrame, component::Component) = j2000_radec(frame,component.direction)
+
+function j2000_radec(frame::ReferenceFrame, direction::Direction)
+    j2000 = measure(frame,direction,dir"J2000")
     ra  = longitude(j2000,"rad")
     dec =  latitude(j2000,"rad")
     ra,dec
@@ -95,16 +101,22 @@ end
 
 Compute the local azimuth and elevation of the component (in radians).
 """
-function local_azel(frame::ReferenceFrame, component::Component)
-    azel = measure(frame,component.direction,dir"AZEL")
+local_azel(frame::ReferenceFrame, component::Component) = local_azel(frame,component.direction)
+
+function local_azel(frame::ReferenceFrame, direction::Direction)
+    azel = measure(frame,direction,dir"AZEL")
     az = longitude(azel,"rad")
     el =  latitude(azel,"rad")
     az,el
 end
 
-function isabovehorizon(frame::ReferenceFrame, component::Point)
-    az,el = local_azel(frame,component)
+function isabovehorizon(frame::ReferenceFrame, direction::Direction)
+    az,el = local_azel(frame,direction)
     el > 0
+end
+
+function isabovehorizon(frame::ReferenceFrame, component::Point)
+    isabovehorizon(frame,component.direction)
 end
 
 function isabovehorizon(frame::ReferenceFrame, source::Source)
