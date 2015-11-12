@@ -192,23 +192,20 @@ let
 
     # Run as `gaincal(...)`
     name,ms = createms(Nant,Nfreq)
-    source = Source("Cristiano",
-                    Point("Ronaldo",
-                          ms.phase_direction,
-                          Spectrum(1,0,0,0,10e6,[0.0])))
-    ms.table["DATA"] = genvis(ms, source, ConstantBeam())
+    sources = readsources("sources.json")
+    ms.table["DATA"] = genvis(ms,sources,ConstantBeam())
 
-    mycal = gaincal(ms,[source],ConstantBeam(),
+    mycal = gaincal(ms,sources,ConstantBeam(),
                     maxiter=100,tolerance=Float64(eps(Float64)))
     @test !any(mycal.flags)
     @test vecnorm(mycal.jones - ones(DiagonalJonesMatrix,Nant,Nfreq)) < sqrt(eps(Float64))
     unlock(ms)
 
     # Run from `main(...)`
-    #output_name = tempname()*".jld"
-    #TTCal.main(["gaincal","--input",name,"--output",output_name,"--sources","sources.json","--maxiter","100","--tolerance","$(eps(Float64))"])
-    #mycal = TTCal.read(output_name)
-    #@test !any(mycal.flags)
-    #@test vecnorm(mycal.jones - ones(DiagonalJonesMatrix,Nant,Nfreq)) < sqrt(eps(Float64))
+    output_name = tempname()*".jld"
+    TTCal.main(["gaincal","--input",name,"--output",output_name,"--sources","sources.json","--maxiter","100","--tolerance","$(eps(Float64))"])
+    mycal = TTCal.read(output_name)
+    @test !any(mycal.flags)
+    @test vecnorm(mycal.jones - ones(DiagonalJonesMatrix,Nant,Nfreq)) < sqrt(eps(Float64))
 end
 
