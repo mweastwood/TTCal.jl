@@ -14,7 +14,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 """
-    getspec(ms::MeasurementSet, dir::Direction; minuvw = 0.0) -> Vector{HermitianJonesMatrix}
+    getspec(ms::MeasurementSet, direction::Direction;
+            minuvw = 0.0) -> Vector{HermitianJonesMatrix}
 
 This function extracts the spectrum in a given direction by means of an
 inverse discrete Fourier transform.
@@ -24,16 +25,17 @@ so this does *not* use a fast Fourier transform. However, the inverse
 discrete Fourier transform *is* the least squares estimator for the flux
 in a given direction (if all baselines are weighted equally).
 """
-function getspec(ms::MeasurementSet, dir::Direction;
+function getspec(ms::MeasurementSet, direction::Direction;
                  minuvw::Float64 = 0.0)
-    if !isabovehorizon(ms.frame,dir)
+    if !isabovehorizon(ms.frame,direction)
         error("Direction is below the horizon.")
     end
 
-    l,m = direction_cosines(ms.phase_direction,dir)
+    j2000 = measure(ms.frame,direction,dir"J2000")
+    l,m   = direction_cosines(ms.phase_direction,j2000)
+
     data  = get_corrected_data(ms)
     flags = get_flags(ms)
-
     flag_short_baselines!(flags,minuvw,ms.u,ms.v,ms.w,ms.ν)
 
     getspec(data,flags,l,m,

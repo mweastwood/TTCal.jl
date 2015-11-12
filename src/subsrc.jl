@@ -13,18 +13,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-#=
 """
-    subsrc!(ms::MeasurementSet,
-            sources::Vector{PointSource},
-            beam::BeamModel)
+    subsrc!(ms::MeasurementSet, sources::Vector{Source}, beam::BeamModel)
 
 Remove the list of sources from the measurement set.
 """
-function subsrc!(ms::MeasurementSet,
-                 sources::Vector{PointSource},
-                 beam::BeamModel)
-    sources = filter(source -> isabovehorizon(ms.frame,source),sources)
+function subsrc!(ms::MeasurementSet, sources::Vector{Source}, beam::BeamModel)
+    sources = abovehorizon(ms.frame,sources)
     data  = get_corrected_data(ms)
     model = genvis(ms,sources,beam)
     subsrc!(data,model)
@@ -48,15 +43,14 @@ function subsrc!(ms::MeasurementSet, dir::Direction;
     flag_short_baselines!(flags,minuvw,ms.u,ms.v,ms.w,ms.ν)
 
     j2000 = measure(ms.frame,dir,dir"J2000")
-    l,m = dir2lm(ms.phase_direction,j2000)
-    xx,xy,yx,yy = getspec(data,flags,l,m,ms.u,ms.v,ms.w,ms.ν,ms.ant1,ms.ant2)
+    l,m   = direction_cosines(ms.phase_direction,j2000)
+    flux  = getspec(data,flags,l,m,ms.u,ms.v,ms.w,ms.ν,ms.ant1,ms.ant2)
 
-    model = genvis(xx,xy,yx,yy,l,m,ms.u,ms.v,ms.w,ms.ν)
+    model = genvis(flux,l,m,ms.u,ms.v,ms.w,ms.ν)
     subsrc!(data,model)
     set_corrected_data!(ms,data)
     data
 end
-=#
 
 function subsrc!(data,model)
     for i in eachindex(data,model)

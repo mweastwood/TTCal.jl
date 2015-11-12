@@ -14,39 +14,36 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 """
-    fitvis(ms::MeasurementSet, sources::Vector{PointSource};
+    fitvis(ms::MeasurementSet, direction::Direction;
            maxiter = 20, tolerance = 1e-3, minuvw = 0.0) -> l,m
 
-Fit for the location of each point source.
+Fit for the location of a point source near the given direction.
 """
 function fitvis(ms::MeasurementSet,
-                sources::Vector{PointSource};
+                direction::Direction;
                 maxiter::Int = 20,
                 tolerance::Float64 = 1e-3,
                 minuvw::Float64 = 0.0)
-    sources = abovehorizon(ms.frame,sources)
-    Nsource = length(sources)
+    if !isabovehorizon(ms.frame,direction)
+        error("Direction is below the horizon.")
+    end
+
+    j2000 = measure(ms.frame,direction,dir"J2000")
+    l,m   = direction_cosines(ms.phase_direction,j2000)
+
     data  = get_corrected_data(ms)
     flags = get_flags(ms)
-
     flag_short_baselines!(flags,minuvw,ms.u,ms.v,ms.w,ms.ν)
 
-    l = zeros(Nsource)
-    m = zeros(Nsource)
-    for i = 1:Nsource
-        dir = measure(ms.frame,direction(sources[i]),dir"J2000")
-        l′,m′ = dir2lm(ms.phase_direction,dir)
-        l[i],m[i] = fitvis_onesource(data,flags,l′,m′,
-                                     ms.u,ms.v,ms.w,ms.ν,
-                                     ms.ant1,ms.ant2,
-                                     maxiter,tolerance)
-    end
-    l,m
+    fitvis(data,flags,l,m,
+           ms.u,ms.v,ms.w,ms.ν,
+           ms.ant1,ms.ant2,
+           maxiter,tolerance)
 end
 
-function fitvis_onesource(data,flags,l,m,
-                          u,v,w,ν,ant1,ant2,
-                          maxiter,tolerance)
+function fitvis(data,flags,l,m,
+                u,v,w,ν,ant1,ant2,
+                maxiter,tolerance)
     lm = [l;m]
     converged = @iterate(FitVisStep(),RK4,maxiter,tolerance,
                          lm,data,flags,u,v,w,ν,ant1,ant2)
