@@ -158,8 +158,7 @@ function direction_cosines(phase_dir::Direction{dir"J2000"}, dir::Direction{dir"
     l,m
 end
 
-#=
-function lm2dir(phase_dir::Direction{dir"J2000"},l,m)
+function undo_direction_cosines(phase_dir::Direction{dir"J2000"},l,m)
     long = longitude(phase_dir)
     lat  =  latitude(phase_dir)
     θ1 = π/2 - long
@@ -177,10 +176,9 @@ function lm2dir(phase_dir::Direction{dir"J2000"},l,m)
     z =                    sin_θ2*m +        cos_θ2*n
     Direction(dir"J2000",x,y,z)
 end
-=#
 
 """
-    readsources(filename) -> Vector{PointSource}
+    readsources(filename) -> Vector{Source}
 
 Read the list of point sources from the given JSON file.
 The format must be as follows:
@@ -228,10 +226,12 @@ function readsources(filename)
         name = parsed_source["name"]
         components = Component[]
         if haskey(parsed_source,"components")
-            warn("Not yet able to read multiple component sources.")
+            parsed_components = parsed_source["components"]
+            for parsed_component in parsed_components
+                component = construct_component(parsed_component)
+                push!(components,component)
+            end
         else
-            # if "components" is not given position and flux of a point
-            # source may be specified inline
             component = construct_component(parsed_source)
             push!(components,component)
         end
@@ -278,32 +278,43 @@ function construct_component(c)
     Point(name,dir,Spectrum(I,Q,U,V,freq,index))
 end
 
-#=
 """
-    writesources(filename, sources::Vector{PointSource})
+    writesources(filename, sources::Vector{Source})
 
 Write the list of sources to the given location as a JSON file.
 These sources can be read back in again using the `readsources` function.
 """
-function writesources(filename, sources::Vector{PointSource})
+function writesources(filename, sources::Vector{Source})
     dicts = Dict{UTF8String,Any}[]
     for source in sources
-        ra  = longitude(source.dir,"deg")
-        dec =  latitude(source.dir,"deg")
-        dict = Dict{UTF8String,Any}()
-        dict["ref"]   = "TTCal"
-        dict["name"]  = source.name
-        if name != "Sun"
-            dict["ra"]  = format_ra(ra)
-            dict["dec"] = format_dec(dec)
+        source_dict = Dict{UTF8String,Any}()
+        source_dict["ref"]  = "TTCal"
+        source_dict["name"] = source.name
+
+        component_dicts = Dict{UTF8String,Any}[]
+        for (n,component) in enumerate(source.components)
+            component_dict = Dict{UTF8String,Any}()
+            component_dict["name"] = component.name
+
+            ra  = longitude(component.direction,"deg")
+            dec =  latitude(component.direction,"deg")
+            if component.name != "Sun" && component.name != "Moon" && component.name != "Jupiter"
+                component_dict["ra"]  = format_ra(ra)
+                component_dict["dec"] = format_dec(dec)
+            end
+
+            component_dict["I"]     = component.spectrum.stokes.I
+            component_dict["Q"]     = component.spectrum.stokes.Q
+            component_dict["U"]     = component.spectrum.stokes.U
+            component_dict["V"]     = component.spectrum.stokes.V
+            component_dict["freq"]  = component.spectrum.ν0
+            component_dict["index"] = component.spectrum.spectral_index
+
+            push!(component_dicts,component_dict)
         end
-        dict["I"]     = source.I
-        dict["Q"]     = source.Q
-        dict["U"]     = source.U
-        dict["V"]     = source.V
-        dict["freq"]  = float(source.reffreq)
-        dict["index"] = source.index
-        push!(dicts,dict)
+
+        source_dict["components"] = component_dicts
+        push!(dicts,source_dict)
     end
     file = open(filename,"w")
     JSON.print(file,dicts)
@@ -311,13 +322,14 @@ function writesources(filename, sources::Vector{PointSource})
     sources
 end
 
+#=
 """
-    write_ds9_regions(filename, sources::Vector{PointSource})
+    write_ds9_regions(filename, sources::Vector{Source})
 
 Write the list of sources to a DS9 region file. This file can then be loaded
 into DS9 to highlight sources within images.
 """
-function write_ds9_regions(filename,sources::Vector{PointSource})
+function write_ds9_regions(filename,sources::Vector{Source})
     open(filename,"w") do f
         Base.write(f,"global color=red edit=0 move=0 delete=1\n")
         Base.write(f,"fk5\n")
@@ -329,6 +341,7 @@ function write_ds9_regions(filename,sources::Vector{PointSource})
         end
     end
 end
+=#
 
 function format_ra(ra::Float64)
     ra /= 15
@@ -353,5 +366,4 @@ function format_dec(dec::Float64)
     sign_str = s < 0? "-" : "+"
     @sprintf("%s%dd%02dm%07.4fs",sign_str,deg,min,sec)
 end
-=#
 

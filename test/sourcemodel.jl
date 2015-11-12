@@ -57,40 +57,36 @@ let
     @test point.spectrum.spectral_index == [+0.085,-0.178]
 end
 
-#=
 let
-    sources1 = [PointSource("S1",Direction(dir"J2000",q"1h",q"0d"),
-                            1.0,2.0,3.0,4.0,10e6,[0.0]),
-                PointSource("S2",Direction(dir"J2000",q"2h",q"0d"),
-                            1.0,2.0,3.0,4.0,10e6,[0.0]),
-                PointSource("S3",Direction(dir"J2000",q"3h",q"0d"),
-                            1.0,2.0,3.0,4.0,10e6,[0.0])]
-    filename = tempname()
+    sources1 = [Source("S1",Point("P1",Direction(dir"J2000",q"1h",q"0d"),
+                            Spectrum(1.0,2.0,3.0,4.0,10e6,[0.0]))),
+                Source("S2",Point("P2",Direction(dir"J2000",q"2h",q"0d"),
+                            Spectrum(1.0,2.0,3.0,4.0,10e6,[0.0]))),
+                Source("S3",Point("P3",Direction(dir"J2000",q"3h",q"0d"),
+                            Spectrum(1.0,2.0,3.0,4.0,10e6,[0.0])))]
+
+    filename = tempname()*".json"
     writesources(filename,sources1)
     sources2 = readsources(filename)
     for i in eachindex(sources1,sources2)
-        @test name(sources1[i]) == name(sources2[i])
-        dir1 = direction(sources1[i])
-        dir2 = direction(sources2[i])
-        @test coordinate_system(dir1) == coordinate_system(dir2)
+        source1 = sources1[i]
+        source2 = sources2[i]
+        point1  = source1.components[1]
+        point2  = source2.components[1]
+        @test source1.name == source2.name
+        @test point1.name == point2.name
+        dir1 = point1.direction
+        dir2 = point2.direction
+        @test coordinate_system(dir1) === coordinate_system(dir2)
         @test longitude(dir1) ≈ longitude(dir2)
-        @test latitude(dir1) ≈ latitude(dir2)
-        @test sources1[i].I == sources2[i].I
-        @test sources1[i].Q == sources2[i].Q
-        @test sources1[i].U == sources2[i].U
-        @test sources1[i].V == sources2[i].V
-        @test sources1[i].reffreq == sources2[i].reffreq
-        @test sources1[i].index == sources2[i].index
+        @test  latitude(dir1) ≈  latitude(dir2)
+        @test point1.spectrum.stokes.I == point2.spectrum.stokes.I
+        @test point1.spectrum.stokes.Q == point2.spectrum.stokes.Q
+        @test point1.spectrum.stokes.U == point2.spectrum.stokes.U
+        @test point1.spectrum.stokes.V == point2.spectrum.stokes.V
+        @test point1.spectrum.ν0 == point2.spectrum.ν0
+        @test point1.spectrum.spectral_index == point2.spectrum.spectral_index
     end
-end
-
-let
-    source = PointSource("S",Direction(dir"J2000",q"1h",q"0d"),
-                         1.0,2.0,3.0,4.0,10e6,[0.0])
-    @test name(source) == "S"
-    @test repr(source) == "S"
-    @test TTCal.flux(source,10e6) == 1.0
-    @test TTCal.flux(source,20e6) == 1.0
 end
 
 let
@@ -107,16 +103,16 @@ let
             l = 2rand()-1
             m = 2rand()-1
         end
-        dir = TTCal.lm2dir(phase_dir,l,m)
-        l′,m′ = TTCal.dir2lm(phase_dir,dir)
+        dir = TTCal.undo_direction_cosines(phase_dir,l,m)
+        l′,m′ = TTCal.direction_cosines(phase_dir,dir)
         @test l ≈ l′
         @test m ≈ m′
     end
 
-    # z should be negative in lm2dir
+    # z should be negative in undo_direction_cosines
     l,m = (-0.26521340920368575,-0.760596242177856)
-    dir = TTCal.lm2dir(phase_dir,l,m)
-    l′,m′ = TTCal.dir2lm(phase_dir,dir)
+    dir = TTCal.undo_direction_cosines(phase_dir,l,m)
+    l′,m′ = TTCal.direction_cosines(phase_dir,dir)
     @test l ≈ l′
     @test m ≈ m′
 end
@@ -129,5 +125,4 @@ let
     dec = get(q"-0d12m34s","deg")
     @test TTCal.format_dec(dec) == "-0d12m34.0000s"
 end
-=#
 
