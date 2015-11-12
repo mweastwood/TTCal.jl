@@ -23,6 +23,7 @@ export JonesMatrix, DiagonalJonesMatrix, HermitianJonesMatrix
 export StokesVector, MuellerMatrix
 
 export Source, Point, Spectrum
+export readsources, writesources
 export ConstantBeam, SineBeam, Memo178Beam
 
 export genvis, subsrc!, getspec, fitvis
@@ -31,10 +32,6 @@ export GainCalibration, gaincal
 export PolarizationCalibration, polcal
 export applycal!, corrupt!
 export peel!
-
-#=
-export readsources, writesources
-=#
 
 importall Base.Operators
 import Base: zero, one, rand, conj, det, inv, norm, kron

@@ -167,7 +167,6 @@ function lm2dir(phase_dir::Direction{dir"J2000"},l,m)
 end
 =#
 
-#=
 """
     readsources(filename) -> Vector{PointSource}
 
@@ -181,9 +180,6 @@ The format must be as follows:
             "ra": "23h23m24s",
             "dec": "58d48m54s",
             "I": 555904.26,
-            "Q": 0.0,
-            "U": 0.0,
-            "V": 0.0,
             "freq": 1.0e6,
             "index": [-0.770]
         },
@@ -193,47 +189,82 @@ The format must be as follows:
             "ra": "19h59m28.35663s",
             "dec": "+40d44m02.0970s",
             "I": 49545.02,
-            "Q": 0.0,
-            "U": 0.0,
-            "V": 0.0,
             "freq": 1.0e6,
             "index": [+0.085,-0.178]
         }
     ]
+
+Additional Stokes parameters may also be specified.
+
+    {
+        ...
+        "I": 100
+        "Q": 20
+        "U": 3.14
+        "V": -30
+        ...
+    }
+
+A right ascension and declination does not need to be specified if
+the name of the source is "Sun", "Moon", or "Jupiter". These sources
+will have their location automatically determined by CasaCore.
 """
 function readsources(filename)
     sources = Source[]
     parsed_sources = JSON.parsefile(filename)
     for parsed_source in parsed_sources
-        name  = parsed_source["name"]
-        if name == "Sun"
-            dir = Direction(dir"SUN")
+        name = parsed_source["name"]
+        components = Component[]
+        if haskey(parsed_source,"components")
+            warn("Not yet able to read multiple component sources.")
         else
-            ra  = parsed_source["ra"]
-            dec = parsed_source["dec"]
-            dir = Direction(dir"J2000",Quantity(Measures.sexagesimal(ra),"deg"),
-                                       Quantity(Measures.sexagesimal(dec),"deg"))
+            # if "components" is not given position and flux of a point
+            # source may be specified inline
+            component = construct_component(parsed_source)
+            push!(components,component)
         end
-        if haskey(parsed_source,"flux")
-            # for compatibility with old sources.json files,
-            # which used "flux" in place of the Stokes parameters.
-            I = parsed_source["flux"]
-            Q = 0.0
-            U = 0.0
-            V = 0.0
-        else
-            I = parsed_source["I"]
-            Q = parsed_source["Q"]
-            U = parsed_source["U"]
-            V = parsed_source["V"]
-        end
-        freq  = parsed_source["freq"]
-        index = parsed_source["index"]
-        push!(sources,Source(name,Point("point",dir,Spectrum(I,Q,U,V,freq,index))))
+        push!(sources,Source(name,components))
     end
     sources
 end
-=#
+
+function construct_component(c)
+    name = get(c,"name","")
+
+    if name == "Sun"
+        dir = Direction(dir"SUN")
+    elseif name == "Moon"
+        dir = Direction(dir"MOON")
+    elseif name == "Jupiter"
+        dir = Direction(dir"JUPITER")
+    else
+        ra  = c["ra"]
+        dec = c["dec"]
+        dir = Direction(dir"J2000",Quantity(Measures.sexagesimal(ra), "deg"),
+                                   Quantity(Measures.sexagesimal(dec),"deg"))
+    end
+
+    if haskey(c,"flux")
+        warn("""
+            $filename is out of date
+            Replace "flux" with "I" (for the Stokes I flux).
+            Additional entries for "Q", "U", and "V" may also be added.
+        """)
+        # for compatibility with old sources.json files,
+        # which used "flux" in place of the Stokes parameters.
+        I = c["flux"]
+    else
+        I = c["I"]
+    end
+    Q = get(c,"Q",0.0)
+    U = get(c,"U",0.0)
+    V = get(c,"V",0.0)
+
+    freq  = c["freq"]
+    index = c["index"]
+
+    Point(name,dir,Spectrum(I,Q,U,V,freq,index))
+end
 
 #=
 """

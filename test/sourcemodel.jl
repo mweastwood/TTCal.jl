@@ -21,39 +21,43 @@ let
     @test sources′[1].name == "S1"
 end
 
-#=
 let
     sources = readsources("sources.json")
 
     cas_a = sources[1]
-    @test name(cas_a) == "Cas A"
-    dir1 = direction(cas_a)
+    point = cas_a.components[1]
+    @test cas_a.name == "Cas A"
+    @test point.name == "Cas A"
+    dir1 = point.direction
     dir2 = Direction(dir"J2000",q"23h23m24s",q"58d48m54s")
-    @test coordinate_system(dir1) == coordinate_system(dir2)
+    @test coordinate_system(dir1) === dir"J2000"
     @test longitude(dir1) ≈ longitude(dir2)
-    @test latitude(dir1) ≈ latitude(dir2)
-    @test cas_a.I == 555904.26
-    @test cas_a.Q == 0.0
-    @test cas_a.U == 0.0
-    @test cas_a.V == 0.0
-    @test cas_a.reffreq == 1.0e6
-    @test cas_a.index == [-0.770]
+    @test  latitude(dir1) ≈  latitude(dir2)
+    @test point.spectrum.stokes.I == 555904.26
+    @test point.spectrum.stokes.Q == 0
+    @test point.spectrum.stokes.U == 0
+    @test point.spectrum.stokes.V == 0
+    @test point.spectrum.ν0 == 1e6
+    @test point.spectrum.spectral_index == [-0.770]
 
     cyg_a = sources[2]
-    @test name(cyg_a) == "Cyg A"
-    dir1 = direction(cyg_a)
+    point = cyg_a.components[1]
+    @test cyg_a.name == "Cyg A"
+    @test point.name == "Cyg A"
+    dir1 = point.direction
     dir2 = Direction(dir"J2000",q"19h59m28.35663s",q"+40d44m02.0970s")
-    @test coordinate_system(dir1) == coordinate_system(dir2)
+    @test coordinate_system(dir1) === dir"J2000"
     @test longitude(dir1) ≈ longitude(dir2)
-    @test latitude(dir1) ≈ latitude(dir2)
-    @test cyg_a.I == 49545.02
-    @test cyg_a.Q == 0.0
-    @test cyg_a.U == 0.0
-    @test cyg_a.V == 0.0
-    @test cyg_a.reffreq == 1.0e6
-    @test cyg_a.index == [+0.085,-0.178]
+    @test  latitude(dir1) ≈  latitude(dir2)
+    @test point.spectrum.stokes.I == 49545.02
+    @test point.spectrum.stokes.Q == 0
+    @test point.spectrum.stokes.U == 0
+    @test point.spectrum.stokes.V == 0
+    @test point.spectrum.ν0 == 1e6
+    @test point.spectrum.spectral_index == [+0.085,-0.178]
 end
 
+#=
 let
     sources1 = [PointSource("S1",Direction(dir"J2000",q"1h",q"0d"),
                             1.0,2.0,3.0,4.0,10e6,[0.0]),
