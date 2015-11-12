@@ -16,7 +16,5 @@ include("genvis.jl")
 #include("subsrc.jl")
 #include("fitvis.jl")
 include("calibration.jl")
-include("gaincal.jl")
-#include("polcal.jl")
 include("utm.jl")
 
