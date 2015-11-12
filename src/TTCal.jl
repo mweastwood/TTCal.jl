@@ -19,23 +19,22 @@ module TTCal
 
 export MeasurementSet
 
-export PointSource
-export readsources, writesources
+export JonesMatrix, DiagonalJonesMatrix, HermitianJonesMatrix
+export StokesVector, MuellerMatrix
 
-export BeamModel, mueller
-export ConstantBeam
-export SineBeam
-export Memo178Beam
+export Source, Point, Spectrum
+export ConstantBeam, SineBeam, Memo178Beam
 
-export getspec
-export genvis, subsrc!
-export fitvis
+export genvis, subsrc!, getspec, fitvis
 
-export AmplitudeCalibration, ampcal
 export GainCalibration, gaincal
 export PolarizationCalibration, polcal
 export applycal!, corrupt!
 export peel!
+
+#=
+export readsources, writesources
+=#
 
 importall Base.Operators
 import Base: zero, one, rand, conj, det, inv, norm, kron
@@ -54,13 +53,13 @@ include("jones.jl")
 include("sourcemodel.jl")
 include("beammodel.jl")
 include("fringepattern.jl")
-include("getspec.jl")
+#include("getspec.jl")
 include("genvis.jl")
 include("subsrc.jl")
-include("fitvis.jl")
+#include("fitvis.jl")
 include("calibration.jl")
 include("gaincal.jl")
-include("polcal.jl")
+#include("polcal.jl")
 include("peel.jl")
 include("utm.jl")
 include("commandline.jl")

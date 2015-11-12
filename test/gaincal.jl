@@ -1,49 +1,60 @@
 let
     N = 100
-    data  = rand(Complex64,N,N)
+    data  = [rand(JonesMatrix) for i = 1:N, j = 1:N]
     model = copy(data)
 
     # Test that the step is zero when the
-    # gains are already at the optimal value.
-    gains = ones(Complex64,N)
-    @test TTCal.gaincal_step(gains,data,model) ≈ zeros(Complex64,N)
-
-    amps = ones(Float64,N)
-    @test TTCal.ampcal_step(amps,data,model) ≈ zeros(Float64,N)
+    # Jones matrices are already at the optimal value.
+    jones = ones(DiagonalJonesMatrix,N)
+    @test TTCal.stefcal_step(jones,data,model) |> vecnorm < N*eps(Float64)
+    jones = ones(JonesMatrix,N)
+    @test TTCal.stefcal_step(jones,data,model) |> vecnorm < N*eps(Float64)
 end
 
 let
     Nant = 10
     Nfreq = 20
 
-    for T in (GainCalibration,AmplitudeCalibration)
+    for T in (GainCalibration,PolarizationCalibration)
         cal = T(Nant,Nfreq)
+        el  = eltype(cal.jones)
         @test TTCal.Nant(cal) == Nant
         @test TTCal.Nfreq(cal) == Nfreq
-        @test all(cal.gains .== 1)
-        @test all(cal.flags .== false)
+        @test cal.jones == ones(el,Nant,Nfreq)
+        @test cal.flags == zeros(Bool,Nant,Nfreq)
 
-        # The inverse of a calibration with unity gains should be itself.
+        # The inverse of a calibration with identity Jones matrices should be itself.
         rand!(cal.flags)
         inverse = TTCal.invert(cal)
-        @test cal.gains == inverse.gains
+        @test vecnorm(cal.jones - inverse.jones) == 0
         @test cal.flags == inverse.flags
     end
 end
 
 let
     Nant = 10
-    Nfreq = 20
+    Nfreq = 3
     cal = GainCalibration(Nant,Nfreq)
+    for i in eachindex(cal.jones)
+        cal.jones[i] = rand(eltype(cal.jones))
+    end
 
     # Test that fixphase! actually sets the phase to zero.
-    rand!(cal.gains)
+
     TTCal.fixphase!(cal,"1x")
-    @test maximum(angle(cal.gains[1,1,:])) < eps(Float32)
+    for β = 1:Nfreq
+        @test angle(cal.jones[1,β].xx) < eps(Float64)
+    end
+
     TTCal.fixphase!(cal,"2y")
-    @test maximum(angle(cal.gains[2,2,:])) < eps(Float32)
+    for β = 1:Nfreq
+        @test angle(cal.jones[2,β].yy) < eps(Float64)
+    end
+
     TTCal.fixphase!(cal,"5y")
-    @test maximum(angle(cal.gains[2,5,:])) < eps(Float32)
+    for β = 1:Nfreq
+        @test angle(cal.jones[5,β].yy) < eps(Float64)
+    end
 end
 
 function test_solve(cal,data,model,
@@ -55,9 +66,10 @@ function test_solve(cal,data,model,
     mycal = similar(cal)
     flags = zeros(Bool,size(data))
     TTCal.solve!(mycal,data,model,flags,
-                 ant1,ant2,maxiter,tolerance,"1x")
+                 ant1,ant2,maxiter,tolerance)
+    TTCal.fixphase!(mycal,"1x")
     @test !any(mycal.flags)
-    @test isapprox(mycal.gains,cal.gains,atol=sqrt(tolerance))
+    @test vecnorm(mycal.jones-cal.jones) < eps(Float32)
 end
 
 # Unity gains
@@ -70,9 +82,9 @@ let
     data  = Array{Complex64,3}(complex(randn(4,Nfreq,Nbase),randn(4,Nfreq,Nbase)))
     model = copy(data)
 
-    for T in (GainCalibration,AmplitudeCalibration)
+    for T in (GainCalibration,PolarizationCalibration)
         cal = T(Nant,Nfreq)
-        test_solve(cal,data,model,ant1,ant2,100,eps(Float32))
+        test_solve(cal,data,model,ant1,ant2,100,eps(Float64))
     end
 end
 
@@ -83,14 +95,16 @@ let
     Nbase = div(Nant*(Nant-1),2) + Nant
     ant1,ant2 = ant1ant2(Nant)
 
-    for T in (GainCalibration,AmplitudeCalibration)
+    for T in (GainCalibration,PolarizationCalibration)
         cal = T(Nant,Nfreq)
-        rand!(cal.gains)
+        for i in eachindex(cal.jones)
+            cal.jones[i] = rand(eltype(cal.jones))
+        end
         TTCal.fixphase!(cal,"1x")
         data  = Array{Complex64,3}(complex(randn(4,Nfreq,Nbase),randn(4,Nfreq,Nbase)))
         model = copy(data)
         corrupt!(data,cal,ant1,ant2)
-        test_solve(cal,data,model,ant1,ant2,100,eps(Float32))
+        test_solve(cal,data,model,ant1,ant2,200,eps(Float64))
     end
 end
 
@@ -101,9 +115,11 @@ let
     Nbase = div(Nant*(Nant-1),2) + Nant
     ant1,ant2 = ant1ant2(Nant)
 
-    for T in (GainCalibration,AmplitudeCalibration)
+    for T in (GainCalibration,PolarizationCalibration)
         cal = T(Nant,Nfreq)
-        rand!(cal.gains)
+        for i in eachindex(cal.jones)
+            cal.jones[i] = rand(eltype(cal.jones))
+        end
         TTCal.fixphase!(cal,"1x")
         data  = Array{Complex64,3}(complex(randn(4,Nfreq,Nbase),randn(4,Nfreq,Nbase)))
         model = copy(data)
@@ -113,7 +129,7 @@ let
             data[:,:,α] = rand(4,Nfreq)
             α += Nant-ant+1
         end
-        test_solve(cal,data,model,ant1,ant2,200,eps(Float32))
+        test_solve(cal,data,model,ant1,ant2,200,eps(Float64))
     end
 
 end
@@ -125,18 +141,23 @@ let
 
     # Run as `gaincal(...)`
     name,ms = createms(Nant,Nfreq)
-    sources = readsources("sources.json")
-    mycal = gaincal(ms,sources,TTCal.ConstantBeam(),
-                    maxiter=100,tolerance=Float64(eps(Float32)))
+    source = Source("Cristiano",
+                    Point("Ronaldo",
+                          ms.phase_direction,
+                          Spectrum(1,0,0,0,10e6,[0.0])))
+    ms.table["DATA"] = genvis(ms, source, ConstantBeam())
+
+    mycal = gaincal(ms,[source],ConstantBeam(),
+                    maxiter=100,tolerance=Float64(eps(Float64)))
     @test !any(mycal.flags)
-    @test mycal.gains ≈ ones(Complex64,2,Nant,Nfreq)
+    @test vecnorm(mycal.jones - ones(DiagonalJonesMatrix,Nant,Nfreq)) < sqrt(eps(Float64))
     unlock(ms)
 
     # Run from `main(...)`
-    output_name = tempname()*".jld"
-    TTCal.main(["gaincal","--input",name,"--output",output_name,"--sources","sources.json","--maxiter","100","--tolerance","$(eps(Float32))"])
-    mycal = TTCal.read(output_name)
-    @test !any(mycal.flags)
-    @test mycal.gains ≈ ones(Complex64,2,Nant,Nfreq)
+    #output_name = tempname()*".jld"
+    #TTCal.main(["gaincal","--input",name,"--output",output_name,"--sources","sources.json","--maxiter","100","--tolerance","$(eps(Float64))"])
+    #mycal = TTCal.read(output_name)
+    #@test !any(mycal.flags)
+    #@test vecnorm(mycal.jones - ones(DiagonalJonesMatrix,Nant,Nfreq)) < sqrt(eps(Float64))
 end
 

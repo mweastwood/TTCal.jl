@@ -13,89 +13,122 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-"""
-    type PointSource
+doc"""
+    immutable Spectrum
 
 These sources have a multi-component power-law spectrum
 such that:
 
-    log(flux) = log(I) + index[1]*log(ν/reffreq)
-                       + index[2]*log²(ν/reffreq) + ...
+\\[
+    \log_{10} S = \log_{10} S_0 + \sum_{n=1}^N \alpha_n \log_{10}\left(\frac{\nu}{\nu_0}\right)^n
+\\]
 
-Polarized fluxes are obtained in a similar manner by
-substituting Q/U/V for I in the above expression.
+where $S$ is a Stokes parameter, and $\alpha_n$ is the list of
+spectral indices. At least one spectral index needs to be provided.
 """
-type PointSource
-    name::ASCIIString
-    dir::Direction
-    I::Float64
-    Q::Float64
-    U::Float64
-    V::Float64
-    reffreq::Float64
-    index::Vector{Float64}
+immutable Spectrum
+    stokes::StokesVector
+    ν0::Float64 # Hz
+    spectral_index::Vector{Float64}
 end
 
-name(source::PointSource) = source.name
-Base.show(io::IO,source::PointSource) = print(io,name(source))
-direction(source::PointSource) = source.dir
+Spectrum(I,Q,U,V,ν,index) = Spectrum(StokesVector(I,Q,U,V),ν,index)
 
-function powerlaw(reference_flux,index,reference_frequency,frequency)
-    s = sign(reference_flux)
-    logflux = log10(abs(reference_flux))
-    logfreq = log10(frequency/reference_frequency)
-    for (i,α) in enumerate(index)
-        logflux += α*logfreq.^i
+function call(spectrum::Spectrum, ν)
+    s = sign(spectrum.stokes.I)
+    log_I = log10(abs(spectrum.stokes.I))
+    log_ν = log10(ν/spectrum.ν0)
+    for (i,α) in enumerate(spectrum.spectral_index)
+        log_I += α*log_ν^i
     end
-    s*10.0.^logflux
+    I = s*10^log_I
+    Q = spectrum.stokes.Q / spectrum.stokes.I * I
+    U = spectrum.stokes.U / spectrum.stokes.I * I
+    V = spectrum.stokes.V / spectrum.stokes.I * I
+    StokesVector(I,Q,U,V)
 end
 
-function flux(source::PointSource, frequency::Number)
-    powerlaw(source.I,source.index,source.reffreq,frequency)
-end
-
-function flux{T<:Number}(source::PointSource, frequencies::Vector{T})
-    T[flux(source,frequency) for frequency in frequencies]
-end
-
-function stokes_flux(source::PointSource, frequency::Number)
-    I = powerlaw(source.I,source.index,source.reffreq,frequency)
-    Q = powerlaw(source.Q,source.index,source.reffreq,frequency)
-    U = powerlaw(source.U,source.index,source.reffreq,frequency)
-    V = powerlaw(source.V,source.index,source.reffreq,frequency)
-    [I,Q,U,V]
-end
+abstract Component
 
 """
-    dir2radec(frame::ReferenceFrame, dir::Direction)
+    immutable Source
 
-Convert the direction into a J2000 right ascension and declination.
+This type represents a radio source.
+
+Each source is composed of one or more components.
 """
-function dir2radec(frame::ReferenceFrame, dir::Direction)
-    j2000 = measure(frame,dir,dir"J2000")
-    ra  = longitude(j2000)
-    dec =  latitude(j2000)
+immutable Source
+    name::ASCIIString
+    components::Vector{Component}
+end
+
+Source(name::ASCIIString,component::Component) = Source(name,[component])
+
+immutable Point <: Component
+    name::ASCIIString
+    direction::Direction
+    spectrum::Spectrum
+end
+
+# TODO
+#immutable Gaussian <: Component
+#end
+
+# TODO
+#immutable Ellipse <: Component
+#end
+
+"""
+    j2000_radec(frame::ReferenceFrame, component::Component) -> ra,dec
+
+Compute the J2000 right ascension and declination of the component (in radians).
+"""
+function j2000_radec(frame::ReferenceFrame, component::Component)
+    j2000 = measure(frame,component.direction,dir"J2000")
+    ra  = longitude(j2000,"rad")
+    dec =  latitude(j2000,"rad")
     ra,dec
 end
 
 """
-    dir2azel(frame::ReferenceFrame, dir::Direction)
+    local_azel(frame::ReferenceFrame, component::Component) -> az,el
 
-Convert the direction into a local azimuth and elevation.
+Compute the local azimuth and elevation of the component (in radians).
 """
-function dir2azel(frame::ReferenceFrame, dir::Direction)
-    azel = measure(frame,dir,dir"AZEL")
-    az = longitude(azel)
-    el =  latitude(azel)
+function local_azel(frame::ReferenceFrame, component::Component)
+    azel = measure(frame,component.direction,dir"AZEL")
+    az = longitude(azel,"rad")
+    el =  latitude(azel,"rad")
     az,el
 end
 
-"""
-    dir2lm(phase_dir::Direction{dir"J2000"}, dir::Direction{dir"J2000"})
+function isabovehorizon(frame::ReferenceFrame, component::Point)
+    az,el = local_azel(frame,component)
+    el > 0
+end
 
-Convert the direction into the standard radio coordinate system.
+function isabovehorizon(frame::ReferenceFrame, source::Source)
+    for component in source.components
+        if !isabovehorizon(frame,component)
+            return false
+        end
+    end
+    true
+end
+
+function abovehorizon(frame::ReferenceFrame, sources::Vector{Source})
+    filter(sources) do source
+        isabovehorizon(frame,source)
+    end
+end
+
+doc"""
+    direction_cosines(phase_dir::Direction{dir"J2000"}, dir::Direction{dir"J2000"}) -> l,m
+
+Compute the direction cosines $(l,m)$ for the given direction with respect to the
+phase direction.
 """
-function dir2lm(phase_dir::Direction{dir"J2000"}, dir::Direction{dir"J2000"})
+function direction_cosines(phase_dir::Direction{dir"J2000"}, dir::Direction{dir"J2000"})
     long = longitude(phase_dir)
     lat  =  latitude(phase_dir)
     θ1 = π/2 - long
@@ -113,6 +146,7 @@ function dir2lm(phase_dir::Direction{dir"J2000"}, dir::Direction{dir"J2000"})
     l,m
 end
 
+#=
 function lm2dir(phase_dir::Direction{dir"J2000"},l,m)
     long = longitude(phase_dir)
     lat  =  latitude(phase_dir)
@@ -131,26 +165,9 @@ function lm2dir(phase_dir::Direction{dir"J2000"},l,m)
     z =                    sin_θ2*m +        cos_θ2*n
     Direction(dir"J2000",x,y,z)
 end
+=#
 
-radec(frame::ReferenceFrame,source::PointSource) = dir2radec(frame,direction(source))
-azel(frame::ReferenceFrame,source::PointSource) = dir2azel(frame,direction(source))
-lm(phase_dir::Direction,source::PointSource) = dir2lm(phase_dir,direction(source))
-
-function isabovehorizon(frame::ReferenceFrame, direction::Direction)
-    az,el = dir2azel(frame,direction)
-    el > 0
-end
-
-function isabovehorizon(frame::ReferenceFrame, source::PointSource)
-    isabovehorizon(frame,direction(source))
-end
-
-function abovehorizon(frame::ReferenceFrame, sources::Vector{PointSource})
-    filter(sources) do source
-        isabovehorizon(frame,source)
-    end
-end
-
+#=
 """
     readsources(filename) -> Vector{PointSource}
 
@@ -185,7 +202,7 @@ The format must be as follows:
     ]
 """
 function readsources(filename)
-    sources = PointSource[]
+    sources = Source[]
     parsed_sources = JSON.parsefile(filename)
     for parsed_source in parsed_sources
         name  = parsed_source["name"]
@@ -212,11 +229,13 @@ function readsources(filename)
         end
         freq  = parsed_source["freq"]
         index = parsed_source["index"]
-        push!(sources,PointSource(name,dir,I,Q,U,V,freq,index))
+        push!(sources,Source(name,Point("point",dir,Spectrum(I,Q,U,V,freq,index))))
     end
     sources
 end
+=#
 
+#=
 """
     writesources(filename, sources::Vector{PointSource})
 
@@ -291,4 +310,5 @@ function format_dec(dec::Float64)
     sign_str = s < 0? "-" : "+"
     @sprintf("%s%dd%02dm%07.4fs",sign_str,deg,min,sec)
 end
+=#
 

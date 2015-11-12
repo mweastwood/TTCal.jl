@@ -1,30 +1,27 @@
-import TTCal: name, direction
-
-let
-    reference_flux = 10.0
-    index = [1.0]
-    reference_frequency = 123.0
+let I0 = 100, Q0 = -50, U0 = 40, V0 = -10, ν0 = 123, index = [1.0]
+    spec = Spectrum(I0,Q0,U0,V0,ν0,index)
 
     frequency = 123.0
-    @test TTCal.powerlaw(reference_flux,index,reference_frequency,frequency) == 10.0
+    @test norm(spec(frequency) - StokesVector(I0,Q0,U0,V0)) < eps(Float64)
     frequency = 1230.0
-    @test TTCal.powerlaw(reference_flux,index,reference_frequency,frequency) == 100.0
+    @test norm(spec(frequency) - 10*StokesVector(I0,Q0,U0,V0)) < eps(Float64)
 end
 
 let
     frame   = ReferenceFrame()
-    sources = [PointSource("S1",Direction(dir"AZEL",Quantity(0.0,"deg"),Quantity(+45.0,"deg")),
-                           1.0,2.0,3.0,4.0,10e6,[0.0]),
-               PointSource("S2",Direction(dir"AZEL",Quantity(0.0,"deg"),Quantity(-45.0,"deg")),
-                           1.0,2.0,3.0,4.0,10e6,[0.0])]
+    sources = [Source("S1",Point("P1",Direction(dir"AZEL",q"0.0deg",q"+45.0deg"),
+                           Spectrum(1.0,2.0,3.0,4.0,10e6,[0.0]))),
+               Source("S2",Point("P2",Direction(dir"AZEL",q"0.0deg",q"-45.0deg"),
+                           Spectrum(1.0,2.0,3.0,4.0,10e6,[0.0])))]
     @test TTCal.isabovehorizon(frame,sources[1]) == true
     @test TTCal.isabovehorizon(frame,sources[2]) == false
 
     sources′ = TTCal.abovehorizon(frame,sources)
     @test length(sources′) == 1
-    @test name(sources′[1]) == "S1"
+    @test sources′[1].name == "S1"
 end
 
+#=
 let
     sources = readsources("sources.json")
 
@@ -128,4 +125,5 @@ let
     dec = get(q"-0d12m34s","deg")
     @test TTCal.format_dec(dec) == "-0d12m34.0000s"
 end
+=#
 

@@ -9,9 +9,11 @@ let
     data′ = copy(data)
     flags = zeros(Bool,4,Nfreq,Nbase)
 
-    for T in (GainCalibration,AmplitudeCalibration)
+    for T in (GainCalibration,PolarizationCalibration)
         cal = T(Nant,Nfreq)
-        rand!(cal.gains)
+        for i in eachindex(cal.jones)
+            cal.jones[i] = rand(eltype(cal.jones))
+        end
         corrupt!(data,flags,cal,ant1,ant2)
         applycal!(data,flags,cal,ant1,ant2)
         @test data ≈ data′
@@ -22,13 +24,17 @@ end
 let
     Nant = 10
     Nfreq = 2
+    Nbase = div(Nant*(Nant-1),2) + Nant
 
     g = 2
     cal = GainCalibration(Nant,Nfreq)
-    cal.gains[:] = g
+    for i in eachindex(cal.jones)
+        cal.jones[i] = DiagonalJonesMatrix(g,g)
+    end
 
     # Run as `applycal(...)`
     name,ms = createms(Nant,Nfreq)
+    ms.table["DATA"] = rand(Complex64,4,Nfreq,Nbase)
     data  = TTCal.get_data(ms)
     applycal!(ms,cal)
     data′ = TTCal.get_data(ms)

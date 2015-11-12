@@ -13,6 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+#=
 """
     subsrc!(ms::MeasurementSet,
             sources::Vector{PointSource},
@@ -55,6 +56,7 @@ function subsrc!(ms::MeasurementSet, dir::Direction;
     set_corrected_data!(ms,data)
     data
 end
+=#
 
 function subsrc!(data,model)
     for i in eachindex(data,model)
