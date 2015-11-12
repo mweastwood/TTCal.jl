@@ -49,7 +49,7 @@ const c = 2.99792e+8
 
 include("measurementsets.jl")
 include("rungekutta.jl")
-include("jones.jl")
+include("stokes.jl")
 include("sourcemodel.jl")
 include("beammodel.jl")
 include("fringepattern.jl")

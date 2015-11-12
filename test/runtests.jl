@@ -7,7 +7,7 @@ include("setup.jl")
 
 srand(123)
 include("measurementsets.jl")
-include("jones.jl")
+include("stokes.jl")
 include("sourcemodel.jl")
 include("beammodel.jl")
 include("fringepattern.jl")
