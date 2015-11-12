@@ -421,15 +421,15 @@ function stefcal_step(input,data,model)
             GM = input[i]*model[i,j]
             V  = data[i,j]
             # note that the compiler should remove the dead branch
-            #if T == DiagonalJonesMatrix
+            if T == DiagonalJonesMatrix
                 numerator   += DiagonalJonesMatrix(GM.xx'*V.xx + GM.yx'*V.yx,
                                                    GM.xy'*V.xy + GM.yy'*V.yy)
                 denominator += DiagonalJonesMatrix(GM.xx'*GM.xx + GM.yx'*GM.yx,
                                                    GM.xy'*GM.xy + GM.yy'*GM.yy)
-            #else
-            #    numerator   += GM'*V
-            #    denominator += GM'*GM
-            #end
+            else
+                numerator   += GM'*V
+                denominator += GM'*GM
+            end
         end
         ok = abs(det(denominator)) > eps(Float64)
         step[j] = ifelse(ok,(denominator\numerator)' - input[j],zero(T))
