@@ -90,61 +90,61 @@ end
 Base.convert(::Type{Matrix},J::HermitianJonesMatrix) = Base.convert(Matrix{Complex128},J)
 
 for op in (:+,:-)
-    @eval function $op(J1::JonesMatrix,J2::JonesMatrix)
+    @eval @inline function $op(J1::JonesMatrix,J2::JonesMatrix)
         JonesMatrix($op(J1.xx,J2.xx),
                     $op(J1.xy,J2.xy),
                     $op(J1.yx,J2.yx),
                     $op(J1.yy,J2.yy))
     end
-    @eval function $op(J1::DiagonalJonesMatrix,J2::DiagonalJonesMatrix)
+    @eval @inline function $op(J1::DiagonalJonesMatrix,J2::DiagonalJonesMatrix)
         DiagonalJonesMatrix($op(J1.xx,J2.xx),
                             $op(J1.yy,J2.yy))
     end
-    @eval function $op(J1::HermitianJonesMatrix,J2::HermitianJonesMatrix)
+    @eval @inline function $op(J1::HermitianJonesMatrix,J2::HermitianJonesMatrix)
         HermitianJonesMatrix($op(J1.xx,J2.xx),
                              $op(J1.xy,J2.xy),
                              $op(J1.yy,J2.yy))
     end
 end
 
-*(a::Number,J::JonesMatrix) = JonesMatrix(a*J.xx,a*J.xy,a*J.yx,a*J.yy)
-*(J::JonesMatrix,a::Number) = *(a,J)
+@inline *(a::Number,J::JonesMatrix) = JonesMatrix(a*J.xx,a*J.xy,a*J.yx,a*J.yy)
+@inline *(J::JonesMatrix,a::Number) = *(a,J)
 
-*(a::Number,J::DiagonalJonesMatrix) = DiagonalJonesMatrix(a*J.xx,a*J.yy)
-*(J::DiagonalJonesMatrix,a::Number) = *(a,J)
+@inline *(a::Number,J::DiagonalJonesMatrix) = DiagonalJonesMatrix(a*J.xx,a*J.yy)
+@inline *(J::DiagonalJonesMatrix,a::Number) = *(a,J)
 
-/(J::HermitianJonesMatrix,a::Number) = HermitianJonesMatrix(J.xx/a,J.xy/a,J.yy/a)
+@inline /(J::HermitianJonesMatrix,a::Number) = HermitianJonesMatrix(J.xx/a,J.xy/a,J.yy/a)
 
-function *(J1::JonesMatrix,J2::JonesMatrix)
+@inline function *(J1::JonesMatrix,J2::JonesMatrix)
     JonesMatrix(J1.xx*J2.xx + J1.xy*J2.yx,
                 J1.xx*J2.xy + J1.xy*J2.yy,
                 J1.yx*J2.xx + J1.yy*J2.yx,
                 J1.yx*J2.xy + J1.yy*J2.yy)
 end
 
-function *(J1::JonesMatrix,J2::DiagonalJonesMatrix)
+@inline function *(J1::JonesMatrix,J2::DiagonalJonesMatrix)
     JonesMatrix(J1.xx*J2.xx,J1.xy*J2.yy,
                 J1.yx*J2.xx,J1.yy*J2.yy)
 end
 
-function *(J1::DiagonalJonesMatrix,J2::JonesMatrix)
+@inline function *(J1::DiagonalJonesMatrix,J2::JonesMatrix)
     JonesMatrix(J1.xx*J2.xx,J1.xx*J2.xy,
                 J1.yy*J2.yx,J1.yy*J2.yy)
 end
 
-*(J1::DiagonalJonesMatrix,J2::DiagonalJonesMatrix) = DiagonalJonesMatrix(J1.xx*J2.xx,J1.yy*J2.yy)
+@inline *(J1::DiagonalJonesMatrix,J2::DiagonalJonesMatrix) = DiagonalJonesMatrix(J1.xx*J2.xx,J1.yy*J2.yy)
 
-\(J1::JonesMatrix,J2::JonesMatrix) = inv(J1)*J2
-\(J1::DiagonalJonesMatrix,J2::DiagonalJonesMatrix) = DiagonalJonesMatrix(J2.xx/J1.xx,J2.yy/J1.yy)
+@inline \(J1::JonesMatrix,J2::JonesMatrix) = inv(J1)*J2
+@inline \(J1::DiagonalJonesMatrix,J2::DiagonalJonesMatrix) = DiagonalJonesMatrix(J2.xx/J1.xx,J2.yy/J1.yy)
 
-conj(J::JonesMatrix) = JonesMatrix(conj(J.xx),conj(J.xy),conj(J.yx),conj(J.yy))
-conj(J::DiagonalJonesMatrix) = DiagonalJonesMatrix(conj(J.xx),conj(J.yy))
+@inline conj(J::JonesMatrix) = JonesMatrix(conj(J.xx),conj(J.xy),conj(J.yx),conj(J.yy))
+@inline conj(J::DiagonalJonesMatrix) = DiagonalJonesMatrix(conj(J.xx),conj(J.yy))
 
-ctranspose(J::JonesMatrix) = JonesMatrix(conj(J.xx),conj(J.yx),conj(J.xy),conj(J.yy))
-ctranspose(J::DiagonalJonesMatrix) = conj(J)
+@inline ctranspose(J::JonesMatrix) = JonesMatrix(conj(J.xx),conj(J.yx),conj(J.xy),conj(J.yy))
+@inline ctranspose(J::DiagonalJonesMatrix) = conj(J)
 
-det(J::JonesMatrix) = J.xx*J.yy - J.xy*J.yx
-det(J::DiagonalJonesMatrix) = J.xx*J.yy
+@inline det(J::JonesMatrix) = J.xx*J.yy - J.xy*J.yx
+@inline det(J::DiagonalJonesMatrix) = J.xx*J.yy
 
 function inv(J::JonesMatrix)
     d = det(J)

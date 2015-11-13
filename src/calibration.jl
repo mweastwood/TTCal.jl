@@ -356,8 +356,6 @@ function makesquare(data, flags, ant1, ant2)
 
         V = JonesMatrix(data[1,α],data[2,α],
                         data[3,α],data[4,α])
-        #V = JonesMatrix(data[1,α],0,
-        #                0,data[4,α])
         output[ant1[α],ant2[α]] = V
         output[ant2[α],ant1[α]] = output[ant1[α],ant2[α]]'
     end
@@ -405,12 +403,12 @@ function stefcal_step{T}(input::AbstractVector{T},data,model)
     step
 end
 
-function inner_multiply(::Type{DiagonalJonesMatrix},X,Y)
+@inline function inner_multiply(::Type{DiagonalJonesMatrix},X,Y)
     DiagonalJonesMatrix(X.xx'*Y.xx + X.yx'*Y.yx,
                         X.xy'*Y.xy + X.yy'*Y.yy)
 end
 
-inner_multiply(::Type{JonesMatrix},X,Y) = X'*Y
+@inline inner_multiply(::Type{JonesMatrix},X,Y) = X'*Y
 
 immutable StefCalStep <: StepFunction end
 call(::StefCalStep,g,V,M) = stefcal_step(g,V,M)
