@@ -15,53 +15,57 @@
 
 abstract Calibration
 
-for (Cal,eltype) in ((:GainCalibration, DiagonalJonesMatrix),
-                     (:PolarizationCalibration, JonesMatrix))
-    @eval immutable $Cal <: Calibration
-        jones::Array{$eltype,2}
-        flags::Array{Bool,2}
-    end
-
-    @eval function $Cal(Nant,Nfreq)
-        jones =  ones($eltype,Nant,Nfreq)
-        flags = zeros(   Bool,Nant,Nfreq)
-        $Cal(jones,flags)
-    end
-
-    @eval Base.similar(cal::$Cal) = $Cal(Nant(cal),Nfreq(cal))
-end
-
-@doc """
+"""
     immutable GainCalibration <: Calibration
 
 This type stores the information for calibrating the
 electronic gains of the interferometer. That is, it stores
 complex gains and flags for each antenna, frequency channel,
 and polarization.
+"""
+immutable GainCalibration <: Calibration
+    jones::Matrix{DiagonalJonesMatrix}
+    flags::Matrix{Bool}
+end
 
+"""
     GainCalibration(Nant, Nfreq)
 
 Create a calibration table for `Nant` antennas with
 `Nfreq` frequency channels where all the gains are
 initially set to unity.
-""" ->
-GainCalibration
+"""
+function GainCalibration(Nant,Nfreq)
+    GainCalibration(ones(DiagonalJonesMatrix,Nant,Nfreq),zeros(Bool,Nant,Nfreq))
+end
 
-@doc """
+Base.similar(cal::GainCalibration) = GainCalibration(Nant(cal),Nfreq(cal))
+
+"""
     immutable PolarizationCalibration <: Calibration
 
 This type stores the information for calibrating the
 polarization of the interferometer. That is, it stores
 Jones matrices and flags for each antenna and each
 frequency channel.
+"""
+immutable PolarizationCalibration <: Calibration
+    jones::Matrix{JonesMatrix}
+    flags::Matrix{Bool}
+end
 
+"""
     PolarizationCalibration(Nant, Nfreq)
 
 Create a calibration table for `Nant` antennas with
 `Nfreq` frequency channels where all the Jones matrices
 are initially set to the identity matrix.
-""" ->
-PolarizationCalibration
+"""
+function PolarizationCalibration(Nant,Nfreq)
+    PolarizationCalibration(ones(JonesMatrix,Nant,Nfreq),zeros(Bool,Nant,Nfreq))
+end
+
+Base.similar(cal::PolarizationCalibration) = PolarizationCalibration(Nant(cal),Nfreq(cal))
 
 Nant( cal::Calibration) = size(cal.jones,1)
 Nfreq(cal::Calibration) = size(cal.jones,2)
@@ -106,17 +110,6 @@ function invert(cal::Calibration)
     end
     output
 end
-
-
-
-
-
-
-
-
-
-
-
 
 """
     applycal!(ms::MeasurementSet, calibration::Calibration;
@@ -318,22 +311,6 @@ function solve_onechannel!(jones, jones_flags,
     square_model = makesquare(model,data_flags,ant1,ant2)
     best_jones   = copy(jones)
 
-    #step = gaincal_step(ones(Complex64,256),gaincal_makesquare(data[1,:],data_flags[1,:],ant1,ant2),
-    #                                        gaincal_makesquare(model[1,:],data_flags[1,:],ant1,ant2))
-    #@show step[1]
-    #println("-------")
-#
-#    step = gaincal_step(ones(Complex64,256),gaincal_makesquare(data[4,:],data_flags[4,:],ant1,ant2),
-#                                            gaincal_makesquare(model[4,:],data_flags[4,:],ant1,ant2))
-#    @show step[1]
-#    println("-------")
-#
-#    step = stefcal_step(best_jones,square_data,square_model)
-#    @show step[1]
-#    #@time stefcal_step(best_jones,square_data,square_model)
-#    #println(@code_llvm stefcal_step(best_jones,square_data,square_model))
-#    error("stop")
-
     converged = @iterate(StefCalStep(),RK4,maxiter,tolerance,
                          best_jones,square_data,square_model)
 
@@ -410,8 +387,7 @@ labels the Jones matrices.
 * Michell, D. et al. 2008, JSTSP, 2, 5.
 * Salvini, S. & Wijnholds, S. 2014, A&A, 571, 97.
 """
-function stefcal_step(input,data,model)
-    T = eltype(input)
+function stefcal_step{T}(input::AbstractVector{T},data,model)
     Nant = length(input)
     step = similar(input)
     @inbounds for j = 1:Nant
@@ -420,22 +396,21 @@ function stefcal_step(input,data,model)
         for i = 1:Nant
             GM = input[i]*model[i,j]
             V  = data[i,j]
-            # note that the compiler should remove the dead branch
-            if T == DiagonalJonesMatrix
-                numerator   += DiagonalJonesMatrix(GM.xx'*V.xx + GM.yx'*V.yx,
-                                                   GM.xy'*V.xy + GM.yy'*V.yy)
-                denominator += DiagonalJonesMatrix(GM.xx'*GM.xx + GM.yx'*GM.yx,
-                                                   GM.xy'*GM.xy + GM.yy'*GM.yy)
-            else
-                numerator   += GM'*V
-                denominator += GM'*GM
-            end
+            numerator   += inner_multiply(T,GM,V)
+            denominator += inner_multiply(T,GM,GM)
         end
         ok = abs(det(denominator)) > eps(Float64)
         step[j] = ifelse(ok,(denominator\numerator)' - input[j],zero(T))
     end
     step
 end
+
+function inner_multiply(::Type{DiagonalJonesMatrix},X,Y)
+    DiagonalJonesMatrix(X.xx'*Y.xx + X.yx'*Y.yx,
+                        X.xy'*Y.xy + X.yy'*Y.yy)
+end
+
+inner_multiply(::Type{JonesMatrix},X,Y) = X'*Y
 
 immutable StefCalStep <: StepFunction end
 call(::StefCalStep,g,V,M) = stefcal_step(g,V,M)
