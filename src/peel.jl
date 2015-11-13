@@ -40,7 +40,7 @@ function peel!{T<:Calibration}(::Type{T},
                                maxiter::Int = 20,
                                tolerance::Float64 = 1e-3,
                                minuvw::Float64 = 0.0)
-    sources = filter(source -> isabovehorizon(ms.frame,source),sources)
+    sources = abovehorizon(ms.frame,sources)
     data  = get_corrected_data(ms)
     flags = get_flags(ms)
     flag_short_baselines!(flags,minuvw,ms.u,ms.v,ms.w,ms.ν)

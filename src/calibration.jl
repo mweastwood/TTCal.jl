@@ -274,7 +274,7 @@ function polcal(ms::MeasurementSet,
                 tolerance::Float64 = 1e-3,
                 minuvw::Float64 = 0.0,
                 force_imaging_columns::Bool = false)
-    sources = filter(source -> isabovehorizon(ms.frame,source),sources)
+    sources = abovehorizon(ms.frame,sources)
     calibration = PolarizationCalibration(ms.Nant,ms.Nfreq)
     data  = get_corrected_data(ms)
     model = genvis(ms,sources,beam)
