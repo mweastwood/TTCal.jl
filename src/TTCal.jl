@@ -19,14 +19,15 @@ module TTCal
 
 export MeasurementSet
 
-export PointSource
+export JonesMatrix, DiagonalJonesMatrix, HermitianJonesMatrix
+export StokesVector, MuellerMatrix
+
+export Source, Point, Spectrum
 export readsources, writesources
+export ConstantBeam, SineBeam, Memo178Beam
 
-export getspec
-export genvis, subsrc!
-export fitvis
+export genvis, subsrc!, getspec, fitvis
 
-export AmplitudeCalibration, ampcal
 export GainCalibration, gaincal
 export PolarizationCalibration, polcal
 export applycal!, corrupt!
@@ -38,6 +39,7 @@ import Base: zero, one, rand, conj, det, inv, norm, kron
 using ArgParse
 using JSON
 using JLD
+using ProgressMeter
 using CasaCore.Measures
 using CasaCore.Tables
 
@@ -45,7 +47,7 @@ const c = 2.99792e+8
 
 include("measurementsets.jl")
 include("rungekutta.jl")
-include("jones.jl")
+include("stokes.jl")
 include("sourcemodel.jl")
 include("beammodel.jl")
 include("fringepattern.jl")

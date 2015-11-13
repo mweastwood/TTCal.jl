@@ -16,8 +16,9 @@
 """
     peel!{T<:Calibration}(::Type{T},
                           ms::MeasurementSet,
-                          sources::Vector{PointSource},
+                          sources::Vector{Source},
                           beam::BeamModel;
+                          peeliter = 3,
                           maxiter = 20,
                           tolerance = 1e-3,
                           minuvw = 0.0)
@@ -33,25 +34,27 @@ manner in which the sources are peeled:
 """
 function peel!{T<:Calibration}(::Type{T},
                                ms::MeasurementSet,
-                               sources::Vector{PointSource},
+                               sources::Vector{Source},
                                beam::BeamModel;
+                               peeliter::Int = 3,
                                maxiter::Int = 20,
                                tolerance::Float64 = 1e-3,
                                minuvw::Float64 = 0.0)
-    sources = filter(source -> isabovehorizon(ms.frame,source),sources)
+    sources = abovehorizon(ms.frame,sources)
     data  = get_corrected_data(ms)
     flags = get_flags(ms)
+    flag_short_baselines!(flags,minuvw,ms.u,ms.v,ms.w,ms.ν)
     calibrations = [T(ms.Nant,ms.Nfreq) for source in sources]
     coherencies  = [genvis(ms,source,beam) for source in sources]
     peel!(calibrations,coherencies,data,flags,
           ms.u,ms.v,ms.w,ms.ν,ms.ant1,ms.ant2,
-          maxiter,tolerance,minuvw)
+          peeliter,maxiter,tolerance)
     set_corrected_data!(ms,data,true)
     calibrations
 end
 
 function peel!(calibrations,coherencies,data,flags,
-               u,v,w,ν,ant1,ant2,maxiter,tolerance,minuvw)
+               u,v,w,ν,ant1,ant2,peeliter,maxiter,tolerance)
     Nsource = length(calibrations)
     Nfreq = size(data,2)
     Nbase = size(data,3)
@@ -62,16 +65,9 @@ function peel!(calibrations,coherencies,data,flags,
         subsrc!(data,coherency)
     end
 
-    # Flag all of the short baselines
-    # (so that they do not contribute to the fit)
-    for α = 1:Nbase, β = 1:Nfreq
-        if sqrt(u[α]^2 + v[α]^2 + w[α]^2) < minuvw*c/ν[β]
-            flags[:,β,α] = true
-        end
-    end
-
     # Derive a calibration towards each source
-    for iter = 1:3
+    p = Progress(peeliter*Nsource, 1, "Peeling...", 50)
+    for iter = 1:peeliter
         for s = 1:Nsource
             coherency = coherencies[s]
             calibration_toward_source = calibrations[s]
@@ -85,7 +81,8 @@ function peel!(calibrations,coherencies,data,flags,
             # of the current source.
             solve!(calibration_toward_source,
                    data,coherency,flags,
-                   ant1,ant2,maxiter,tolerance)
+                   ant1,ant2,maxiter,tolerance,
+                   quiet = true)
 
             # Take the source back out of the measured visibilities,
             # but this time subtract it with the corrected gains toward
@@ -93,8 +90,15 @@ function peel!(calibrations,coherencies,data,flags,
             corrupted = copy(coherency)
             corrupt!(corrupted,calibration_toward_source,ant1,ant2)
             subsrc!(data,corrupted)
+
+            next!(p)
         end
     end
-    nothing
+    for calibration in calibrations
+        if sum(calibration.flags) > 0.5length(calibration.flags)
+            warn("Frequently failed to converge. There will likely be large residuals.")
+        end
+    end
+    calibrations
 end
 

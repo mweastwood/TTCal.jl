@@ -14,46 +14,36 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 """
-    fitvis(ms::MeasurementSet,
-           sources::Vector{PointSource};
-           maxiter::Int = 20,
-           tolerance::Float64 = 1e-3,
-           minuvw::Float64 = 0.0)
+    fitvis(ms::MeasurementSet, direction::Direction;
+           maxiter = 20, tolerance = 1e-3, minuvw = 0.0) -> l,m
 
-Fit for the location of each point source.
+Fit for the location of a point source near the given direction.
 """
 function fitvis(ms::MeasurementSet,
-                sources::Vector{PointSource};
+                direction::Direction;
                 maxiter::Int = 20,
                 tolerance::Float64 = 1e-3,
                 minuvw::Float64 = 0.0)
-    sources = filter(source -> isabovehorizon(ms.frame,source),sources)
-    Nsource = length(sources)
+    if !isabovehorizon(ms.frame,direction)
+        error("Direction is below the horizon.")
+    end
+
+    j2000 = measure(ms.frame,direction,dir"J2000")
+    l,m   = direction_cosines(ms.phase_direction,j2000)
+
     data  = get_corrected_data(ms)
     flags = get_flags(ms)
+    flag_short_baselines!(flags,minuvw,ms.u,ms.v,ms.w,ms.ν)
 
-    # Flag all of the short baselines
-    for α = 1:ms.Nbase, β = 1:ms.Nfreq
-        if sqrt(ms.u[α]^2 + ms.v[α]^2 + ms.w[α]^2) < minuvw*c/ms.ν[β]
-            flags[:,β,α] = true
-        end
-    end
-
-    l = zeros(Nsource)
-    m = zeros(Nsource)
-    for i = 1:Nsource
-        l′,m′ = lm(ms.frame,ms.phase_direction,sources[i])
-        l[i],m[i] = fitvis_onesource(data,flags,l′,m′,
-                                     ms.u,ms.v,ms.w,ms.ν,
-                                     ms.ant1,ms.ant2,
-                                     maxiter,tolerance)
-    end
-    l,m
+    fitvis(data,flags,l,m,
+           ms.u,ms.v,ms.w,ms.ν,
+           ms.ant1,ms.ant2,
+           maxiter,tolerance)
 end
 
-function fitvis_onesource(data,flags,l,m,
-                          u,v,w,ν,ant1,ant2,
-                          maxiter,tolerance)
+function fitvis(data,flags,l,m,
+                u,v,w,ν,ant1,ant2,
+                maxiter,tolerance)
     lm = [l;m]
     converged = @iterate(FitVisStep(),RK4,maxiter,tolerance,
                          lm,data,flags,u,v,w,ν,ant1,ant2)
@@ -70,57 +60,60 @@ function fitvis_step(lm,data,flags,
     # Calculate the flux in the given direction
     # and its derivatives with respect to direction.
     fringe = fringepattern(l,m,u,v,w,ν)
-    F   = zeros(Nfreq)     # flux at each frequency
-    dF  = zeros(2,Nfreq)   # [ ∂F/∂l ∂F/∂m ]
-    d2F = zeros(2,2,Nfreq) # [ ∂²F/∂l²  ∂²F/∂l∂m
-                           #   ∂²F/∂l∂m ∂²F/∂m² ]
-    count = zeros(Int,Nfreq) # The number of baselines used in the calculation
+    F   = 0.0        # flux
+    dF  = [0.0, 0.0] # [ ∂F/∂l ∂F/∂m ]
+    d2F = [0.0 0.0;  # [ ∂²F/∂l²  ∂²F/∂l∂m
+           0.0 0.0]  #   ∂²F/∂l∂m ∂²F/∂m² ]
+    count = 0 # the number of baselines used in the calculation
 
     πi = π*1im
     λ = [c/ν[β] for β = 1:Nfreq]
     @inbounds for α = 1:Nbase
-        ant1[α] == ant2[α] && continue # Don't use auto-correlations
+        ant1[α] == ant2[α] && continue # don't use auto-correlations
         for β = 1:Nfreq
             any(slice(flags,:,β,α)) && continue
-            z = conj(fringe[β,α])
-            V = 0.5*(data[1,β,α]+data[4,β,α])*z # Stokes I only
-            uu = u[α]/λ[β]
-            vv = v[α]/λ[β]
-            F[β]       += real(V)
-            dF[1,β]    += real(V * -2πi * uu)
-            dF[2,β]    += real(V * -2πi * vv)
-            d2F[1,1,β] += real(V * (-2πi)^2 * uu^2)
-            d2F[2,1,β] += real(V * (-2πi)^2 * uu*vv)
-            d2F[1,2,β] += real(V * (-2πi)^2 * uu*vv)
-            d2F[2,2,β] += real(V * (-2πi)^2 * vv^2)
-            count[β] += 1
+            # use the Stokes I visibilities only
+            V = 0.5*(data[1,β,α]+data[4,β,α])*conj(fringe[β,α])
+            uλ = u[α]/λ[β]
+            vλ = v[α]/λ[β]
+            F        += real(V)
+            dF[1]    += real(V * -2πi * uλ)
+            dF[2]    += real(V * -2πi * vλ)
+            d2F[1,1] += real(V * (-2πi)^2 * uλ^2)
+            d2F[2,1] += real(V * (-2πi)^2 * uλ*vλ)
+            d2F[1,2] += real(V * (-2πi)^2 * uλ*vλ)
+            d2F[2,2] += real(V * (-2πi)^2 * vλ^2)
+            count += 1
         end
     end
-    @inbounds for β = 1:Nfreq
-        F[β] /= count[β]
-        dF[:,β] /= count[β]
-        d2F[:,:,β] /= count[β]
-    end
+
+    # Normalizing isn't strictly necessary because we care
+    # about the ratio of the Hessian to the gradient, but
+    # we do it here just to avoid confusion later in life
+    F /= count
+    dF /= count
+    d2F /= count
 
     # Calculate how far to step in each direction
-    # TODO: weight using `count` and wavelength appropriately
-    # (higher frequencies should be given more weight)
-    dl = 0.0
-    dm = 0.0
-    normalization = 0.0
-    for β = 1:Nfreq
-        count[β] .== 0 && continue
-        δ = -slice(d2F,:,:,β) \ slice(dF,:,β)
-        dl += δ[1]
-        dm += δ[2]
-        normalization += 1
-    end
-    dl /= normalization
-    dm /= normalization
+    δ = -d2F \ dF
+    dl = δ[1]
+    dm = δ[2]
+    l′,m′ = force_to_horizon(l+dl,m+dm)
 
-    # Don't let the source lie beyond the horizon
-    l_horizon,m_horizon = force_to_horizon(l+dl,m+dm)
-    [l_horizon-l;m_horizon-m]
+    # If the step size is larger than a resolution element
+    # we will stay put because the fitting process is about
+    # to diverge.
+    n  = sqrt(1-l^2-m^2)
+    n′ = sqrt(1-l′^2-m′^2)
+    dθ = acos(l*l′+m*m′+n*n′)
+    baseline_length = [sqrt(u[α]^2+v[α]^2+w[α]^2) for α = 1:Nbase]
+    resolution = minimum(λ) / maximum(baseline_length)
+    if dθ > resolution
+        l′ = l
+        m′ = m
+    end
+
+    [l′-l, m′-m]
 end
 
 immutable FitVisStep <: StepFunction end

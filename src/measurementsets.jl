@@ -52,7 +52,7 @@ function MeasurementSet(name)
     time  = ms["TIME",1]
     position = antenna_table["POSITION",1]
     set!(frame,Epoch(epoch"UTC",Quantity(time,"s")))
-    set!(frame,Measures.from_xyz_in_meters(pos"ITRF",position[1],position[2],position[3]))
+    set!(frame,Position(pos"ITRF",position[1],position[2],position[3]))
 
     dir = field_table["PHASE_DIR"]
     phase_direction = Direction(dir"J2000",Quantity(dir[1],"rad"),
@@ -109,7 +109,7 @@ function get_data(ms::MeasurementSet)
     ms.table["DATA"]
 end
 
-function set_model_data!(ms::MeasurementSet, data,
+function set_model_data!(ms::MeasurementSet, model,
                          force_imaging_columns = false)
     if force_imaging_columns || Tables.checkColumnExists(ms.table,"MODEL_DATA")
         ms.table["MODEL_DATA"] = model
@@ -136,5 +136,24 @@ function set_corrected_data!(ms::MeasurementSet, data,
     else
         ms.table["DATA"] = data
     end
+end
+
+"""
+    flag_short_baselines!(flags, minuvw, u, v, w, ν)
+
+Flag all of the baselines whose length is less than `minuvw` wavelengths.
+
+This is a common operation that can mitigate contamination by unmodeled
+diffuse emission.
+"""
+function flag_short_baselines!(flags, minuvw, u, v, w, ν)
+    Nbase = length(u)
+    Nfreq = length(ν)
+    for α = 1:Nbase, β = 1:Nfreq
+        if u[α]^2 + v[α]^2 + w[α]^2 < (minuvw*c/ν[β])^2
+            flags[:,β,α] = true
+        end
+    end
+    flags
 end
 

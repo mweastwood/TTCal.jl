@@ -13,92 +13,143 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-"""
-    type PointSource
+doc"""
+    immutable Spectrum
 
 These sources have a multi-component power-law spectrum
 such that:
 
-    log(flux) = log(I) + index[1]*log(ν/reffreq)
-                       + index[2]*log²(ν/reffreq) + ...
+\\[
+    \log_{10} S = \log_{10} S_0 + \sum_{n=1}^N \alpha_n \log_{10}\left(\frac{\nu}{\nu_0}\right)^n
+\\]
 
-Polarized fluxes are obtained in a similar manner by
-substituting Q/U/V for I in the above expression.
+where $S$ is a Stokes parameter, and $\alpha_n$ is the list of
+spectral indices. At least one spectral index needs to be provided.
 """
-type PointSource
-    name::ASCIIString
-    dir::Direction
-    I::Float64
-    Q::Float64
-    U::Float64
-    V::Float64
-    reffreq::Float64
-    index::Vector{Float64}
+immutable Spectrum
+    stokes::StokesVector
+    ν0::Float64 # Hz
+    spectral_index::Vector{Float64}
 end
 
-name(source::PointSource) = source.name
-Base.show(io::IO,source::PointSource) = print(io,name(source))
-direction(source::PointSource) = source.dir
+Spectrum(I,Q,U,V,ν,index) = Spectrum(StokesVector(I,Q,U,V),ν,index)
 
-function powerlaw(reference_flux,index,reference_frequency,frequency)
-    s = sign(reference_flux)
-    logflux = log10(abs(reference_flux))
-    logfreq = log10(frequency/reference_frequency)
-    for (i,α) in enumerate(index)
-        logflux += α*logfreq.^i
+function call(spectrum::Spectrum, ν::AbstractFloat)
+    s = sign(spectrum.stokes.I)
+    log_I = log10(abs(spectrum.stokes.I))
+    log_ν = log10(ν/spectrum.ν0)
+    for (i,α) in enumerate(spectrum.spectral_index)
+        log_I += α*log_ν^i
     end
-    s*10.0.^logflux
+    I = s*10^log_I
+    Q = spectrum.stokes.Q / spectrum.stokes.I * I
+    U = spectrum.stokes.U / spectrum.stokes.I * I
+    V = spectrum.stokes.V / spectrum.stokes.I * I
+    StokesVector(I,Q,U,V)
 end
 
-function flux(source::PointSource, frequency::Number)
-    powerlaw(source.I,source.index,source.reffreq,frequency)
+function call(spectrum::Spectrum, ν::AbstractVector)
+    [spectrum(ν[β]) for β = 1:length(ν)]
 end
 
-function flux{T<:Number}(source::PointSource, frequencies::Vector{T})
-    T[flux(source,frequency) for frequency in frequencies]
-end
-
-function stokes_flux(source::PointSource, frequency::Number)
-    I = powerlaw(source.I,source.index,source.reffreq,frequency)
-    Q = powerlaw(source.Q,source.index,source.reffreq,frequency)
-    U = powerlaw(source.U,source.index,source.reffreq,frequency)
-    V = powerlaw(source.V,source.index,source.reffreq,frequency)
-    [I,Q,U,V]
-end
+abstract Component
 
 """
-Convert the direction into a right ascension and declination.
+    immutable Source
+
+This type represents a radio source.
+
+Each source is composed of one or more components.
 """
-function dir2radec(frame::ReferenceFrame,dir::Direction)
-    j2000 = measure(frame,dir,dir"J2000")
-    ra  = longitude(j2000)
-    dec =  latitude(j2000)
+immutable Source
+    name::ASCIIString
+    components::Vector{Component}
+end
+
+Source(name::ASCIIString,component::Component) = Source(name,[component])
+
+immutable Point <: Component
+    name::ASCIIString
+    direction::Direction
+    spectrum::Spectrum
+end
+
+# TODO
+#immutable Gaussian <: Component
+#end
+
+# TODO
+#immutable Ellipse <: Component
+#end
+
+"""
+    j2000_radec(frame::ReferenceFrame, component::Component) -> ra,dec
+
+Compute the J2000 right ascension and declination of the component (in radians).
+"""
+j2000_radec(frame::ReferenceFrame, component::Component) = j2000_radec(frame,component.direction)
+
+function j2000_radec(frame::ReferenceFrame, direction::Direction)
+    j2000 = measure(frame,direction,dir"J2000")
+    ra  = longitude(j2000,"rad")
+    dec =  latitude(j2000,"rad")
     ra,dec
 end
 
 """
-Convert the direction into an azimuth and elevation.
+    local_azel(frame::ReferenceFrame, component::Component) -> az,el
+
+Compute the local azimuth and elevation of the component (in radians).
 """
-function dir2azel(frame::ReferenceFrame,dir::Direction)
-    azel = measure(frame,dir,dir"AZEL")
-    az = longitude(azel)
-    el =  latitude(azel)
+local_azel(frame::ReferenceFrame, component::Component) = local_azel(frame,component.direction)
+
+function local_azel(frame::ReferenceFrame, direction::Direction)
+    azel = measure(frame,direction,dir"AZEL")
+    az = longitude(azel,"rad")
+    el =  latitude(azel,"rad")
     az,el
 end
 
+function isabovehorizon(frame::ReferenceFrame, direction::Direction)
+    az,el = local_azel(frame,direction)
+    el > 0
+end
+
+function isabovehorizon(frame::ReferenceFrame, component::Point)
+    isabovehorizon(frame,component.direction)
+end
+
+function isabovehorizon(frame::ReferenceFrame, source::Source)
+    for component in source.components
+        if !isabovehorizon(frame,component)
+            return false
+        end
+    end
+    true
+end
+
+function abovehorizon(frame::ReferenceFrame, sources::Vector{Source})
+    filter(sources) do source
+        isabovehorizon(frame,source)
+    end
+end
+
+doc"""
+    direction_cosines(phase_dir::Direction{dir"J2000"}, dir::Direction{dir"J2000"}) -> l,m
+
+Compute the direction cosines $(l,m)$ for the given direction with respect to the
+phase direction.
 """
-Convert the direction into the standard radio coordinate system.
-"""
-function dir2lm{ref}(frame::ReferenceFrame,phase_dir::Direction{dir"J2000"},dir::Direction{ref})
+function direction_cosines(phase_dir::Direction{dir"J2000"}, dir::Direction{dir"J2000"})
     long = longitude(phase_dir)
-    lat  = latitude(phase_dir)
+    lat  =  latitude(phase_dir)
     θ1 = π/2 - long
     θ2 = π/2 - lat
     sin_θ1 = sin(θ1); cos_θ1 = cos(θ1)
     sin_θ2 = sin(θ2); cos_θ2 = cos(θ2)
-    x,y,z = Measures.xyz_in_meters(measure(frame,dir,dir"J2000"))
-    # - Rotate first by θ1 about the z-axis
-    # - Then rotate by θ2 about the x-axis
+    x,y,z = vector(dir)
+    # Rotate first by θ1 about the z-axis
+    # Then rotate by θ2 about the x-axis
     # ⌈    -l    ⌉   ⌈1    0        0    ⌉   ⌈+cos(θ1) -sin(θ1) 0⌉   ⌈x⌉
     # |    -m    | = |0 +cos(θ2) -sin(θ2)| * |+sin(θ1) +cos(θ1) 0| * |y|
     # ⌊√(1-l²-m²)⌋   ⌊0 +sin(θ2) +cos(θ2)⌋   ⌊   0        0     1⌋   ⌊z⌋
@@ -107,9 +158,9 @@ function dir2lm{ref}(frame::ReferenceFrame,phase_dir::Direction{dir"J2000"},dir:
     l,m
 end
 
-function lm2dir(phase_dir::Direction{dir"J2000"},l,m)
+function undo_direction_cosines(phase_dir::Direction{dir"J2000"},l,m)
     long = longitude(phase_dir)
-    lat  = latitude(phase_dir)
+    lat  =  latitude(phase_dir)
     θ1 = π/2 - long
     θ2 = π/2 - lat
     sin_θ1 = sin(θ1); cos_θ1 = cos(θ1)
@@ -123,89 +174,162 @@ function lm2dir(phase_dir::Direction{dir"J2000"},l,m)
     x = -cos_θ1*l - sin_θ1*cos_θ2*m + sin_θ1*sin_θ2*n
     y = +sin_θ1*l - cos_θ1*cos_θ2*m + cos_θ1*sin_θ2*n
     z =                    sin_θ2*m +        cos_θ2*n
-    Measures.from_xyz_in_meters(dir"J2000",x,y,z)
+    Direction(dir"J2000",x,y,z)
 end
 
-radec(frame::ReferenceFrame,source::PointSource) = dir2radec(frame,direction(source))
-azel(frame::ReferenceFrame,source::PointSource) = dir2azel(frame,direction(source))
-lm(frame::ReferenceFrame,phase_dir::Direction,source::PointSource) = dir2lm(frame,phase_dir,direction(source))
+"""
+    readsources(filename) -> Vector{Source}
 
-function isabovehorizon(frame::ReferenceFrame,direction::Direction)
-    az,el = dir2azel(frame,direction)
-    el > 0
-end
+Read the list of point sources from the given JSON file.
+The format must be as follows:
 
-function isabovehorizon(frame::ReferenceFrame,source::PointSource)
-    isabovehorizon(frame,direction(source))
-end
+    [
+        {
+            "ref": "Baars et al. 1977",
+            "name": "Cas A",
+            "ra": "23h23m24s",
+            "dec": "58d48m54s",
+            "I": 555904.26,
+            "freq": 1.0e6,
+            "index": [-0.770]
+        },
+        {
+            "ref": "Baars et al. 1977",
+            "name": "Cyg A",
+            "ra": "19h59m28.35663s",
+            "dec": "+40d44m02.0970s",
+            "I": 49545.02,
+            "freq": 1.0e6,
+            "index": [+0.085,-0.178]
+        }
+    ]
 
-################################################################################
-# I/O
+Additional Stokes parameters may also be specified.
 
-function readsources(filename::AbstractString)
-    sources = PointSource[]
+    {
+        ...
+        "I": 100
+        "Q": 20
+        "U": 3.14
+        "V": -30
+        ...
+    }
+
+A right ascension and declination does not need to be specified if
+the name of the source is "Sun", "Moon", or "Jupiter". These sources
+will have their location automatically determined by CasaCore.
+"""
+function readsources(filename)
+    sources = Source[]
     parsed_sources = JSON.parsefile(filename)
     for parsed_source in parsed_sources
-        name  = parsed_source["name"]
-        if name == "Sun"
-            dir = Direction(dir"SUN")
+        name = parsed_source["name"]
+        components = Component[]
+        if haskey(parsed_source,"components")
+            parsed_components = parsed_source["components"]
+            for parsed_component in parsed_components
+                component = construct_component(parsed_component)
+                push!(components,component)
+            end
         else
-            ra  = parsed_source["ra"]
-            dec = parsed_source["dec"]
-            dir = Direction(dir"J2000",Quantity(Measures.sexagesimal(ra),"deg"),
-                                       Quantity(Measures.sexagesimal(dec),"deg"))
+            component = construct_component(parsed_source)
+            push!(components,component)
         end
-        if haskey(parsed_source,"flux")
-            I = parsed_source["flux"]
-            Q = 0.0
-            U = 0.0
-            V = 0.0
-        else
-            I = parsed_source["I"]
-            Q = parsed_source["Q"]
-            U = parsed_source["U"]
-            V = parsed_source["V"]
-        end
-        freq  = parsed_source["freq"]
-        index = parsed_source["index"]
-        push!(sources,PointSource(name,dir,I,Q,U,V,freq,index))
+        push!(sources,Source(name,components))
     end
     sources
 end
 
-function writesources(filename::AbstractString,sources::Vector{PointSource})
+function construct_component(c)
+    name = get(c,"name","")
+
+    if name == "Sun"
+        dir = Direction(dir"SUN")
+    elseif name == "Moon"
+        dir = Direction(dir"MOON")
+    elseif name == "Jupiter"
+        dir = Direction(dir"JUPITER")
+    else
+        ra  = c["ra"]
+        dec = c["dec"]
+        dir = Direction(dir"J2000",Quantity(Measures.sexagesimal(ra), "deg"),
+                                   Quantity(Measures.sexagesimal(dec),"deg"))
+    end
+
+    if haskey(c,"flux")
+        warn("""
+            $filename is out of date
+            Replace "flux" with "I" (for the Stokes I flux).
+            Additional entries for "Q", "U", and "V" may also be added.
+        """)
+        # for compatibility with old sources.json files,
+        # which used "flux" in place of the Stokes parameters.
+        I = c["flux"]
+    else
+        I = c["I"]
+    end
+    Q = get(c,"Q",0.0)
+    U = get(c,"U",0.0)
+    V = get(c,"V",0.0)
+
+    freq  = c["freq"]
+    index = c["index"]
+
+    Point(name,dir,Spectrum(I,Q,U,V,freq,index))
+end
+
+"""
+    writesources(filename, sources::Vector{Source})
+
+Write the list of sources to the given location as a JSON file.
+These sources can be read back in again using the `readsources` function.
+"""
+function writesources(filename, sources::Vector{Source})
     dicts = Dict{UTF8String,Any}[]
     for source in sources
-        ra  = longitude(source.dir,"deg")
-        dec =  latitude(source.dir,"deg")
-        dict = Dict{UTF8String,Any}()
-        dict["ref"]   = "TTCal"
-        dict["name"]  = source.name
-        if name != "Sun"
-            dict["ra"]  = format_ra(ra)
-            dict["dec"] = format_dec(dec)
+        source_dict = Dict{UTF8String,Any}()
+        source_dict["ref"]  = "TTCal"
+        source_dict["name"] = source.name
+
+        component_dicts = Dict{UTF8String,Any}[]
+        for (n,component) in enumerate(source.components)
+            component_dict = Dict{UTF8String,Any}()
+            component_dict["name"] = component.name
+
+            ra  = longitude(component.direction,"deg")
+            dec =  latitude(component.direction,"deg")
+            if component.name != "Sun" && component.name != "Moon" && component.name != "Jupiter"
+                component_dict["ra"]  = format_ra(ra)
+                component_dict["dec"] = format_dec(dec)
+            end
+
+            component_dict["I"]     = component.spectrum.stokes.I
+            component_dict["Q"]     = component.spectrum.stokes.Q
+            component_dict["U"]     = component.spectrum.stokes.U
+            component_dict["V"]     = component.spectrum.stokes.V
+            component_dict["freq"]  = component.spectrum.ν0
+            component_dict["index"] = component.spectrum.spectral_index
+
+            push!(component_dicts,component_dict)
         end
-        dict["I"]     = source.I
-        dict["Q"]     = source.Q
-        dict["U"]     = source.U
-        dict["V"]     = source.V
-        dict["freq"]  = float(source.reffreq)
-        dict["index"] = source.index
-        push!(dicts,dict)
+
+        source_dict["components"] = component_dicts
+        push!(dicts,source_dict)
     end
     file = open(filename,"w")
     JSON.print(file,dicts)
     close(file)
-    nothing
+    sources
 end
 
+#=
 """
-    write_ds9_regions(filename,sources::Vector{PointSource})
+    write_ds9_regions(filename, sources::Vector{Source})
 
 Write the list of sources to a DS9 region file. This file can then be loaded
 into DS9 to highlight sources within images.
 """
-function write_ds9_regions(filename,sources::Vector{PointSource})
+function write_ds9_regions(filename,sources::Vector{Source})
     open(filename,"w") do f
         Base.write(f,"global color=red edit=0 move=0 delete=1\n")
         Base.write(f,"fk5\n")
@@ -217,6 +341,7 @@ function write_ds9_regions(filename,sources::Vector{PointSource})
         end
     end
 end
+=#
 
 function format_ra(ra::Float64)
     ra /= 15

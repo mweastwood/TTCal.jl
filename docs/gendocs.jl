@@ -1,7 +1,8 @@
 #!/usr/bin/env julia
 
 module_name = :TTCal
-output = "api.md"
+output_external = "external.md"
+output_internal = "internal.md"
 
 @eval using $module_name
 import Base.Markdown.plain
@@ -11,7 +12,6 @@ cd(dirname(@__FILE__))
 
 exports = @eval names($module_name)
 meta    = @eval Docs.meta($module_name)
-@show exports
 
 # Get the plain text docs corresponding to each type and function.
 docs = Dict{Any,UTF8String}()
@@ -45,17 +45,45 @@ for sym in exports
     end
 end
 
+# Collect the unexported symbols with documentation
+not_exports = Symbol[]
+for sym in keys(docs)
+    str = replace(string(sym),"$module_name.","")
+    stripped_sym = symbol(str)
+    stripped_sym in exports && continue
+    push!(not_exports,symbol(str))
+end
+sort!(not_exports)
+
 # Write the documentation
-open(output,"w") do file
+open(output_external,"w") do file
     write(file,"""
         <!---
         This is an auto-generated file and should not be edited directly.
         -->
 
+        ## API
+
         """)
     for sym in exports
         sym == module_name && continue
-        write(file,"## $sym\n\n")
+        write(file,"### $sym\n\n")
+        sym = symbol(module_name,".",sym)
+        write(file,docs[sym])
+        write(file,"\n")
+    end
+end
+open(output_internal,"w") do file
+    write(file,"""
+        <!---
+        This is an auto-generated file and should not be edited directly.
+        -->
+
+        ## Internal Documentation
+
+        """)
+    for sym in not_exports
+        write(file,"### $sym\n\n")
         sym = symbol(module_name,".",sym)
         write(file,docs[sym])
         write(file,"\n")

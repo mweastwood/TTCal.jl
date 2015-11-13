@@ -53,7 +53,7 @@ using the published spectra for [Baars et al. 1977](http://adsabs.harvard.edu/ab
 
 Higher order terms are defined such that
 \[
-    \log S = \log S_0 + \sum_{n=1}^N \alpha_n \log\left(\frac{\nu}{\nu_0}\right)^n
+    \log_{10} S = \log_{10} S_0 + \sum_{n=1}^N \alpha_n \log_{10}\left(\frac{\nu}{\nu_0}\right)^n
 \]
 where $S$ is the value of a given Stokes parameter and $\alpha_n$ represents
 the values contained in `index`.

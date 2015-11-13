@@ -3,15 +3,36 @@ let
     Nfreq = 2
     name,ms = createms(Nant,Nfreq)
 
-    # Regenerate the data column with only one source
+    # Generate the data column with only one source
     # to prevent sidelobe contamination in the tests
-    sources = readsources("sources.json")[1:1]
-    ms.table["DATA"] = genvis(ms.frame,ms.phase_direction,sources,
-                              TTCal.ConstantBeam(),ms.u,ms.v,ms.w,ms.ν)
+    source = readsources("sources.json")[1]
+    point  = source.components[1]
+    ms.table["DATA"] = genvis(ms, source, TTCal.ConstantBeam())
 
-    flux = TTCal.flux(sources[1],ms.ν)
-    xx,xy,yx,yy = getspec(ms,TTCal.direction(sources[1]))
-    @test isapprox(xx,flux,rtol=1e-7)
-    @test isapprox(yy,flux,rtol=1e-7)
+    stokes_flux = point.spectrum(ms.ν)
+    measured_flux = getspec(ms,point.direction)
+    for β = 1:Nfreq
+        linear_flux = TTCal.linear(stokes_flux[β])
+        @test linear_flux.xx ≈ measured_flux[β].xx
+        @test linear_flux.xy ≈ measured_flux[β].xy
+        @test linear_flux.yy ≈ measured_flux[β].yy
+    end
+
+    # try again with a polarized source
+    source = Source("FRB",
+                    Point("from z=1",
+                          ms.phase_direction,
+                          Spectrum(rand(StokesVector),10e6,[1.0])))
+    point  = source.components[1]
+    ms.table["DATA"] = genvis(ms, source, TTCal.ConstantBeam())
+
+    stokes_flux = point.spectrum(ms.ν)
+    measured_flux = getspec(ms,point.direction)
+    for β = 1:Nfreq
+        linear_flux = TTCal.linear(stokes_flux[β])
+        @test isapprox(linear_flux.xx, measured_flux[β].xx,atol=1e-6)
+        @test isapprox(linear_flux.xy, measured_flux[β].xy,atol=1e-6)
+        @test isapprox(linear_flux.yy, measured_flux[β].yy,atol=1e-6)
+    end
 end
 

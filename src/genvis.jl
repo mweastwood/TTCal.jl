@@ -14,9 +14,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 doc"""
-    genvis(ms::MeasurementSet,
-           sources::Union{PointSource,Vector{PointSource}},
-           beam::BeamModel)
+    genvis(ms::MeasurementSet, sources, beam::BeamModel)
 
 Generate model visibilities for the given list of sources
 and the given beam model.
@@ -24,80 +22,74 @@ and the given beam model.
 No gridding is performed, so the runtime of this naive
 algorithm scales as $O(N_{base} \times N_{source})$.
 """
-function genvis(ms::MeasurementSet,
-                sources::Union{PointSource,Vector{PointSource}},
-                beam::BeamModel)
-    genvis(ms.frame,ms.phase_direction,
-           sources,beam,ms.u,ms.v,ms.w,ms.ν)
-end
-
-function genvis(frame::ReferenceFrame,
-                phase_direction::Direction,
-                sources::Vector{PointSource},
-                beam::BeamModel,
-                u,v,w,ν)
-    model = zeros(Complex64,4,length(ν),length(u))
-    for source in sources
-        genvis!(model,frame,phase_direction,source,beam,u,v,w,ν)
-    end
-    model
-end
-
-function genvis(frame::ReferenceFrame,
-                phase_direction::Direction,
-                source::PointSource,
-                beam::BeamModel,
-                u,v,w,ν)
-    model = zeros(Complex64,4,length(ν),length(u))
-    genvis!(model,frame,phase_direction,source,beam,u,v,w,ν)
+function genvis(ms::MeasurementSet, sources, beam::BeamModel)
+    model = zeros(Complex64,4,ms.Nfreq,ms.Nbase)
+    genvis!(model,ms.frame,ms.phase_direction,sources,beam,ms.u,ms.v,ms.w,ms.ν)
     model
 end
 
 function genvis!(model::Array{Complex64,3},
                  frame::ReferenceFrame,
                  phase_direction::Direction,
-                 source::PointSource,
+                 sources::Vector{Source},
                  beam::BeamModel,
                  u,v,w,ν)
-    az,el  = azel(frame,source)
-    l,m    = lm(frame,phase_direction,source)
-    fringe = fringepattern(l,m,u,v,w,ν)
-
-    # Get the Stokes parameters and apply the beam model
-    xx = zeros(length(ν))
-    xy = zeros(length(ν))
-    yx = zeros(length(ν))
-    yy = zeros(length(ν))
-    for β = 1:length(ν)
-        M = mueller(beam(ν[β],az,el))
-        IQUV = stokes_flux(source,ν[β])
-        correlations = linear(M*IQUV)
-        xx[β] = correlations[1]
-        xy[β] = correlations[2]
-        yx[β] = correlations[3]
-        yy[β] = correlations[4]
+    for source in sources
+        genvis!(model,frame,phase_direction,source,beam,u,v,w,ν)
     end
-
-    genvis!(model,xx,xy,yx,yy,l,m,u,v,w,ν)
-end
-
-function genvis(xx,xy,yx,yy,
-                l,m,u,v,w,ν)
-    model = zeros(Complex64,4,length(ν),length(u))
-    genvis!(model,xx,xy,yx,yy,l,m,u,v,w,ν)
     model
 end
 
 function genvis!(model::Array{Complex64,3},
-                 xx,xy,yx,yy,
-                 l,m,u,v,w,ν)
+                 frame::ReferenceFrame,
+                 phase_direction::Direction,
+                 source::Source,
+                 beam::BeamModel,
+                 u,v,w,ν)
+    for component in source.components
+        genvis!(model,frame,phase_direction,component,beam,u,v,w,ν)
+    end
+    model
+end
+
+function genvis!(model::Array{Complex64,3},
+                 frame::ReferenceFrame,
+                 phase_direction::Direction,
+                 point::Point,
+                 beam::BeamModel,
+                 u,v,w,ν)
+    Nfreq  = length(ν)
+    az,el  = local_azel(frame,point)
+    l,m    = direction_cosines(phase_direction,measure(frame,point.direction,dir"J2000"))
+    fringe = fringepattern(l,m,u,v,w,ν)
+
+    flux = Array{HermitianJonesMatrix}(Nfreq)
+    for β = 1:length(ν)
+        jones  = beam(ν[β],az,el)
+        stokes = point.spectrum(ν[β])
+        uncorrupted = linear(stokes) # convert from I,Q,U,V to xx,xy,yx,yy
+        corrupted   = congruence_transform(jones,uncorrupted)
+        flux[β] = corrupted
+    end
+
+    genvis!(model,flux,l,m,u,v,w,ν)
+end
+
+function genvis(flux,l,m,u,v,w,ν)
+    model = zeros(Complex64,4,length(ν),length(u))
+    genvis!(model,flux,l,m,u,v,w,ν)
+    model
+end
+
+function genvis!(model::Array{Complex64,3},
+                 flux,l,m,u,v,w,ν)
     fringe = fringepattern(l,m,u,v,w,ν)
     Nfreq,Nbase = size(fringe)
     @inbounds for α = 1:Nbase, β = 1:Nfreq
-        model[1,β,α] += xx[β]*fringe[β,α]
-        model[2,β,α] += xy[β]*fringe[β,α]
-        model[3,β,α] += yx[β]*fringe[β,α]
-        model[4,β,α] += yy[β]*fringe[β,α]
+        model[1,β,α] += flux[β].xx*fringe[β,α]
+        model[2,β,α] += flux[β].xy*fringe[β,α]
+        model[3,β,α] += conj(flux[β].xy)*fringe[β,α]
+        model[4,β,α] += flux[β].yy*fringe[β,α]
     end
     model
 end
