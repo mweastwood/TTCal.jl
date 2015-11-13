@@ -203,7 +203,7 @@ let
 
     # Run from `main(...)`
     output_name = tempname()*".jld"
-    TTCal.main(["gaincal","--input",name,"--output",output_name,"--sources","sources.json","--maxiter","100","--tolerance","$(eps(Float64))"])
+    TTCal.main(["gaincal","--input",name,"--output",output_name,"--sources","sources.json","--maxiter","100","--tolerance","$(eps(Float64))","--beam","constant"])
     mycal = TTCal.read(output_name)
     @test !any(mycal.flags)
     @test vecnorm(mycal.jones - ones(DiagonalJonesMatrix,Nant,Nfreq)) < sqrt(eps(Float64))
