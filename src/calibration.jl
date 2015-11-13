@@ -310,7 +310,7 @@ function solve_onechannel!(jones, jones_flags,
                            data, model, data_flags,
                            ant1, ant2, maxiter, tolerance)
     # If the entire channel is flagged, don't bother calibrating.
-    all(data_flags) && (gain_flags[:] = true; return)
+    all(data_flags) && (jones_flags[:] = true; return)
 
     N = length(jones)
     T = eltype(jones)
