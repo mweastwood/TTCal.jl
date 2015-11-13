@@ -4,87 +4,32 @@ This is an auto-generated file and should not be edited directly.
 
 ## Internal Documentation
 
-### ConstantBeam
-
-```
-ConstantBeam <: BeamModel
-```
-
-In this beam model, the Jones matrix is assumed to be unity in every direction.
-
-### JonesMatrix
-
-This type represents a 2x2 complex Jones matrix.
-
-```
-⌈xx xy⌉
-⌊yx yy⌋
-```
-
-### Memo178Beam
-
-```
-Memo178Beam <: BeamModel
-```
-
-This beam is based on the parametric fit to EM simulations presented in LWA memo 178 by Jayce Dowell.
-
-[http://www.faculty.ece.vt.edu/swe/lwa/memo/lwa0178a.pdf]
-
 ### RK{N}
 
 This singleton type is used to indicate which Runge-Kutta method should be used. For example, `RK{4}` tells us to use the RK4 method.
 
-### SineBeam
+### congruence_transform
 
 ```
-SineBeam <: BeamModel
+congruence_transform(J::JonesMatrix, K::HermitianJonesMatrix) -> J*K*J'
 ```
 
-This beam is azimuthally symmetric and independent of frequency. The gain of an individual dipole scales as $\sin(elevation)^\alpha$.
+Compute the congruence transformation of $K$ with respect to $J$:
 
-### ampcal_step
+\[     K \rightarrow JKJ^* \]
 
-```
-ampcal_step(amplitudes,data,model) -> step
-```
-
-Given the `data` and `model` visibilities, and the current guess for the gain `amplitudes`, solve for `step` such that the new value of the amplitudes is `amplitudes+step`.
-
-### dir2azel
+### direction_cosines
 
 ```
-dir2azel(frame::ReferenceFrame, dir::Direction)
+direction_cosines(phase_dir::Direction{dir"J2000"}, dir::Direction{dir"J2000"}) -> l,m
 ```
 
-Convert the direction into a local azimuth and elevation.
-
-### dir2lm
-
-```
-dir2lm(phase_dir::Direction{dir"J2000"}, dir::Direction{dir"J2000"})
-```
-
-Convert the direction into the standard radio coordinate system.
-
-### dir2radec
-
-```
-dir2radec(frame::ReferenceFrame, dir::Direction)
-```
-
-Convert the direction into a J2000 right ascension and declination.
+Compute the direction cosines $(l,m)$ for the given direction with respect to the phase direction.
 
 ### fixphase!
 
 ```
-fixphase!(cal::AmplitudeCalibration, reference_antenna)
-```
-
-With an amplitude calibration there is no freedom to pick an arbitrary phase, so this function does nothing.
-
-```
-fixphase!(cal::GainCalibration, reference_antenna)
+fixphase!(cal::Calibration, reference_antenna)
 ```
 
 Set the phase of the reference antenna and polarization to zero.
@@ -114,30 +59,15 @@ This function forces the coordinates $(l,m)$ to be above the horizon.
 
 Although this is a nasty hack, it is necessary for fitting some sources that are near the horizon.
 
-### fringepattern!
+### fringepattern
 
-Compute exp(i(ϕ+nΔϕ)) where ϕ and Δϕ define an equally space grid of points where n = 1 to N.
+```
+fringepattern(ϕ, Δϕ, N)
+```
+
+Compute $\exp(i(\phi+n\Delta\phi))$ where $\phi$, $\Delta\phi$, and $n = 1,\ldots,N$ define an equally spaced grid of points.
 
 Using the sine and cosine angle addition rules, you can define an iterative method such that you only need to compute sines and cosines for a single iteration.
-
-### gaincal_step
-
-```
-gaincal_step(gains,data,model) -> step
-```
-
-Given the `data` and `model` visibilities, and the current guess for the electronic `gains`, solve for `step` such that the new value of the gains is `gains+step`.
-
-The update step is defined such that the new value of the gains minimizes
-
-[     \sum_{i,j}\|V_{i,j} - g_i g_{j,new}^* M_{i,j}\|^2$, ]
-
-where $i$ and $j$ label the antennas, $V$ labels the measured visibilities, $M$ labels the model visibilities, and $g$ labels the complex gains.
-
-*References:*
-
-  * Michell, D. et al. 2008, JSTSP, 2, 5.
-  * Salvini, S. & Wijnholds, S. 2014, A&A, 571, 97.
 
 ### get_corrected_data
 
@@ -158,16 +88,18 @@ Get the flags from the dataset, but this information is stored in multiple locat
 ### invert
 
 ```
-invert(cal::ScalarCalibration)
-```
-
-Returns the inverse of the given calibration. The gain $g$ of each antenna is set to $1/g$.
-
-```
-invert(cal::PolarizationCalibration)
+invert(cal::Calibration)
 ```
 
 Returns the inverse of the given calibration. The Jones matrix $J$ of each antenna is set to $J^{-1}$.
+
+### j2000_radec
+
+```
+j2000_radec(frame::ReferenceFrame, component::Component) -> ra,dec
+```
+
+Compute the J2000 right ascension and declination of the component (in radians).
 
 ### latlong_to_utm
 
@@ -182,85 +114,65 @@ This function is entirely based on the [Universal Transverse Mercator coordinate
 ### linear
 
 ```
-linear(stokes) -> [xx,xy,yx,yy]
+linear(stokes::StokesVector) -> HermitianJonesMatrix
 ```
 
-Take the vector of Stokes parameters `[I,Q,U,V]` and convert it to the vector of linear correlations.
+Take the set of Stokes parameters $(I,Q,U,V)$ and convert it to the set of correlations $(xx,xy,yx,yy)$.
 
-### mueller
-
-```
-mueller(J::JonesMatrix)
-```
-
-Create a Mueller matrix from the given Jones matrix.
+### local_azel
 
 ```
-mueller(J1::JonesMatrix, J2::JonesMatrix)
+local_azel(frame::ReferenceFrame, component::Component) -> az,el
 ```
 
-Create a Mueller matrix from the two Jones matrices.
+Compute the local azimuth and elevation of the component (in radians).
 
-### polcal_makesquare
-
-```
-polcal_makesquare(data, flags, ant1, ant2)
-```
-
-Pack the data into a square Hermitian matrix where each element is a Jones matrix.
-
-Compare this to the regular complex gain calibration where each element is a complex scalar.
-
-The packing order is:
+### makesquare
 
 ```
-11 12 13
-21 22 23
-31 32 33
-         .
-           .
-             .
+makesquare(data, flags, ant1, ant2)
 ```
 
-### polcal_step
+Pack the data into a square Hermitian matrix such that the data is ordered as follows:
 
-```
-polcal_step(jones,data,model) -> step
-```
+\[     \begin{pmatrix}         V_{11} & V_{12} & V_{13} &        & \\
+        V_{21} & V_{22} & V_{23} &        & \\
+        V_{31} & V_{32} & V_{33} &        & \\
+               &        &        & \ddots & \\
+    \end{pmatrix} \]
 
-Given the `data` and `model` visibilities, and the current guess for the Jones matrices (`jones`), solve for `step` such that the new value of the Jones matrices is `jones+step`.
+Flagged correlations and autocorrelations are set to zero.
 
 ### rkstep
 
 Take a Runge-Kutta step. * `step(x,args...)` must return the list of steps to take from the given location `x` * `rk` is the order of the Runge-Kutta method to use (eg. `RK4`) * `x` is the starting location * `args` is simply passed on as the second argument to `step`
 
-### scalar_makesquare
+### stefcal_step
 
 ```
-scalar_makesquare(data, flags, ant1, ant2)
+stefcal_step(input,data,model) -> step
 ```
 
-Pack the data into a square Hermitian matrix such that the data is ordered as follows:
+Given the `data` and `model` visibilities, and the current guess for the Jones matrices, solve for `step` such that the new value of the Jones matrices is `input+step`.
 
-```
-x₁x₁ x₁y₁ x₁x₂ x₁y₂
-y₁x₁ y₁y₁ y₁x₂ y₁y₂
-x₂x₁ y₂y₁ y₂x₂ y₂y₂
-y₂x₁ y₂y₁ y₂x₂ y₂y₂
-                     .
-                       .
-                         .
-```
+The update step is defined such that the new value of the Jones matrices minimizes
 
-Flagged correlations and autocorrelations are set to zero.
+\[     \sum_{i,j}\|V_{i,j} - G_i M_{i,j} G_{j,new}^*\|^2$, \]
+
+where $i$ and $j$ label the antennas, $V$ labels the measured visibilities, $M$ labels the model visibilities, and $G$ labels the Jones matrices.
+
+*References:*
+
+  * Michell, D. et al. 2008, JSTSP, 2, 5.
+  * Salvini, S. & Wijnholds, S. 2014, A&A, 571, 97.
 
 ### stokes
 
 ```
-stokes(correlations) -> [I,Q,U,V]
+stokes(correlations::HermitianJonesMatrix) -> StokesVector
 ```
 
-Take the vector of correlations `[xx,xy,yx,yy]` and convert it to the Stokes parameters.
+Take the set of correlations $(xx,xy,yx,yy)$ and convert it to the set of Stokes parameters $(I,Q,U,V)$.
 
 ### utm_to_latlong
 
@@ -272,12 +184,4 @@ utm_to_latlong(zone, easting, northing,
 Convert the easting and northing (both in meters) to a latitude and longitude (both in degrees).
 
 This function is entirely based on the [Universal Transverse Mercator coordinate system](https://en.wikipedia.org/w/index.php?title=Universal_Transverse_Mercator_coordinate_system&oldid=683193579#Simplified_formulas) Wikipedia page.
-
-### write_ds9_regions
-
-```
-write_ds9_regions(filename, sources::Vector{PointSource})
-```
-
-Write the list of sources to a DS9 region file. This file can then be loaded into DS9 to highlight sources within images.
 
