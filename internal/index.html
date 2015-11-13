@@ -114,23 +114,11 @@
             
                 <li class="toctree-l3"><a href="#internal-documentation">Internal Documentation</a></li>
                 
-                    <li><a class="toctree-l4" href="#constantbeam">ConstantBeam</a></li>
-                
-                    <li><a class="toctree-l4" href="#jonesmatrix">JonesMatrix</a></li>
-                
-                    <li><a class="toctree-l4" href="#memo178beam">Memo178Beam</a></li>
-                
                     <li><a class="toctree-l4" href="#rkn">RK{N}</a></li>
                 
-                    <li><a class="toctree-l4" href="#sinebeam">SineBeam</a></li>
+                    <li><a class="toctree-l4" href="#congruence_transform">congruence_transform</a></li>
                 
-                    <li><a class="toctree-l4" href="#ampcal_step">ampcal_step</a></li>
-                
-                    <li><a class="toctree-l4" href="#dir2azel">dir2azel</a></li>
-                
-                    <li><a class="toctree-l4" href="#dir2lm">dir2lm</a></li>
-                
-                    <li><a class="toctree-l4" href="#dir2radec">dir2radec</a></li>
+                    <li><a class="toctree-l4" href="#direction_cosines">direction_cosines</a></li>
                 
                     <li><a class="toctree-l4" href="#fixphase">fixphase!</a></li>
                 
@@ -138,9 +126,7 @@
                 
                     <li><a class="toctree-l4" href="#force_to_horizon">force_to_horizon</a></li>
                 
-                    <li><a class="toctree-l4" href="#fringepattern">fringepattern!</a></li>
-                
-                    <li><a class="toctree-l4" href="#gaincal_step">gaincal_step</a></li>
+                    <li><a class="toctree-l4" href="#fringepattern">fringepattern</a></li>
                 
                     <li><a class="toctree-l4" href="#get_corrected_data">get_corrected_data</a></li>
                 
@@ -148,25 +134,23 @@
                 
                     <li><a class="toctree-l4" href="#invert">invert</a></li>
                 
+                    <li><a class="toctree-l4" href="#j2000_radec">j2000_radec</a></li>
+                
                     <li><a class="toctree-l4" href="#latlong_to_utm">latlong_to_utm</a></li>
                 
                     <li><a class="toctree-l4" href="#linear">linear</a></li>
                 
-                    <li><a class="toctree-l4" href="#mueller">mueller</a></li>
+                    <li><a class="toctree-l4" href="#local_azel">local_azel</a></li>
                 
-                    <li><a class="toctree-l4" href="#polcal_makesquare">polcal_makesquare</a></li>
-                
-                    <li><a class="toctree-l4" href="#polcal_step">polcal_step</a></li>
+                    <li><a class="toctree-l4" href="#makesquare">makesquare</a></li>
                 
                     <li><a class="toctree-l4" href="#rkstep">rkstep</a></li>
                 
-                    <li><a class="toctree-l4" href="#scalar_makesquare">scalar_makesquare</a></li>
+                    <li><a class="toctree-l4" href="#stefcal_step">stefcal_step</a></li>
                 
                     <li><a class="toctree-l4" href="#stokes">stokes</a></li>
                 
                     <li><a class="toctree-l4" href="#utm_to_latlong">utm_to_latlong</a></li>
-                
-                    <li><a class="toctree-l4" href="#write_ds9_regions">write_ds9_regions</a></li>
                 
             
             </ul>
@@ -236,56 +220,23 @@ This is an auto-generated file and should not be edited directly.
 -->
 
 <h2 id="internal-documentation">Internal Documentation</h2>
-<h3 id="constantbeam">ConstantBeam</h3>
-<pre><code>ConstantBeam &lt;: BeamModel
-</code></pre>
-
-<p>In this beam model, the Jones matrix is assumed to be unity in every direction.</p>
-<h3 id="jonesmatrix">JonesMatrix</h3>
-<p>This type represents a 2x2 complex Jones matrix.</p>
-<pre><code>⌈xx xy⌉
-⌊yx yy⌋
-</code></pre>
-
-<h3 id="memo178beam">Memo178Beam</h3>
-<pre><code>Memo178Beam &lt;: BeamModel
-</code></pre>
-
-<p>This beam is based on the parametric fit to EM simulations presented in LWA memo 178 by Jayce Dowell.</p>
-<p>[http://www.faculty.ece.vt.edu/swe/lwa/memo/lwa0178a.pdf]</p>
 <h3 id="rkn">RK{N}</h3>
 <p>This singleton type is used to indicate which Runge-Kutta method should be used. For example, <code>RK{4}</code> tells us to use the RK4 method.</p>
-<h3 id="sinebeam">SineBeam</h3>
-<pre><code>SineBeam &lt;: BeamModel
+<h3 id="congruence_transform">congruence_transform</h3>
+<pre><code>congruence_transform(J::JonesMatrix, K::HermitianJonesMatrix) -&gt; J*K*J'
 </code></pre>
 
-<p>This beam is azimuthally symmetric and independent of frequency. The gain of an individual dipole scales as $\sin(elevation)^\alpha$.</p>
-<h3 id="ampcal_step">ampcal_step</h3>
-<pre><code>ampcal_step(amplitudes,data,model) -&gt; step
+<p>Compute the congruence transformation of $K$ with respect to $J$:</p>
+<p>
+<script type="math/tex; mode=display">     K \rightarrow JKJ^* </script>
+</p>
+<h3 id="direction_cosines">direction_cosines</h3>
+<pre><code>direction_cosines(phase_dir::Direction{dir&quot;J2000&quot;}, dir::Direction{dir&quot;J2000&quot;}) -&gt; l,m
 </code></pre>
 
-<p>Given the <code>data</code> and <code>model</code> visibilities, and the current guess for the gain <code>amplitudes</code>, solve for <code>step</code> such that the new value of the amplitudes is <code>amplitudes+step</code>.</p>
-<h3 id="dir2azel">dir2azel</h3>
-<pre><code>dir2azel(frame::ReferenceFrame, dir::Direction)
-</code></pre>
-
-<p>Convert the direction into a local azimuth and elevation.</p>
-<h3 id="dir2lm">dir2lm</h3>
-<pre><code>dir2lm(phase_dir::Direction{dir&quot;J2000&quot;}, dir::Direction{dir&quot;J2000&quot;})
-</code></pre>
-
-<p>Convert the direction into the standard radio coordinate system.</p>
-<h3 id="dir2radec">dir2radec</h3>
-<pre><code>dir2radec(frame::ReferenceFrame, dir::Direction)
-</code></pre>
-
-<p>Convert the direction into a J2000 right ascension and declination.</p>
+<p>Compute the direction cosines $(l,m)$ for the given direction with respect to the phase direction.</p>
 <h3 id="fixphase">fixphase!</h3>
-<pre><code>fixphase!(cal::AmplitudeCalibration, reference_antenna)
-</code></pre>
-
-<p>With an amplitude calibration there is no freedom to pick an arbitrary phase, so this function does nothing.</p>
-<pre><code>fixphase!(cal::GainCalibration, reference_antenna)
+<pre><code>fixphase!(cal::Calibration, reference_antenna)
 </code></pre>
 
 <p>Set the phase of the reference antenna and polarization to zero.</p>
@@ -306,22 +257,12 @@ This is an auto-generated file and should not be edited directly.
 
 <p>This function forces the coordinates $(l,m)$ to be above the horizon.</p>
 <p>Although this is a nasty hack, it is necessary for fitting some sources that are near the horizon.</p>
-<h3 id="fringepattern">fringepattern!</h3>
-<p>Compute exp(i(ϕ+nΔϕ)) where ϕ and Δϕ define an equally space grid of points where n = 1 to N.</p>
-<p>Using the sine and cosine angle addition rules, you can define an iterative method such that you only need to compute sines and cosines for a single iteration.</p>
-<h3 id="gaincal_step">gaincal_step</h3>
-<pre><code>gaincal_step(gains,data,model) -&gt; step
+<h3 id="fringepattern">fringepattern</h3>
+<pre><code>fringepattern(ϕ, Δϕ, N)
 </code></pre>
 
-<p>Given the <code>data</code> and <code>model</code> visibilities, and the current guess for the electronic <code>gains</code>, solve for <code>step</code> such that the new value of the gains is <code>gains+step</code>.</p>
-<p>The update step is defined such that the new value of the gains minimizes</p>
-<p>[     \sum_{i,j}\|V_{i,j} - g_i g_{j,new}^* M_{i,j}\|^2$, ]</p>
-<p>where $i$ and $j$ label the antennas, $V$ labels the measured visibilities, $M$ labels the model visibilities, and $g$ labels the complex gains.</p>
-<p><em>References:</em></p>
-<ul>
-<li>Michell, D. et al. 2008, JSTSP, 2, 5.</li>
-<li>Salvini, S. &amp; Wijnholds, S. 2014, A&amp;A, 571, 97.</li>
-</ul>
+<p>Compute $\exp(i(\phi+n\Delta\phi))$ where $\phi$, $\Delta\phi$, and $n = 1,\ldots,N$ define an equally spaced grid of points.</p>
+<p>Using the sine and cosine angle addition rules, you can define an iterative method such that you only need to compute sines and cosines for a single iteration.</p>
 <h3 id="get_corrected_data">get_corrected_data</h3>
 <pre><code>get_corrected_data(ms::MeasurementSet)
 </code></pre>
@@ -333,14 +274,15 @@ This is an auto-generated file and should not be edited directly.
 
 <p>Get the flags from the dataset, but this information is stored in multiple locations. Unify all these flags before returning.</p>
 <h3 id="invert">invert</h3>
-<pre><code>invert(cal::ScalarCalibration)
-</code></pre>
-
-<p>Returns the inverse of the given calibration. The gain $g$ of each antenna is set to $1/g$.</p>
-<pre><code>invert(cal::PolarizationCalibration)
+<pre><code>invert(cal::Calibration)
 </code></pre>
 
 <p>Returns the inverse of the given calibration. The Jones matrix $J$ of each antenna is set to $J^{-1}$.</p>
+<h3 id="j2000_radec">j2000_radec</h3>
+<pre><code>j2000_radec(frame::ReferenceFrame, component::Component) -&gt; ra,dec
+</code></pre>
+
+<p>Compute the J2000 right ascension and declination of the component (in radians).</p>
 <h3 id="latlong_to_utm">latlong_to_utm</h3>
 <pre><code>latlong_to_utm(zone, latitude, longitude)
 </code></pre>
@@ -348,61 +290,50 @@ This is an auto-generated file and should not be edited directly.
 <p>Convert the latitude and longitude (both in degrees) to an easting and a northing (both in meters).</p>
 <p>This function is entirely based on the <a href="https://en.wikipedia.org/w/index.php?title=Universal_Transverse_Mercator_coordinate_system&amp;oldid=683193579#Simplified_formulas">Universal Transverse Mercator coordinate system</a> Wikipedia page.</p>
 <h3 id="linear">linear</h3>
-<pre><code>linear(stokes) -&gt; [xx,xy,yx,yy]
+<pre><code>linear(stokes::StokesVector) -&gt; HermitianJonesMatrix
 </code></pre>
 
-<p>Take the vector of Stokes parameters <code>[I,Q,U,V]</code> and convert it to the vector of linear correlations.</p>
-<h3 id="mueller">mueller</h3>
-<pre><code>mueller(J::JonesMatrix)
+<p>Take the set of Stokes parameters $(I,Q,U,V)$ and convert it to the set of correlations $(xx,xy,yx,yy)$.</p>
+<h3 id="local_azel">local_azel</h3>
+<pre><code>local_azel(frame::ReferenceFrame, component::Component) -&gt; az,el
 </code></pre>
 
-<p>Create a Mueller matrix from the given Jones matrix.</p>
-<pre><code>mueller(J1::JonesMatrix, J2::JonesMatrix)
-</code></pre>
-
-<p>Create a Mueller matrix from the two Jones matrices.</p>
-<h3 id="polcal_makesquare">polcal_makesquare</h3>
-<pre><code>polcal_makesquare(data, flags, ant1, ant2)
-</code></pre>
-
-<p>Pack the data into a square Hermitian matrix where each element is a Jones matrix.</p>
-<p>Compare this to the regular complex gain calibration where each element is a complex scalar.</p>
-<p>The packing order is:</p>
-<pre><code>11 12 13
-21 22 23
-31 32 33
-         .
-           .
-             .
-</code></pre>
-
-<h3 id="polcal_step">polcal_step</h3>
-<pre><code>polcal_step(jones,data,model) -&gt; step
-</code></pre>
-
-<p>Given the <code>data</code> and <code>model</code> visibilities, and the current guess for the Jones matrices (<code>jones</code>), solve for <code>step</code> such that the new value of the Jones matrices is <code>jones+step</code>.</p>
-<h3 id="rkstep">rkstep</h3>
-<p>Take a Runge-Kutta step. * <code>step(x,args...)</code> must return the list of steps to take from the given location <code>x</code> * <code>rk</code> is the order of the Runge-Kutta method to use (eg. <code>RK4</code>) * <code>x</code> is the starting location * <code>args</code> is simply passed on as the second argument to <code>step</code></p>
-<h3 id="scalar_makesquare">scalar_makesquare</h3>
-<pre><code>scalar_makesquare(data, flags, ant1, ant2)
+<p>Compute the local azimuth and elevation of the component (in radians).</p>
+<h3 id="makesquare">makesquare</h3>
+<pre><code>makesquare(data, flags, ant1, ant2)
 </code></pre>
 
 <p>Pack the data into a square Hermitian matrix such that the data is ordered as follows:</p>
-<pre><code>x₁x₁ x₁y₁ x₁x₂ x₁y₂
-y₁x₁ y₁y₁ y₁x₂ y₁y₂
-x₂x₁ y₂y₁ y₂x₂ y₂y₂
-y₂x₁ y₂y₁ y₂x₂ y₂y₂
-                     .
-                       .
-                         .
-</code></pre>
-
+<p>
+<script type="math/tex; mode=display">     \begin{pmatrix}         V_{11} & V_{12} & V_{13} &        & \\
+        V_{21} & V_{22} & V_{23} &        & \\
+        V_{31} & V_{32} & V_{33} &        & \\
+               &        &        & \ddots & \\
+    \end{pmatrix} </script>
+</p>
 <p>Flagged correlations and autocorrelations are set to zero.</p>
-<h3 id="stokes">stokes</h3>
-<pre><code>stokes(correlations) -&gt; [I,Q,U,V]
+<h3 id="rkstep">rkstep</h3>
+<p>Take a Runge-Kutta step. * <code>step(x,args...)</code> must return the list of steps to take from the given location <code>x</code> * <code>rk</code> is the order of the Runge-Kutta method to use (eg. <code>RK4</code>) * <code>x</code> is the starting location * <code>args</code> is simply passed on as the second argument to <code>step</code></p>
+<h3 id="stefcal_step">stefcal_step</h3>
+<pre><code>stefcal_step(input,data,model) -&gt; step
 </code></pre>
 
-<p>Take the vector of correlations <code>[xx,xy,yx,yy]</code> and convert it to the Stokes parameters.</p>
+<p>Given the <code>data</code> and <code>model</code> visibilities, and the current guess for the Jones matrices, solve for <code>step</code> such that the new value of the Jones matrices is <code>input+step</code>.</p>
+<p>The update step is defined such that the new value of the Jones matrices minimizes</p>
+<p>
+<script type="math/tex; mode=display">     \sum_{i,j}\|V_{i,j} - G_i M_{i,j} G_{j,new}^*\|^2$, </script>
+</p>
+<p>where $i$ and $j$ label the antennas, $V$ labels the measured visibilities, $M$ labels the model visibilities, and $G$ labels the Jones matrices.</p>
+<p><em>References:</em></p>
+<ul>
+<li>Michell, D. et al. 2008, JSTSP, 2, 5.</li>
+<li>Salvini, S. &amp; Wijnholds, S. 2014, A&amp;A, 571, 97.</li>
+</ul>
+<h3 id="stokes">stokes</h3>
+<pre><code>stokes(correlations::HermitianJonesMatrix) -&gt; StokesVector
+</code></pre>
+
+<p>Take the set of correlations $(xx,xy,yx,yy)$ and convert it to the set of Stokes parameters $(I,Q,U,V)$.</p>
 <h3 id="utm_to_latlong">utm_to_latlong</h3>
 <pre><code>utm_to_latlong(zone, easting, northing,
                hemisphere = north)
@@ -410,11 +341,6 @@ y₂x₁ y₂y₁ y₂x₂ y₂y₂
 
 <p>Convert the easting and northing (both in meters) to a latitude and longitude (both in degrees).</p>
 <p>This function is entirely based on the <a href="https://en.wikipedia.org/w/index.php?title=Universal_Transverse_Mercator_coordinate_system&amp;oldid=683193579#Simplified_formulas">Universal Transverse Mercator coordinate system</a> Wikipedia page.</p>
-<h3 id="write_ds9_regions">write_ds9_regions</h3>
-<pre><code>write_ds9_regions(filename, sources::Vector{PointSource})
-</code></pre>
-
-<p>Write the list of sources to a DS9 region file. This file can then be loaded into DS9 to highlight sources within images.</p>
               
             </div>
           </div>

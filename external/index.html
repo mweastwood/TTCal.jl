@@ -107,17 +107,33 @@
             
                 <li class="toctree-l3"><a href="#api">API</a></li>
                 
-                    <li><a class="toctree-l4" href="#amplitudecalibration">AmplitudeCalibration</a></li>
+                    <li><a class="toctree-l4" href="#constantbeam">ConstantBeam</a></li>
+                
+                    <li><a class="toctree-l4" href="#diagonaljonesmatrix">DiagonalJonesMatrix</a></li>
                 
                     <li><a class="toctree-l4" href="#gaincalibration">GainCalibration</a></li>
                 
+                    <li><a class="toctree-l4" href="#hermitianjonesmatrix">HermitianJonesMatrix</a></li>
+                
+                    <li><a class="toctree-l4" href="#jonesmatrix">JonesMatrix</a></li>
+                
                     <li><a class="toctree-l4" href="#measurementset">MeasurementSet</a></li>
                 
-                    <li><a class="toctree-l4" href="#pointsource">PointSource</a></li>
+                    <li><a class="toctree-l4" href="#memo178beam">Memo178Beam</a></li>
+                
+                    <li><a class="toctree-l4" href="#muellermatrix">MuellerMatrix</a></li>
+                
+                    <li><a class="toctree-l4" href="#point">Point</a></li>
                 
                     <li><a class="toctree-l4" href="#polarizationcalibration">PolarizationCalibration</a></li>
                 
-                    <li><a class="toctree-l4" href="#ampcal">ampcal</a></li>
+                    <li><a class="toctree-l4" href="#sinebeam">SineBeam</a></li>
+                
+                    <li><a class="toctree-l4" href="#source">Source</a></li>
+                
+                    <li><a class="toctree-l4" href="#spectrum">Spectrum</a></li>
+                
+                    <li><a class="toctree-l4" href="#stokesvector">StokesVector</a></li>
                 
                     <li><a class="toctree-l4" href="#applycal">applycal!</a></li>
                 
@@ -216,8 +232,42 @@ This is an auto-generated file and should not be edited directly.
 -->
 
 <h2 id="api">API</h2>
-<h3 id="amplitudecalibration">AmplitudeCalibration</h3>
+<h3 id="constantbeam">ConstantBeam</h3>
+<pre><code>ConstantBeam &lt;: BeamModel
+</code></pre>
+
+<p>In this beam model, the Jones matrix is assumed to be unity in every direction.</p>
+<h3 id="diagonaljonesmatrix">DiagonalJonesMatrix</h3>
+<pre><code>immutable DiagonalJonesMatrix
+</code></pre>
+
+<p>This type represents a Jones matrix that is diagonal.</p>
+<p>These matrices are used to represent the complex gains of each antenna without accounting for the off-diagonal polarization leakage terms.</p>
 <h3 id="gaincalibration">GainCalibration</h3>
+<pre><code>immutable GainCalibration &lt;: Calibration
+</code></pre>
+
+<p>This type stores the information for calibrating the electronic gains of the interferometer. That is, it stores complex gains and flags for each antenna, frequency channel, and polarization.</p>
+<pre><code>GainCalibration(Nant, Nfreq)
+</code></pre>
+
+<p>Create a calibration table for <code>Nant</code> antennas with <code>Nfreq</code> frequency channels where all the gains are initially set to unity.</p>
+<h3 id="hermitianjonesmatrix">HermitianJonesMatrix</h3>
+<pre><code>immutable HermitianJonesMatrix
+</code></pre>
+
+<p>This type represents a Jones matrix that is Hermitian.</p>
+<p>These matrices are useful for representing the $xx$, $xy$, $yx$, and $yy$ flux, because $xx$ and $yy$ are constrained to be real while $xy$ and $yx$ are complex conjugates.</p>
+<h3 id="jonesmatrix">JonesMatrix</h3>
+<pre><code>immutable JonesMatrix
+</code></pre>
+
+<p>This type represents a 2x2 complex Jones matrix.</p>
+<p>
+<script type="math/tex; mode=display"> \begin{pmatrix}     j_{xx} & j_{xy} \\
+    j_{yx} & j_{yy} \\
+\end{pmatrix} </script>
+</p>
 <h3 id="measurementset">MeasurementSet</h3>
 <pre><code>immutable MeasurementSet
 </code></pre>
@@ -227,16 +277,22 @@ This is an auto-generated file and should not be edited directly.
 </code></pre>
 
 <p>Open the measurement set at the given location. Assorted quantities that are commonly used by TTCal are automatically loaded and stored in fields.</p>
-<h3 id="pointsource">PointSource</h3>
-<pre><code>type PointSource
+<h3 id="memo178beam">Memo178Beam</h3>
+<pre><code>Memo178Beam &lt;: BeamModel
 </code></pre>
 
-<p>These sources have a multi-component power-law spectrum such that:</p>
-<pre><code>log(flux) = log(I) + index[1]*log(ν/reffreq)
-                   + index[2]*log²(ν/reffreq) + ...
+<p>This beam is based on the parametric fit to EM simulations presented in LWA memo 178 by Jayce Dowell.</p>
+<p>[http://www.faculty.ece.vt.edu/swe/lwa/memo/lwa0178a.pdf]</p>
+<h3 id="muellermatrix">MuellerMatrix</h3>
+<pre><code>immutable MuellerMatrix
 </code></pre>
 
-<p>Polarized fluxes are obtained in a similar manner by substituting Q/U/V for I in the above expression.</p>
+<p>This type represents a Mueller matrix.</p>
+<pre><code>MuellerMatrix(J::JonesMatrix)
+</code></pre>
+
+<p>Create a Mueller matrix from the given Jones matrix.</p>
+<h3 id="point">Point</h3>
 <h3 id="polarizationcalibration">PolarizationCalibration</h3>
 <pre><code>immutable PolarizationCalibration &lt;: Calibration
 </code></pre>
@@ -246,25 +302,38 @@ This is an auto-generated file and should not be edited directly.
 </code></pre>
 
 <p>Create a calibration table for <code>Nant</code> antennas with <code>Nfreq</code> frequency channels where all the Jones matrices are initially set to the identity matrix.</p>
-<h3 id="ampcal">ampcal</h3>
-<pre><code>ampcal(ms::MeasurementSet, sources::Vector{PointSource}, beam::BeamModel;
-       maxiter = 20, tolerance = 1e-3, minuvw = 0.0,
-       force_imaging_columns = false)
+<h3 id="sinebeam">SineBeam</h3>
+<pre><code>SineBeam &lt;: BeamModel
 </code></pre>
 
-<p><strong>Arguments:</strong></p>
-<ul>
-<li><code>ms</code> - the measurement set from which to derive the calibration</li>
-<li><code>sources</code> - the list of points sources to use as the sky model</li>
-<li><code>beam</code> - the beam model</li>
-</ul>
-<p><strong>Keyword Arguments:</strong></p>
-<ul>
-<li><code>maxiter</code> - the maximum number of Runge-Kutta steps to take on each     frequency channel</li>
-<li><code>tolerance</code> - the relative tolerance to use while checking to see if     more iterations are required</li>
-<li><code>minuvw</code> - the minimum baseline length (measured in wavelengths) to be     used during the calibration procedure</li>
-<li><code>force_imaging_columns</code> - if this is set to true, the MODEL_DATA column     will be created and populated with model visibilities even if it     doesn't already exist</li>
-</ul>
+<p>This beam is azimuthally symmetric and independent of frequency. The gain of an individual dipole scales as $\sin(elevation)^\alpha$.</p>
+<h3 id="source">Source</h3>
+<pre><code>immutable Source
+</code></pre>
+
+<p>This type represents a radio source.</p>
+<p>Each source is composed of one or more components.</p>
+<h3 id="spectrum">Spectrum</h3>
+<pre><code>immutable Spectrum
+</code></pre>
+
+<p>These sources have a multi-component power-law spectrum such that:</p>
+<p>
+<script type="math/tex; mode=display">     \log_{10} S = \log_{10} S_0 + \sum_{n=1}^N \alpha_n \log_{10}\left(\frac{\nu}{\nu_0}\right)^n </script>
+</p>
+<p>where $S$ is a Stokes parameter, and $\alpha_n$ is the list of spectral indices. At least one spectral index needs to be provided.</p>
+<h3 id="stokesvector">StokesVector</h3>
+<pre><code>immutable StokesVector
+</code></pre>
+
+<p>This type represents a Stokes vector.</p>
+<p>
+<script type="math/tex; mode=display"> \begin{pmatrix}     I \\
+    Q \\
+    U \\
+    V \\
+\end{pmatrix} </script>
+</p>
 <h3 id="applycal">applycal!</h3>
 <pre><code>applycal!(ms::MeasurementSet, calibration::Calibration;
           apply_to_corrected = false, force_imaging_columns = false)
@@ -282,29 +351,23 @@ This is an auto-generated file and should not be edited directly.
 <li><code>force_imaging_columns</code> - if this is set to true, the calibrated data     will be written to the CORRECTED_DATA column regardless of whether     or not the column already exists</li>
 </ul>
 <h3 id="corrupt">corrupt!</h3>
-<pre><code>corrupt!(data::Array{Complex64,3}, flags::Array{Bool,3},
-         cal::PolarizationCalibration, ant1, ant2)
-</code></pre>
-
-<p>Corrupt the data as if it was observed with the given calibration.</p>
 <pre><code>corrupt!(data::Array{Complex64,3}, cal::Calibration, ant1, ant2)
 </code></pre>
 
 <p>Corrupt the model data as if it had been observed with an instrument with the given calibration.</p>
 <pre><code>corrupt!(data::Array{Complex64,3}, flags::Array{Bool,3},
-         cal::ScalarCalibration, ant1, ant2)
+         cal::Calibration, ant1, ant2)
 </code></pre>
 
 <p>Corrupt the data as if it was observed with the given calibration.</p>
 <h3 id="fitvis">fitvis</h3>
-<pre><code>fitvis(ms::MeasurementSet, sources::Vector{PointSource};
-       maxiter::Int = 20, tolerance::Float64 = 1e-3,
-       minuvw::Float64 = 0.0) -&gt; l,m
+<pre><code>fitvis(ms::MeasurementSet, direction::Direction;
+       maxiter = 20, tolerance = 1e-3, minuvw = 0.0) -&gt; l,m
 </code></pre>
 
-<p>Fit for the location of each point source.</p>
+<p>Fit for the location of a point source near the given direction.</p>
 <h3 id="gaincal">gaincal</h3>
-<pre><code>gaincal(ms::MeasurementSet, sources::Vector{PointSource}, beam::BeamModel;
+<pre><code>gaincal(ms::MeasurementSet, sources::Vector{Source}, beam::BeamModel;
         maxiter = 20, tolerance = 1e-3, minuvw = 0.0,
         reference_antenna = &quot;1x&quot;, force_imaging_columns = false)
 </code></pre>
@@ -325,29 +388,28 @@ This is an auto-generated file and should not be edited directly.
 <li><code>force_imaging_columns</code> - if this is set to true, the MODEL_DATA column     will be created and populated with model visibilities even if it     doesn't already exist</li>
 </ul>
 <h3 id="genvis">genvis</h3>
-<pre><code>genvis(ms::MeasurementSet,
-       sources::Union{PointSource,Vector{PointSource}},
-       beam::BeamModel)
+<pre><code>genvis(ms::MeasurementSet, sources, beam::BeamModel)
 </code></pre>
 
 <p>Generate model visibilities for the given list of sources and the given beam model.</p>
 <p>No gridding is performed, so the runtime of this naive algorithm scales as $O(N_{base} \times N_{source})$.</p>
 <h3 id="getspec">getspec</h3>
-<pre><code>getspec(ms::MeasurementSet, dir::Direction;
-        minuvw::Float64 = 0.0) -&gt; xx,xy,yx,yy
+<pre><code>getspec(data, flags, l, m, u, v, w, ν, ant1, ant2) -&gt; Vector{HermitianJonesMatrix}
+</code></pre>
+
+<p>Compute the spectrum of a source located at $(l,m)$ in all of the polarized correlation products.</p>
+<pre><code>getspec(ms::MeasurementSet, direction::Direction;
+        minuvw = 0.0) -&gt; Vector{HermitianJonesMatrix}
 </code></pre>
 
 <p>This function extracts the spectrum in a given direction by means of an inverse discrete Fourier transform.</p>
 <p>Note that no gridding is performed, so this does <em>not</em> use a fast Fourier transform. However, the inverse discrete Fourier transform <em>is</em> the least squares estimator for the flux in a given direction (if all baselines are weighted equally).</p>
-<pre><code>getspec(data, flags, l, m, u, v, w, ν, ant1, ant2) -&gt; xx,xy,yx,yy
-</code></pre>
-
-<p>Compute the spectrum of a source located at $(l,m)$ in all of the polarized correlation products.</p>
 <h3 id="peel">peel!</h3>
 <pre><code>peel!{T&lt;:Calibration}(::Type{T},
                       ms::MeasurementSet,
-                      sources::Vector{PointSource},
+                      sources::Vector{Source},
                       beam::BeamModel;
+                      peeliter = 3,
                       maxiter = 20,
                       tolerance = 1e-3,
                       minuvw = 0.0)
@@ -361,7 +423,7 @@ This is an auto-generated file and should not be edited directly.
 <li><code>AmplitudeCalibration</code> - each source receives a full set of gain amplitudes</li>
 </ul>
 <h3 id="polcal">polcal</h3>
-<pre><code>polcal(ms::MeasurementSet, sources::Vector{PointSources}, beam::BeamModel;
+<pre><code>polcal(ms::MeasurementSet, sources::Vector{Source}, beam::BeamModel;
        maxiter = 20, tolerance = 1e-3, minuvw = 0.0,
        force_imaging_columns = false)
 </code></pre>
@@ -381,7 +443,7 @@ This is an auto-generated file and should not be edited directly.
 <li><code>force_imaging_columns</code> - if this is set to true, the MODEL_DATA column     will be created and populated with model visibilities even if it     doesn't already exist</li>
 </ul>
 <h3 id="readsources">readsources</h3>
-<pre><code>readsources(filename) -&gt; Vector{PointSource}
+<pre><code>readsources(filename) -&gt; Vector{Source}
 </code></pre>
 
 <p>Read the list of point sources from the given JSON file. The format must be as follows:</p>
@@ -392,9 +454,6 @@ This is an auto-generated file and should not be edited directly.
         &quot;ra&quot;: &quot;23h23m24s&quot;,
         &quot;dec&quot;: &quot;58d48m54s&quot;,
         &quot;I&quot;: 555904.26,
-        &quot;Q&quot;: 0.0,
-        &quot;U&quot;: 0.0,
-        &quot;V&quot;: 0.0,
         &quot;freq&quot;: 1.0e6,
         &quot;index&quot;: [-0.770]
     },
@@ -404,29 +463,36 @@ This is an auto-generated file and should not be edited directly.
         &quot;ra&quot;: &quot;19h59m28.35663s&quot;,
         &quot;dec&quot;: &quot;+40d44m02.0970s&quot;,
         &quot;I&quot;: 49545.02,
-        &quot;Q&quot;: 0.0,
-        &quot;U&quot;: 0.0,
-        &quot;V&quot;: 0.0,
         &quot;freq&quot;: 1.0e6,
         &quot;index&quot;: [+0.085,-0.178]
     }
 ]
 </code></pre>
 
+<p>Additional Stokes parameters may also be specified.</p>
+<pre><code>{
+    ...
+    &quot;I&quot;: 100
+    &quot;Q&quot;: 20
+    &quot;U&quot;: 3.14
+    &quot;V&quot;: -30
+    ...
+}
+</code></pre>
+
+<p>A right ascension and declination does not need to be specified if the name of the source is "Sun", "Moon", or "Jupiter". These sources will have their location automatically determined by CasaCore.</p>
 <h3 id="subsrc">subsrc!</h3>
-<pre><code>subsrc!(ms::MeasurementSet, dir::Direction)
+<pre><code>subsrc!(ms::MeasurementSet, dir::Direction; minuvw = 0.0)
 </code></pre>
 
 <p>Subtract all of the measured flux from a given direction.</p>
 <p>This can be used to remove RFI sources provided they have a known direction.</p>
-<pre><code>subsrc!(ms::MeasurementSet,
-        sources::Vector{PointSource},
-        beam::BeamModel)
+<pre><code>subsrc!(ms::MeasurementSet, sources::Vector{Source}, beam::BeamModel)
 </code></pre>
 
 <p>Remove the list of sources from the measurement set.</p>
 <h3 id="writesources">writesources</h3>
-<pre><code>writesources(filename, sources::Vector{PointSource})
+<pre><code>writesources(filename, sources::Vector{Source})
 </code></pre>
 
 <p>Write the list of sources to the given location as a JSON file. These sources can be read back in again using the <code>readsources</code> function.</p>
