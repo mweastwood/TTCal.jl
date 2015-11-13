@@ -39,6 +39,7 @@ import Base: zero, one, rand, conj, det, inv, norm, kron
 using ArgParse
 using JSON
 using JLD
+using ProgressMeter
 using CasaCore.Measures
 using CasaCore.Tables
 
