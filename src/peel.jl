@@ -45,17 +45,7 @@ function peel!{T<:Calibration}(::Type{T},
     flags = get_flags(ms)
     flag_short_baselines!(flags,minuvw,ms.u,ms.v,ms.w,ms.ν)
     calibrations = [T(ms.Nant,ms.Nfreq) for source in sources]
-
     coherencies  = [genvis(ms,source,beam) for source in sources]
-    # Fuck it, I want a new set of coherencies that are closer to truth
-    #coherencies = Array{Array{Complex64,3}}(length(sources))
-    #for s = 1:length(sources)
-        #@show s
-        #l,m = fitvis(ms,sources[s:s],minuvw=15.0)
-        #xx,xy,yx,yy = getspec(data,flags,l[1],m[1],ms.u,ms.v,ms.w,ms.ν,ms.ant1,ms.ant2)
-        #coherencies[s] = genvis(xx,xy,yx,yy,l[1],m[1],ms.u,ms.v,ms.w,ms.ν)
-    #end
-
     peel!(calibrations,coherencies,data,flags,
           ms.u,ms.v,ms.w,ms.ν,ms.ant1,ms.ant2,
           peeliter,maxiter,tolerance)
@@ -76,6 +66,7 @@ function peel!(calibrations,coherencies,data,flags,
     end
 
     # Derive a calibration towards each source
+    p = Progress(peeliter*Nsource, 1, "Peeling...", 50)
     for iter = 1:peeliter
         for s = 1:Nsource
             coherency = coherencies[s]
@@ -90,8 +81,8 @@ function peel!(calibrations,coherencies,data,flags,
             # of the current source.
             solve!(calibration_toward_source,
                    data,coherency,flags,
-                   ant1,ant2,maxiter,tolerance)
-            @show s,sum(calibration_toward_source.flags)
+                   ant1,ant2,maxiter,tolerance,
+                   quiet = true)
 
             # Take the source back out of the measured visibilities,
             # but this time subtract it with the corrected gains toward
@@ -99,13 +90,15 @@ function peel!(calibrations,coherencies,data,flags,
             corrupted = copy(coherency)
             corrupt!(corrupted,calibration_toward_source,ant1,ant2)
             subsrc!(data,corrupted)
+
+            next!(p)
         end
     end
-    # TEMP BEGIN
-    #corrupted = copy(coherencies[2])
-    #corrupt!(corrupted,calibrations[2],ant1,ant2)
-    #data[:] = corrupted
-    # TEMP END
+    for calibration in calibrations
+        if sum(calibration.flags) > 0.5length(calibration.flags)
+            warn("Frequently failed to converge. There will likely be large residuals.")
+        end
+    end
     calibrations
 end
 

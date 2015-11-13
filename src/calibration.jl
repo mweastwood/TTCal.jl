@@ -288,16 +288,18 @@ end
 
 function solve!(calibration::Calibration,
                 data, model, flags, ant1, ant2,
-                maxiter, tolerance)
-    @showprogress 1 "Thinking..." 50 for β = 1:Nfreq(calibration)
+                maxiter, tolerance; quiet = false)
+    quiet || (p = Progress(Nfreq(calibration), 1, "Thinking...", 50))
+    for β = 1:Nfreq(calibration)
         solve_onechannel!(slice(calibration.jones,:,β),
                           slice(calibration.flags,:,β),
                           slice(data, :,β,:),
                           slice(model,:,β,:),
                           slice(flags,:,β,:),
                           ant1, ant2, maxiter, tolerance)
+        quiet || next!(p)
     end
-    if sum(calibration.flags) > 0.5length(calibration.flags)
+    if !quiet && sum(calibration.flags) > 0.5length(calibration.flags)
         warn("Over half of the calibration solutions are flagged.")
     end
 end
