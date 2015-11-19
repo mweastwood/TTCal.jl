@@ -16,5 +16,6 @@ include("genvis.jl")
 include("subsrc.jl")
 include("fitvis.jl")
 include("calibration.jl")
+include("peel.jl")
 include("utm.jl")
 

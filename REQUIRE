@@ -1,6 +1,8 @@
 julia 0.4
 ArgParse
 CasaCore
+FileIO
 JSON
 JLD
+NPZ
 ProgressMeter

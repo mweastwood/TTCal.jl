@@ -164,8 +164,19 @@ function corrupt!(data::Array{Complex64,3},
     corrupt!(data,flags,cal,ant1,ant2)
 end
 
-write(filename,calibration::Calibration) = JLD.save(filename,"cal",calibration)
+write(filename,calibration::Calibration) = JLD.save(File(format"JLD",filename),"cal",calibration)
 read(filename) = JLD.load(filename,"cal")
+
+function write_for_python(filename,calibration::GainCalibration)
+    gains = zeros(Complex128,2,Nant(calibration),Nfreq(calibration))
+    flags = zeros(      Bool,  Nant(calibration),Nfreq(calibration))
+    for β = 1:Nfreq(calibration), ant = 1:Nant(calibration)
+        gains[1,ant,β] = calibration.jones[ant,β].xx
+        gains[2,ant,β] = calibration.jones[ant,β].yy
+        flags[  ant,β] = calibration.flags[ant,β]
+    end
+    npzwrite(filename,Dict("gains" => gains, "flags" => flags))
+end
 
 """
     fixphase!(cal::Calibration, reference_antenna)

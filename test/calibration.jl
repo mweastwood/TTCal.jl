@@ -196,7 +196,7 @@ let
     ms.table["DATA"] = genvis(ms,sources,ConstantBeam())
 
     mycal = gaincal(ms,sources,ConstantBeam(),
-                    maxiter=100,tolerance=Float64(eps(Float64)))
+                    maxiter=100,tolerance=eps(Float64))
     @test !any(mycal.flags)
     @test vecnorm(mycal.jones - ones(DiagonalJonesMatrix,Nant,Nfreq)) < sqrt(eps(Float64))
     unlock(ms)
