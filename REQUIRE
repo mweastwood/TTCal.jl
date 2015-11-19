@@ -4,4 +4,5 @@ CasaCore
 FileIO
 JSON
 JLD
+NPZ
 ProgressMeter

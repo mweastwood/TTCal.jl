@@ -99,6 +99,10 @@ end
         help = "A JSON file describing the sources to be peeled from the given measurement set."
         arg_type = ASCIIString
         required = true
+    "--output"
+        help = "If provided, write the direction dependent calibration solutions to disk as NumPy arrays."
+        arg_type = ASCIIString
+        default = ""
     "--beam"
         help = "The name of the beam model to use ($(join(keys(beam_dictionary),",")))."
         arg_type = ASCIIString
@@ -183,11 +187,17 @@ function run_peel(args)
     ms = MeasurementSet(ascii(args["input"]))
     sources = readsources(args["sources"])
     beam = beam_dictionary[args["beam"]]()
-    peel!(GainCalibration,ms,sources,beam,
-                          peeliter=args["peeliter"],
-                          maxiter=args["maxiter"],
-                          tolerance=args["tolerance"],
-                          minuvw=args["minuvw"])
+    calibrations = peel!(GainCalibration,ms,sources,beam,
+                         peeliter=args["peeliter"],
+                         maxiter=args["maxiter"],
+                         tolerance=args["tolerance"],
+                         minuvw=args["minuvw"])
+    if !isempty(args["output"])
+        for i = 1:length(calibrations)
+            filename = args["output"]*"-$i.npz"
+            write_for_python(filename, calibrations[i])
+        end
+    end
 end
 
 function run_applycal(args)
