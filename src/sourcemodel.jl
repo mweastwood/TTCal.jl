@@ -91,8 +91,8 @@ j2000_radec(frame::ReferenceFrame, component::Component) = j2000_radec(frame,com
 
 function j2000_radec(frame::ReferenceFrame, direction::Direction)
     j2000 = measure(frame,direction,dir"J2000")
-    ra  = longitude(j2000,"rad")
-    dec =  latitude(j2000,"rad")
+    ra  = longitude(j2000)
+    dec =  latitude(j2000)
     ra,dec
 end
 
@@ -105,8 +105,8 @@ local_azel(frame::ReferenceFrame, component::Component) = local_azel(frame,compo
 
 function local_azel(frame::ReferenceFrame, direction::Direction)
     azel = measure(frame,direction,dir"AZEL")
-    az = longitude(azel,"rad")
-    el =  latitude(azel,"rad")
+    az = longitude(azel)
+    el =  latitude(azel)
     az,el
 end
 
@@ -135,19 +135,19 @@ function abovehorizon(frame::ReferenceFrame, sources::Vector{Source})
 end
 
 doc"""
-    direction_cosines(phase_dir::Direction{dir"J2000"}, dir::Direction{dir"J2000"}) -> l,m
+    direction_cosines(phase_dir::Direction, dir::Direction) -> l,m
 
 Compute the direction cosines $(l,m)$ for the given direction with respect to the
 phase direction.
 """
-function direction_cosines(phase_dir::Direction{dir"J2000"}, dir::Direction{dir"J2000"})
+function direction_cosines(phase_dir::Direction, dir::Direction)
     long = longitude(phase_dir)
     lat  =  latitude(phase_dir)
     θ1 = π/2 - long
     θ2 = π/2 - lat
     sin_θ1 = sin(θ1); cos_θ1 = cos(θ1)
     sin_θ2 = sin(θ2); cos_θ2 = cos(θ2)
-    x,y,z = vector(dir)
+    x,y,z = dir.x, dir.y, dir.z
     # Rotate first by θ1 about the z-axis
     # Then rotate by θ2 about the x-axis
     # ⌈    -l    ⌉   ⌈1    0        0    ⌉   ⌈+cos(θ1) -sin(θ1) 0⌉   ⌈x⌉
@@ -158,7 +158,7 @@ function direction_cosines(phase_dir::Direction{dir"J2000"}, dir::Direction{dir"
     l,m
 end
 
-function undo_direction_cosines(phase_dir::Direction{dir"J2000"},l,m)
+function undo_direction_cosines(phase_dir::Direction,l,m)
     long = longitude(phase_dir)
     lat  =  latitude(phase_dir)
     θ1 = π/2 - long
@@ -250,10 +250,7 @@ function construct_component(c)
     elseif name == "Jupiter"
         dir = Direction(dir"JUPITER")
     else
-        ra  = c["ra"]
-        dec = c["dec"]
-        dir = Direction(dir"J2000",Quantity(Measures.sexagesimal(ra), "deg"),
-                                   Quantity(Measures.sexagesimal(dec),"deg"))
+        dir = Direction(dir"J2000", c["ra"], c["dec"])
     end
 
     if haskey(c,"flux")
@@ -296,11 +293,11 @@ function writesources(filename, sources::Vector{Source})
             component_dict = Dict{UTF8String,Any}()
             component_dict["name"] = component.name
 
-            ra  = longitude(component.direction,"deg")
-            dec =  latitude(component.direction,"deg")
             if component.name != "Sun" && component.name != "Moon" && component.name != "Jupiter"
-                component_dict["ra"]  = format_ra(ra)
-                component_dict["dec"] = format_dec(dec)
+                ra  = longitude(component.direction) * radians
+                dec =  latitude(component.direction) * radians
+                component_dict["ra"]  = sexagesimal(ra, hours = true)
+                component_dict["dec"] = sexagesimal(dec)
             end
 
             component_dict["I"]     = component.spectrum.stokes.I
@@ -342,28 +339,4 @@ function write_ds9_regions(filename,sources::Vector{Source})
     end
 end
 =#
-
-function format_ra(ra::Float64)
-    ra /= 15
-    ra  = mod(ra,24)
-    hrs = floor(Integer,ra)
-    ra  = (ra-hrs)*60
-    min = floor(Integer,ra)
-    ra  = (ra-min)*60
-    sec = ra
-    @sprintf("%dh%02dm%07.4fs",hrs,min,sec)
-end
-
-function format_dec(dec::Float64)
-    s = sign(dec)
-    dec *= s
-    dec = mod(dec,90)
-    deg = floor(Integer,dec)
-    dec = (dec-deg)*60
-    min = floor(Integer,dec)
-    dec = (dec-min)*60
-    sec = dec
-    sign_str = s < 0? "-" : "+"
-    @sprintf("%s%dd%02dm%07.4fs",sign_str,deg,min,sec)
-end
 

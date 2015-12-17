@@ -14,7 +14,7 @@ let
     lold,mold = TTCal.direction_cosines(ms.phase_direction,point.direction)
     az += 0.1 * π/180
     el += 0.1 * π/180
-    dir = Direction(dir"AZEL",Quantity(az,"rad"),Quantity(el,"rad"))
+    dir = Direction(dir"AZEL",az*radians,el*radians)
 
     l,m = fitvis(ms,dir,maxiter = 100, tolerance = sqrt(eps(Float64)))
 

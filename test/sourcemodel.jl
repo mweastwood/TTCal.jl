@@ -9,9 +9,9 @@ end
 
 let
     frame   = ReferenceFrame()
-    sources = [Source("S1",Point("P1",Direction(dir"AZEL",q"0.0deg",q"+45.0deg"),
+    sources = [Source("S1",Point("P1",Direction(dir"AZEL","0.0deg","+45.0deg"),
                            Spectrum(1.0,2.0,3.0,4.0,10e6,[0.0]))),
-               Source("S2",Point("P2",Direction(dir"AZEL",q"0.0deg",q"-45.0deg"),
+               Source("S2",Point("P2",Direction(dir"AZEL","0.0deg","-45.0deg"),
                            Spectrum(1.0,2.0,3.0,4.0,10e6,[0.0])))]
     @test TTCal.isabovehorizon(frame,sources[1]) == true
     @test TTCal.isabovehorizon(frame,sources[2]) == false
@@ -28,11 +28,7 @@ let
     point = cas_a.components[1]
     @test cas_a.name == "Cas A"
     @test point.name == "Cas A"
-    dir1 = point.direction
-    dir2 = Direction(dir"J2000",q"23h23m24s",q"58d48m54s")
-    @test coordinate_system(dir1) === dir"J2000"
-    @test longitude(dir1) ≈ longitude(dir2)
-    @test  latitude(dir1) ≈  latitude(dir2)
+    @test point.direction == Direction(dir"J2000","23h23m24s","58d48m54s")
     @test point.spectrum.stokes.I == 555904.26
     @test point.spectrum.stokes.Q == 0
     @test point.spectrum.stokes.U == 0
@@ -44,11 +40,7 @@ let
     point = cyg_a.components[1]
     @test cyg_a.name == "Cyg A"
     @test point.name == "Cyg A"
-    dir1 = point.direction
-    dir2 = Direction(dir"J2000",q"19h59m28.35663s",q"+40d44m02.0970s")
-    @test coordinate_system(dir1) === dir"J2000"
-    @test longitude(dir1) ≈ longitude(dir2)
-    @test  latitude(dir1) ≈  latitude(dir2)
+    @test point.direction == Direction(dir"J2000","19h59m28.35663s","+40d44m02.0970s")
     @test point.spectrum.stokes.I == 49545.02
     @test point.spectrum.stokes.Q == 0
     @test point.spectrum.stokes.U == 0
@@ -58,11 +50,11 @@ let
 end
 
 let
-    sources1 = [Source("S1",Point("P1",Direction(dir"J2000",q"1h",q"0d"),
+    sources1 = [Source("S1",Point("P1",Direction(dir"J2000","1h","0d"),
                             Spectrum(1.0,2.0,3.0,4.0,10e6,[0.0]))),
-                Source("S2",Point("P2",Direction(dir"J2000",q"2h",q"0d"),
+                Source("S2",Point("P2",Direction(dir"J2000","2h","0d"),
                             Spectrum(1.0,2.0,3.0,4.0,10e6,[0.0]))),
-                Source("S3",Point("P3",Direction(dir"J2000",q"3h",q"0d"),
+                Source("S3",Point("P3",Direction(dir"J2000","3h","0d"),
                             Spectrum(1.0,2.0,3.0,4.0,10e6,[0.0])))]
 
     filename = tempname()*".json"
@@ -75,11 +67,7 @@ let
         point2  = source2.components[1]
         @test source1.name == source2.name
         @test point1.name == point2.name
-        dir1 = point1.direction
-        dir2 = point2.direction
-        @test coordinate_system(dir1) === coordinate_system(dir2)
-        @test longitude(dir1) ≈ longitude(dir2)
-        @test  latitude(dir1) ≈  latitude(dir2)
+        @test point1.direction == point2.direction
         @test point1.spectrum.stokes.I == point2.spectrum.stokes.I
         @test point1.spectrum.stokes.Q == point2.spectrum.stokes.Q
         @test point1.spectrum.stokes.U == point2.spectrum.stokes.U
@@ -91,10 +79,10 @@ end
 
 let
     frame = ReferenceFrame()
-    t = (2015.-1858.)*365.*24.*60.*60. # a rough, current Julian date (in seconds)
-    set!(frame,Epoch(epoch"UTC",Quantity(t,"s")))
+    t = (2015.-1858.)*365. # a rough, current Julian date
+    set!(frame,Epoch(epoch"UTC",t * days))
     set!(frame,observatory("OVRO_MMA"))
-    phase_dir = Direction(dir"J2000",q"19h59m28.35663s",q"+40d44m02.0970s")
+    phase_dir = Direction(dir"J2000","19h59m28.35663s","+40d44m02.0970s")
 
     for iteration = 1:5
         l = 2rand()-1
@@ -115,14 +103,5 @@ let
     l′,m′ = TTCal.direction_cosines(phase_dir,dir)
     @test l ≈ l′
     @test m ≈ m′
-end
-
-let
-    ra = get(q"0h12m34s","deg")
-    @test TTCal.format_ra(ra) == "0h12m34.0000s"
-    dec = get(q"+0d12m34s","deg")
-    @test TTCal.format_dec(dec) == "+0d12m34.0000s"
-    dec = get(q"-0d12m34s","deg")
-    @test TTCal.format_dec(dec) == "-0d12m34.0000s"
 end
 

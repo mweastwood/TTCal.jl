@@ -23,7 +23,7 @@ between TTCal and measurement sets.
 immutable MeasurementSet
     table::Table
     frame::ReferenceFrame
-    phase_direction::Direction{dir"J2000"}
+    phase_direction::Direction
     u::Vector{Float64}
     v::Vector{Float64}
     w::Vector{Float64}
@@ -51,12 +51,11 @@ function MeasurementSet(name)
     frame = ReferenceFrame()
     time  = ms["TIME",1]
     position = antenna_table["POSITION",1]
-    set!(frame,Epoch(epoch"UTC",Quantity(time,"s")))
+    set!(frame,Epoch(epoch"UTC",time*seconds))
     set!(frame,Position(pos"ITRF",position[1],position[2],position[3]))
 
     dir = field_table["PHASE_DIR"]
-    phase_direction = Direction(dir"J2000",Quantity(dir[1],"rad"),
-                                           Quantity(dir[2],"rad"))
+    phase_direction = Direction(dir"J2000",dir[1]*radians,dir[2]*radians)
 
     uvw_arr = ms["UVW"]
     u = squeeze(uvw_arr[1,:],1)
@@ -69,7 +68,7 @@ function MeasurementSet(name)
     ant1 = ms["ANTENNA1"] + 1
     ant2 = ms["ANTENNA2"] + 1
 
-    Nant = numrows(antenna_table)
+    Nant = size(antenna_table)[1]
     Nbase = length(u)
     Nfreq = length(ν)
 
@@ -111,7 +110,7 @@ end
 
 function set_model_data!(ms::MeasurementSet, model,
                          force_imaging_columns = false)
-    if force_imaging_columns || Tables.checkColumnExists(ms.table,"MODEL_DATA")
+    if force_imaging_columns || Tables.exists(ms.table,"MODEL_DATA")
         ms.table["MODEL_DATA"] = model
     end
 end
@@ -122,7 +121,7 @@ end
 Get the CORRECTED_DATA column if it exists. Otherwise settle for the DATA column.
 """
 function get_corrected_data(ms::MeasurementSet)
-    if Tables.checkColumnExists(ms.table,"CORRECTED_DATA")
+    if Tables.exists(ms.table,"CORRECTED_DATA")
         return ms.table["CORRECTED_DATA"]
     else
         return ms.table["DATA"]
@@ -131,7 +130,7 @@ end
 
 function set_corrected_data!(ms::MeasurementSet, data,
                              force_imaging_columns = false)
-    if force_imaging_columns || Tables.checkColumnExists(ms.table,"CORRECTED_DATA")
+    if force_imaging_columns || Tables.exists(ms.table,"CORRECTED_DATA")
         ms.table["CORRECTED_DATA"] = data
     else
         ms.table["DATA"] = data
