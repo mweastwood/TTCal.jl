@@ -327,8 +327,8 @@ function solve_onechannel!(jones, jones_flags,
     square_model = makesquare(model,data_flags,ant1,ant2)
     best_jones   = copy(jones)
 
-    converged = @iterate(StefCalStep(),RK4,maxiter,tolerance,
-                         best_jones,square_data,square_model)
+    converged = iterate(stefcal,RK4,maxiter,tolerance,
+                        best_jones,square_data,square_model)
 
     # Propagate antenna flags to the calibration solutions.
     # A flagged antenna should correspond to a row and column
@@ -419,13 +419,14 @@ function stefcal_step{T}(input::AbstractVector{T},data,model)
     step
 end
 
+immutable StefCalStep <: StepFunction end
+call(::StefCalStep,input,data,model) = stefcal_step(input,data,model)
+const stefcal = StefCalStep()
+
 @inline function inner_multiply(::Type{DiagonalJonesMatrix},X,Y)
     DiagonalJonesMatrix(X.xx'*Y.xx + X.yx'*Y.yx,
                         X.xy'*Y.xy + X.yy'*Y.yy)
 end
 
 @inline inner_multiply(::Type{JonesMatrix},X,Y) = X'*Y
-
-immutable StefCalStep <: StepFunction end
-call(::StefCalStep,g,V,M) = stefcal_step(g,V,M)
 
