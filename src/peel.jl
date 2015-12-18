@@ -66,7 +66,7 @@ function peel!(calibrations,coherencies,data,flags,
     end
 
     # Derive a calibration towards each source
-    p = Progress(peeliter*Nsource, 1, "Peeling...", 50)
+    p = Progress(peeliter*Nsource)
     for iter = 1:peeliter
         for s = 1:Nsource
             coherency = coherencies[s]
