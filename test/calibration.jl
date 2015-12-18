@@ -109,7 +109,7 @@
         TTCal.solve!(mycal,data,model,flags,ant1,ant2,maxiter,tolerance,false,quiet=true)
         TTCal.fixphase!(mycal,"1x")
         @test !any(mycal.flags)
-        @test vecnorm(mycal.jones-cal.jones) < eps(Float32)
+        @test vecnorm(mycal.jones-cal.jones) < eps(Float32)*vecnorm(cal.jones)
     end
 
     @testset "unity gains" begin
