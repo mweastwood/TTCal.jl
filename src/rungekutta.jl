@@ -117,14 +117,17 @@ Take a 4th-order Runge-Kutta step.
 @generate_step RK4 RK4_tableau
 
 """
-    iterate(step, rkstep, maxiter, tolerance, x, args...)
+    iterate(step, rkstep, maxiter, tolerance, switch, x, args...)
 
-Repeatedly call `rkstep(step, x, args...)` and updating the value of `x`
+Repeatedly call `rkstep(step, x, args...)` while updating the value of `x`
 until either the step size is sufficiently small or the maximum number
 of iterations is reached.
+
+If `switch` is set to `true`, every iteration will also run `check!(step, x, args...)`.
+This function can then be used to constrain or help the iteration converge.
+For example `check!` can be used to update flags on bad antennas.
 """
-function iterate(step::StepFunction, rkstep::RKStepFunction,
-                 maxiter, tolerance, x, args...)
+function iterate(step::StepFunction, rkstep, maxiter, tolerance, switch, x, args...)
     iter = 0
     converged = false
     while !converged && iter < maxiter
@@ -135,8 +138,11 @@ function iterate(step::StepFunction, rkstep::RKStepFunction,
         for i in eachindex(x, δ)
             x[i] += δ[i]
         end
+        switch && check!(step, x, args...) # hook that allows flags to be updated while iterating
         iter += 1
     end
     converged
 end
+
+check!(::StepFunction, x, args...) = nothing
 

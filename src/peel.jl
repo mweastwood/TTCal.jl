@@ -81,7 +81,7 @@ function peel!(calibrations,coherencies,data,flags,
             # of the current source.
             solve!(calibration_toward_source,
                    data,coherency,flags,
-                   ant1,ant2,maxiter,tolerance,
+                   ant1,ant2,maxiter,tolerance,false,
                    quiet = true)
 
             # Take the source back out of the measured visibilities,
