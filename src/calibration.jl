@@ -63,6 +63,22 @@ are initially set to the identity matrix.
 Nant( cal::Calibration) = size(cal.jones,1)
 Nfreq(cal::Calibration) = size(cal.jones,2)
 
+doc"""
+    invert(cal::Calibration)
+
+Returns the inverse of the given calibration.
+The Jones matrix $J$ of each antenna is set to $J^{-1}$.
+"""
+function invert(cal::Calibration)
+    output = similar(cal)
+    for i in eachindex(output.jones, output.flags,
+                          cal.jones,    cal.flags)
+        output.jones[i] = inv(cal.jones[i])
+        output.flags[i] = cal.flags[i]
+    end
+    output
+end
+
 write(filename,calibration::Calibration) = JLD.save(File(format"JLD",filename),"cal",calibration)
 read(filename) = JLD.load(filename,"cal")
 
@@ -116,22 +132,6 @@ function corrupt!(data::Array{Complex64,3},
     corrupt!(data, flags, cal, ant1, ant2)
 end
 
-doc"""
-    invert(cal::Calibration)
-
-Returns the inverse of the given calibration.
-The Jones matrix $J$ of each antenna is set to $J^{-1}$.
-"""
-function invert(cal::Calibration)
-    output = similar(cal)
-    for i in eachindex(output.jones, output.flags,
-                          cal.jones,    cal.flags)
-        output.jones[i] = inv(cal.jones[i])
-        output.flags[i] = cal.flags[i]
-    end
-    output
-end
-
 """
     applycal!(ms::MeasurementSet, calibration::Calibration;
               apply_to_corrected = false, force_imaging_columns = false)
@@ -171,13 +171,7 @@ end
 
 # gaincal / polcal
 
-"""
-    gaincal(ms::MeasurementSet, sources::Vector{Source}, beam::BeamModel;
-            maxiter = 20, tolerance = 1e-3, flag = false, minuvw = 0.0,
-            reference_antenna = "1x", force_imaging_columns = false)
-
-Solve for the interferometer's electronic gains.
-
+const argument_docs = """
 **Arguments:**
 
 * `ms` - the measurement set from which to derive the calibration
@@ -200,6 +194,16 @@ Solve for the interferometer's electronic gains.
     will be created and populated with model visibilities even if it
     doesn't already exist
 """
+
+"""
+    gaincal(ms::MeasurementSet, sources::Vector{Source}, beam::BeamModel;
+            maxiter = 20, tolerance = 1e-3, flag = false, minuvw = 0.0,
+            reference_antenna = "1x", force_imaging_columns = false)
+
+Solve for the interferometer's electronic gains.
+
+$argument_docs
+"""
 function gaincal(ms::MeasurementSet, sources::Vector{Source}, beam::BeamModel;
                  maxiter::Int = 20, tolerance::Float64 = 1e-3, flag::Bool = false,
                  minuvw::Float64 = 0.0, reference_antenna::ASCIIString = "1x",
@@ -219,34 +223,16 @@ end
 
 """
     polcal(ms::MeasurementSet, sources::Vector{Source}, beam::BeamModel;
-           maxiter = 20, tolerance = 1e-3, minuvw = 0.0,
-           force_imaging_columns = false)
+           maxiter = 20, tolerance = 1e-3, flag = false, minuvw = 0.0,
+           reference_antenna = "1x", force_imaging_columns = false)
 
 Solve for the polarization properties of the interferometer.
 
-**Arguments:**
-
-* `ms` - the measurement set from which to derive the calibration
-* `sources` - the list of points sources to use as the sky model
-* `beam` - the beam model
-
-**Keyword Arguments:**
-
-* `maxiter` - the maximum number of Runge-Kutta steps to take on each
-    frequency channel
-* `tolerance` - the relative tolerance to use while checking to see if
-    more iterations are required
-* `flag` - if set to true, attempt to identify and flag slowly converging
-    calibration solutions
-* `minuvw` - the minimum baseline length (measured in wavelengths) to be
-    used during the calibration procedure
-* `force_imaging_columns` - if this is set to true, the MODEL_DATA column
-    will be created and populated with model visibilities even if it
-    doesn't already exist
+$argument_docs
 """
 function polcal(ms::MeasurementSet, sources::Vector{Source}, beam::BeamModel;
                 maxiter::Int = 20, tolerance::Float64 = 1e-3, flag::Bool = false,
-                minuvw::Float64 = 0.0,
+                minuvw::Float64 = 0.0, reference_antenna::ASCIIString = "1x",
                 force_imaging_columns::Bool = false)
     sources = abovehorizon(ms.frame, sources)
     calibration = PolarizationCalibration(ms.Nant, ms.Nfreq)
@@ -255,8 +241,9 @@ function polcal(ms::MeasurementSet, sources::Vector{Source}, beam::BeamModel;
     flags = get_flags(ms)
     flag_short_baselines!(flags, minuvw, ms.u, ms.v, ms.w, ms.ν)
     set_model_data!(ms, model)
-    polcal!(calibration, data, model, flags,
-            ms.ant1, ms.ant2, maxiter, tolerance, flag)
+    solve!(calibration, data, model, flags,
+           ms.ant1, ms.ant2, maxiter, tolerance, flag)
+    fixphase!(calibration, reference_antenna)
     calibration
 end
 
@@ -279,18 +266,22 @@ function solve!(cal::Calibration, data, model, flags, ant1, ant2,
         idx = percentage .> 0.25
         antennas   = (1:Nant(cal))[idx]
         percentage = percentage[idx]
-        for i = 1:length(antennas)
-            color = :white
-            percentage[i]  ≥ 0.5 && (color = :red)
-            percentage[i] == 1.0 && (color = :blue)
-            print_with_color(color, string(antennas[i]))
-            i == length(antennas) || print(", ")
+        if length(antennas) > 0
+            for i = 1:length(antennas)
+                color = :white
+                percentage[i]  ≥ 0.5 && (color = :red)
+                percentage[i] == 1.0 && (color = :blue)
+                print_with_color(color, string(antennas[i]))
+                i == length(antennas) || print(", ")
+            end
+            print("\n")
+            print("          Legend: ")
+            print_with_color(:white, ">25% flagged"); print(", ")
+            print_with_color(  :red, ">50% flagged"); print(", ")
+            print_with_color( :blue, "100% flagged"); print("\n")
+        else
+            println("all antennas have <25% flags")
         end
-        print("\n")
-        print("          Legend: ")
-        print_with_color(:white, ">25% flagged"); print(", ")
-        print_with_color(  :red, ">50% flagged"); print(", ")
-        print_with_color( :blue, "100% flagged"); print("\n")
     end
 end
 
