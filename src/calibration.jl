@@ -479,15 +479,12 @@ function check!(::StefCalStep, input, data, model)
         δ[i] = median(slice(residual, :, i))
     end
 
-    μ = mean(δ)
-    σ =  std(δ)
-    for i = 1:Nant
-        if abs(δ[i] - μ) > 10σ
-            data[i,:] = zero(JonesMatrix)
-            data[:,i] = zero(JonesMatrix)
-            model[i,:] = zero(JonesMatrix)
-            model[:,i] = zero(JonesMatrix)
-        end
+    worst_antenna = indmax(δ)
+    if δ[worst_antenna] > 10median(δ)
+        data[worst_antenna,:] = zero(JonesMatrix)
+        data[:,worst_antenna] = zero(JonesMatrix)
+        model[worst_antenna,:] = zero(JonesMatrix)
+        model[:,worst_antenna] = zero(JonesMatrix)
     end
 
     nothing

@@ -1,5 +1,5 @@
 @testset "Calibration Tests" begin
-    Nant  = 10
+    Nant  = 100
     Nfreq = 2
     Nbase = div(Nant*(Nant-1),2) + Nant
     ant1,ant2 = ant1ant2(Nant)
@@ -100,9 +100,6 @@
     end
 
     function test_solve(cal,data,model,maxiter,tolerance)
-        Nant  = TTCal.Nant( cal)
-        Nfreq = TTCal.Nfreq(cal)
-
         # Run as `solve!(...)`
         mycal = similar(cal)
         flags = zeros(Bool,size(data))
@@ -151,6 +148,24 @@
                 α += Nant-ant+1
             end
             test_solve(cal,data,model,200,eps(Float64))
+        end
+    end
+
+    @testset "one bad antenna" begin
+        data  = Array{Complex64,3}(complex(randn(4,Nfreq,Nbase),randn(4,Nfreq,Nbase)))
+        model = copy(data)
+        for α = 1:Nant
+            data[:,:,α] = 0
+        end
+        for T in (GainCalibration,PolarizationCalibration)
+            cal = T(Nant,Nfreq)
+            mycal = T(Nant,Nfreq)
+            flags = zeros(Bool,size(data))
+            TTCal.solve!(mycal,data,model,flags,ant1,ant2,200,eps(Float64),true)
+            TTCal.fixphase!(mycal,"1y")
+            @test all(mycal.flags[1,:])
+            @test !any(mycal.flags[2:end,:])
+            @test vecnorm(mycal.jones[2:end,:]-cal.jones[2:end,:]) < eps(Float32)*vecnorm(cal.jones[2:end,:])
         end
     end
 
