@@ -60,6 +60,8 @@ immutable HermitianJonesMatrix
     yy::Float64
 end
 
+typealias AnyJonesMatrix Union{JonesMatrix,DiagonalJonesMatrix,HermitianJonesMatrix}
+
 zero(::Type{JonesMatrix}) = JonesMatrix(0,0,0,0)
 one(::Type{JonesMatrix}) = JonesMatrix(1,0,0,1) # the identity matrix
 rand(::Type{JonesMatrix}) = JonesMatrix(rand(Complex128),rand(Complex128),rand(Complex128),rand(Complex128))
@@ -113,6 +115,8 @@ end
 @inline *(a::Number,J::DiagonalJonesMatrix) = DiagonalJonesMatrix(a*J.xx,a*J.yy)
 @inline *(J::DiagonalJonesMatrix,a::Number) = *(a,J)
 
+@inline /(J::JonesMatrix,a::Number) = JonesMatrix(J.xx/a,J.xy/a,J.yx/a,J.yy/a)
+@inline /(J::DiagonalJonesMatrix,a::Number) = DiagonalJonesMatrix(J.xx/a,J.yy/a)
 @inline /(J::HermitianJonesMatrix,a::Number) = HermitianJonesMatrix(J.xx/a,J.xy/a,J.yy/a)
 
 @inline function *(J1::JonesMatrix,J2::JonesMatrix)
@@ -134,8 +138,8 @@ end
 
 @inline *(J1::DiagonalJonesMatrix,J2::DiagonalJonesMatrix) = DiagonalJonesMatrix(J1.xx*J2.xx,J1.yy*J2.yy)
 
-@inline \(J1::JonesMatrix,J2::JonesMatrix) = inv(J1)*J2
-@inline \(J1::DiagonalJonesMatrix,J2::DiagonalJonesMatrix) = DiagonalJonesMatrix(J2.xx/J1.xx,J2.yy/J1.yy)
+@inline \(J1::AnyJonesMatrix,J2::AnyJonesMatrix) = inv(J1)*J2
+@inline /(J1::AnyJonesMatrix,J2::AnyJonesMatrix) = J1*inv(J2)
 
 @inline conj(J::JonesMatrix) = JonesMatrix(conj(J.xx),conj(J.xy),conj(J.yx),conj(J.yy))
 @inline conj(J::DiagonalJonesMatrix) = DiagonalJonesMatrix(conj(J.xx),conj(J.yy))

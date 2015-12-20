@@ -45,8 +45,8 @@ function fitvis(data,flags,l,m,
                 u,v,w,ν,ant1,ant2,
                 maxiter,tolerance)
     lm = [l;m]
-    converged = @iterate(FitVisStep(),RK4,maxiter,tolerance,
-                         lm,data,flags,u,v,w,ν,ant1,ant2)
+    converged = iterate(FitVisStep(),RK4,maxiter,tolerance,false,
+                        lm,data,flags,u,v,w,ν,ant1,ant2)
     lm[1],lm[2]
 end
 

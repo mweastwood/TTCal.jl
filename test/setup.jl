@@ -40,31 +40,31 @@ function createms(Nant,Nfreq)
 
     frame = ReferenceFrame()
     pos = observatory("OVRO_MMA")
-    set!(frame,Epoch(epoch"UTC",Quantity(t,"s")))
+    set!(frame,Epoch(epoch"UTC",t*seconds))
     set!(frame,pos)
-    zenith = Direction(dir"AZEL",q"0.0deg",q"90.0deg")
+    zenith = Direction(dir"AZEL",0degrees,90degrees)
     phase_dir = measure(frame,zenith,dir"J2000")
 
     name  = tempname()*".ms"
     table = Table(name)
 
     subtable = Table("$name/SPECTRAL_WINDOW")
-    Tables.addRows!(subtable,1)
+    Tables.addrows!(subtable,1)
     subtable["CHAN_FREQ"] = reshape(ν,length(ν),1)
     unlock(subtable)
 
     subtable = Table("$name/ANTENNA")
-    Tables.addRows!(subtable,Nant)
-    x,y,z = vector(pos)
+    Tables.addrows!(subtable,Nant)
+    x,y,z = pos.x, pos.y, pos.z
     subtable["POSITION"] = [x;y;z]*ones(1,Nant)
     unlock(subtable)
 
     subtable = Table("$name/FIELD")
-    Tables.addRows!(subtable,1)
+    Tables.addrows!(subtable,1)
     subtable["PHASE_DIR"] = reshape([longitude(phase_dir);latitude(phase_dir)],2,1)
     unlock(subtable)
 
-    Tables.addRows!(table,Nbase)
+    Tables.addrows!(table,Nbase)
     table[kw"SPECTRAL_WINDOW"] = "Table: $name/SPECTRAL_WINDOW"
     table[kw"ANTENNA"] = "Table: $name/ANTENNA"
     table[kw"FIELD"] = "Table: $name/FIELD"

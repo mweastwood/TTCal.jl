@@ -1,5 +1,10 @@
 using TTCal
-using Base.Test
+if VERSION >= v"0.5-"
+    using Base.Test
+else
+    using BaseTestNext
+    const Test = BaseTestNext
+end
 using CasaCore.Measures
 using CasaCore.Tables
 
