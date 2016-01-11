@@ -6,7 +6,15 @@ This is an auto-generated file and should not be edited directly.
 
 ### RK{N}
 
-This singleton type is used to indicate which Runge-Kutta method should be used. For example, `RK{4}` tells us to use the RK4 method.
+```
+immutable RK{N}
+```
+
+This singleton type is used to indicate which Runge-Kutta method should be used.
+
+  * `RK{2}` - use RK2 steps
+  * `RK{3}` - use RK3 steps
+  * `RK{4}` - use RK4 steps
 
 ### congruence_transform
 
@@ -83,7 +91,9 @@ Get the CORRECTED_DATA column if it exists. Otherwise settle for the DATA column
 get_flags(ms::MeasurementSet)
 ```
 
-Get the flags from the dataset, but this information is stored in multiple locations. Unify all these flags before returning.
+Get the flags from the dataset.
+
+This information is stored in multiple locations. Unify all these flags before returning.
 
 ### invert
 
@@ -143,21 +153,36 @@ Pack the data into a square Hermitian matrix such that the data is ordered as fo
 
 Flagged correlations and autocorrelations are set to zero.
 
+### mikecal_step
+
+```
+mikecal_step(input, data, model, λ) -> step
+```
+
+Minimize
+
+\[     \sum_{i,j}\|V_{i,j} - G_i M_{i,j} G_{j,\rm new}^*\|^2         + \lambda \left(\sum_{i} \|G_i M_{i,j}\|^2 \right)                   \left(\sum_{i} \|G_{i,\rm new} - \frac{1}{N}\sum_{j}G_{j,\rm new}\|^2\right) \]
+
 ### rkstep
 
-Take a Runge-Kutta step. * `step(x,args...)` must return the list of steps to take from the given location `x` * `rk` is the order of the Runge-Kutta method to use (eg. `RK4`) * `x` is the starting location * `args` is simply passed on as the second argument to `step`
+Take a Runge-Kutta step.
+
+  * `step(x,args...)` must return the list of steps to take from the given location `x`
+  * `rk` is the order of the Runge-Kutta method to use (eg. `RK4`)
+  * `x` is the starting location
+  * `args` is simply passed on as the second argument to `step`
 
 ### stefcal_step
 
 ```
-stefcal_step(input,data,model) -> step
+stefcal_step(input, data, model) -> step
 ```
 
 Given the `data` and `model` visibilities, and the current guess for the Jones matrices, solve for `step` such that the new value of the Jones matrices is `input+step`.
 
 The update step is defined such that the new value of the Jones matrices minimizes
 
-\[     \sum_{i,j}\|V_{i,j} - G_i M_{i,j} G_{j,new}^*\|^2$, \]
+\[     \sum_{i,j}\|V_{i,j} - G_i M_{i,j} G_{j,\rm new}^*\|^2, \]
 
 where $i$ and $j$ label the antennas, $V$ labels the measured visibilities, $M$ labels the model visibilities, and $G$ labels the Jones matrices.
 

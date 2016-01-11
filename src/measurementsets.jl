@@ -62,7 +62,7 @@ function MeasurementSet(name)
     v = squeeze(uvw_arr[2,:],1)
     w = squeeze(uvw_arr[3,:],1)
 
-    ν = spw_table["CHAN_FREQ",1]
+    ν = spw_table["CHAN_FREQ",1] + 150e3 # temp fix
 
     # the +1 converts to a 1-based indexing scheme
     ant1 = ms["ANTENNA1"] + 1
@@ -86,7 +86,9 @@ Tables.unlock(ms::MeasurementSet) = Tables.unlock(ms.table)
 """
     get_flags(ms::MeasurementSet)
 
-Get the flags from the dataset, but this information is stored in multiple locations.
+Get the flags from the dataset.
+
+This information is stored in multiple locations.
 Unify all these flags before returning.
 """
 function get_flags(ms::MeasurementSet)

@@ -35,7 +35,7 @@ manner in which the sources are peeled:
 function peel!{T<:Calibration}(::Type{T},
                                ms::MeasurementSet,
                                sources::Vector{Source},
-                               beam::BeamModel;
+                               beam::BeamModel, delays;
                                peeliter::Int = 3,
                                maxiter::Int = 20,
                                tolerance::Float64 = 1e-3,
@@ -45,7 +45,7 @@ function peel!{T<:Calibration}(::Type{T},
     flags = get_flags(ms)
     flag_short_baselines!(flags,minuvw,ms.u,ms.v,ms.w,ms.ν)
     calibrations = [T(ms.Nant,ms.Nfreq) for source in sources]
-    coherencies  = [genvis(ms,source,beam) for source in sources]
+    coherencies  = [genvis(ms,source,beam,delays) for source in sources]
     peel!(calibrations,coherencies,data,flags,
           ms.u,ms.v,ms.w,ms.ν,ms.ant1,ms.ant2,
           peeliter,maxiter,tolerance)

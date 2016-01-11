@@ -204,14 +204,14 @@ Solve for the interferometer's electronic gains.
 
 $argument_docs
 """
-function gaincal(ms::MeasurementSet, sources::Vector{Source}, beam::BeamModel;
+function gaincal(ms::MeasurementSet, sources::Vector{Source}, beam::BeamModel, delays;
                  maxiter::Int = 20, tolerance::Float64 = 1e-3, flag::Bool = false,
                  minuvw::Float64 = 0.0, reference_antenna::ASCIIString = "1x",
                  force_imaging_columns::Bool = false)
     sources = abovehorizon(ms.frame, sources)
     calibration = GainCalibration(ms.Nant, ms.Nfreq)
     data  = get_data(ms)
-    model = genvis(ms, sources, beam)
+    model = genvis(ms, sources, beam, delays)
     flags = get_flags(ms)
     flag_short_baselines!(flags, minuvw, ms.u, ms.v, ms.w, ms.ν)
     set_model_data!(ms, model, force_imaging_columns)
@@ -479,8 +479,9 @@ function check!(::StefCalStep, input, data, model)
         δ[i] = median(slice(residual, :, i))
     end
 
+    μ = median(δ)
     worst_antenna = indmax(δ)
-    if δ[worst_antenna] > 10median(δ)
+    if δ[worst_antenna] > 10μ
         data[worst_antenna,:] = zero(JonesMatrix)
         data[:,worst_antenna] = zero(JonesMatrix)
         model[worst_antenna,:] = zero(JonesMatrix)

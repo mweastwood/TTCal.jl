@@ -15,6 +15,40 @@
 
 abstract BeamModel
 
+function dipole_projection(az,el)
+    # Coordinate system definition
+    # ============================
+    #     x-polarization: runs north-south at zenith
+    #     y-polarization: runs east-west at zenith
+    x = [1; 0; 0]
+    y = [0; 1; 0]
+
+    cos_az = cos(az); sin_az = sin(az)
+    cos_el = cos(el); sin_el = sin(el)
+
+    # rotate to the meridian
+    R1 = [ cos_az sin_az 0
+          -sin_az cos_az 0
+              0      0   1]
+    x′ = R1*x
+    y′ = R1*y
+
+    # rotate to the desired elevation
+    R2 = [ sin_el 0 cos_el
+              0   1    0
+          -cos_el 0 sin_el]
+    x′ = R2*x′
+    y′ = R2*y′
+
+    # rotate back to the desired azimuth
+    x′ = R1'*x′
+    y′ = R1'*y′
+    @show x′ y′
+
+    JonesMatrix(dot(x,x′), dot(x,y′),
+                dot(y,x′), dot(y,y′))
+end
+
 """
     ConstantBeam <: BeamModel
 
