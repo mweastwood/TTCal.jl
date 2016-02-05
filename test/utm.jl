@@ -25,10 +25,10 @@
     east   = Direction(dir"AZEL",  90degrees,  0degrees)
     south  = Direction(dir"AZEL", 180degrees,  0degrees)
     west   = Direction(dir"AZEL", 270degrees,  0degrees)
-    @test measure(frame, zenith, dir"ITRF") ≈ TTCal.direction_to_itrf(zenith, position)
-    @test measure(frame,  north, dir"ITRF") ≈ TTCal.direction_to_itrf(north, position)
-    @test measure(frame,   east, dir"ITRF") ≈ TTCal.direction_to_itrf(east, position)
-    @test measure(frame,  south, dir"ITRF") ≈ TTCal.direction_to_itrf(south, position)
-    @test measure(frame,   west, dir"ITRF") ≈ TTCal.direction_to_itrf(west, position)
+    @test measure(frame, zenith, dir"ITRF") ≈ TTCal.azel_to_itrf(zenith, position)
+    @test measure(frame,  north, dir"ITRF") ≈ TTCal.azel_to_itrf(north, position)
+    @test measure(frame,   east, dir"ITRF") ≈ TTCal.azel_to_itrf(east, position)
+    @test measure(frame,  south, dir"ITRF") ≈ TTCal.azel_to_itrf(south, position)
+    @test measure(frame,   west, dir"ITRF") ≈ TTCal.azel_to_itrf(west, position)
 end
 

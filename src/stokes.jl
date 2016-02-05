@@ -111,13 +111,14 @@ end
 
 @inline *(a::Number,J::JonesMatrix) = JonesMatrix(a*J.xx,a*J.xy,a*J.yx,a*J.yy)
 @inline *(J::JonesMatrix,a::Number) = *(a,J)
-
 @inline *(a::Number,J::DiagonalJonesMatrix) = DiagonalJonesMatrix(a*J.xx,a*J.yy)
 @inline *(J::DiagonalJonesMatrix,a::Number) = *(a,J)
+@inline *(a::Number,J::HermitianJonesMatrix) = JonesMatrix(a*J.xx,a*J.xy,a*conj(J.xy),a*J.yy)
+@inline *(J::HermitianJonesMatrix,a::Number) = *(a,J)
 
 @inline /(J::JonesMatrix,a::Number) = JonesMatrix(J.xx/a,J.xy/a,J.yx/a,J.yy/a)
 @inline /(J::DiagonalJonesMatrix,a::Number) = DiagonalJonesMatrix(J.xx/a,J.yy/a)
-@inline /(J::HermitianJonesMatrix,a::Number) = HermitianJonesMatrix(J.xx/a,J.xy/a,J.yy/a)
+@inline /(J::HermitianJonesMatrix,a::Real) = HermitianJonesMatrix(J.xx/a,J.xy/a,J.yy/a)
 
 @inline function *(J1::JonesMatrix,J2::JonesMatrix)
     JonesMatrix(J1.xx*J2.xx + J1.xy*J2.yx,

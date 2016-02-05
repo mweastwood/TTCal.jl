@@ -13,105 +13,182 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-"""
-    immutable MeasurementSet
+immutable Antenna
+    position :: Position
+end
 
-This type is a wrapper around `CasaCore.Tables.Table` that
-is intended to simplify most of the common interactions
-between TTCal and measurement sets.
-"""
-immutable MeasurementSet
-    table::Table
-    frame::ReferenceFrame
-    phase_direction::Direction
-    u::Vector{Float64}
-    v::Vector{Float64}
-    w::Vector{Float64}
-    ν::Vector{Float64}
-    ant1::Vector{Int32}
-    ant2::Vector{Int32}
-    Nant::Int
-    Nbase::Int
-    Nfreq::Int
+immutable Baseline
+    antenna1 :: Int
+    antenna2 :: Int
+end
+
+type Metadata
+    antennas  :: Vector{Antenna}
+    baselines :: Vector{Baseline}
+    channels  :: Vector{Float64}
+    phase_center :: Direction
+    time :: Epoch
+    beam :: BeamModel
 end
 
 """
-    MeasurementSet(name)
+    collect_metadata(ms::Table, beam)
 
-Open the measurement set at the given location. Assorted
-quantities that are commonly used by TTCal are automatically
-loaded and stored in fields.
+Read the interferometer's instrumental parameters from the measurement set.
 """
-function MeasurementSet(name)
-    ms = Table(name)
-    antenna_table = Table(ms[kw"ANTENNA"])
-    field_table   = Table(ms[kw"FIELD"])
-    spw_table     = Table(ms[kw"SPECTRAL_WINDOW"])
+function collect_metadata(ms::Table, beam)
+    antennas  = read_antennas(ms)
+    baselines = read_baselines(ms)
+    channels  = read_channels(ms)
+    phase_center = read_phase_center(ms)
+    time = read_time(ms)
+    Metadata(antennas, baselines, channels, phase_center, time, beam)
+end
 
+Nant(meta::Metadata)  = length(meta.antennas)
+Nfreq(meta::Metadata) = length(meta.channels)
+Nbase(meta::Metadata) = length(meta.baselines)
+
+function position(meta)
+    x = 0.0
+    y = 0.0
+    z = 0.0
+    for i = 1:Nant(meta)
+        pos = meta.antennas[i].position
+        x += pos.x
+        y += pos.y
+        z += pos.z
+    end
+    x /= Nant(meta)
+    y /= Nant(meta)
+    z /= Nant(meta)
+    Position(pos"ITRF", x, y, z)
+end
+
+function reference_frame(meta)
     frame = ReferenceFrame()
-    time  = ms["TIME",1]
-    position = antenna_table["POSITION",1]
-    set!(frame,Epoch(epoch"UTC",time*seconds))
-    set!(frame,Position(pos"ITRF",position[1],position[2],position[3]))
-
-    dir = field_table["PHASE_DIR"]
-    phase_direction = Direction(dir"J2000",dir[1]*radians,dir[2]*radians)
-
-    uvw_arr = ms["UVW"]
-    u = squeeze(uvw_arr[1,:],1)
-    v = squeeze(uvw_arr[2,:],1)
-    w = squeeze(uvw_arr[3,:],1)
-
-    ν = spw_table["CHAN_FREQ",1]
-
-    # the +1 converts to a 1-based indexing scheme
-    ant1 = ms["ANTENNA1"] + 1
-    ant2 = ms["ANTENNA2"] + 1
-
-    Nant = size(antenna_table)[1]
-    Nbase = length(u)
-    Nfreq = length(ν)
-
-    unlock(antenna_table)
-    unlock(field_table)
-    unlock(spw_table)
-
-    MeasurementSet(ms,frame,phase_direction,
-                   u,v,w,ν,ant1,ant2,
-                   Nant,Nbase,Nfreq)
+    set!(frame, meta.time)
+    set!(frame, position(meta))
+    frame
 end
 
-Tables.unlock(ms::MeasurementSet) = Tables.unlock(ms.table)
+type Visibilities
+    data  :: Matrix{JonesMatrix}
+    flags :: Matrix{Bool}
+end
+
+Nfreq(vis::Visibilities) = size(vis.data, 2)
+Nbase(vis::Visibilities) = size(vis.data, 1)
 
 """
-    get_flags(ms::MeasurementSet)
+    read_data_column(ms::Table, column)
 
-Get the flags from the dataset, but this information is stored in multiple locations.
-Unify all these flags before returning.
+Read the visibilities from the measurement set.
 """
-function get_flags(ms::MeasurementSet)
-    data_flags = ms.table["FLAG"]
-    row_flags  = ms.table["FLAG_ROW"]
-    for α = 1:length(row_flags)
-        if row_flags[α]
-            data_flags[:,:,α] = true
+function read_data_column(ms::Table, column)
+    raw_data   = ms[column]
+    data_flags = ms["FLAG"]
+    row_flags  = ms["FLAG_ROW"]
+    data  = organize_data(raw_data)
+    flags = resolve_flags(data_flags, row_flags)
+    Visibilities(data, flags)
+end
+
+function write_data_column(ms::Table, column, data::Visibilities)
+    reorganized_data = zeros(Complex64, 4, Nfreq(data), Nbase(data))
+    for α = 1:Nbase(data), β = 1:Nfreq(data)
+        reorganized_data[1,β,α] = data.data[α,β].xx
+        reorganized_data[2,β,α] = data.data[α,β].xy
+        reorganized_data[3,β,α] = data.data[α,β].yx
+        reorganized_data[4,β,α] = data.data[α,β].yy
+    end
+    ms[column] = reorganized_data
+end
+
+"""
+    read_antennas(ms::Table)
+
+Read the antenna positions from the `ANTENNA` subtable.
+"""
+function read_antennas(ms::Table)
+    antenna_table = ms[kw"ANTENNA"] |> Table
+    xyz = antenna_table["POSITION"]
+    antennas = Antenna[]
+    for i = 1:size(xyz, 2)
+        x = xyz[1,i]
+        y = xyz[2,i]
+        z = xyz[3,i]
+        position = Position(pos"ITRF", x, y, z)
+        push!(antennas, Antenna(position))
+    end
+    unlock(antenna_table)
+    antennas
+end
+
+function read_baselines(ms::Table)
+    ant1 = ms["ANTENNA1"]
+    ant2 = ms["ANTENNA2"]
+    [Baseline(ant1[α]+1, ant2[α]+1) for α = 1:length(ant1)]
+end
+
+function read_channels(ms::Table)
+    spw_table = ms[kw"SPECTRAL_WINDOW"] |> Table
+    channels  = spw_table["CHAN_FREQ", 1]
+    unlock(spw_table)
+    channels
+end
+
+function read_phase_center(ms::Table)
+    field_table = ms[kw"FIELD"] |> Table
+    dir = field_table["PHASE_DIR"]
+    unlock(field_table)
+    Direction(dir"J2000", dir[1]*radians, dir[2]*radians)
+end
+
+function read_time(ms::Table)
+    time = ms["TIME", 1]
+    Epoch(epoch"UTC", time*seconds)
+end
+
+function organize_data(raw_data)
+    data = zeros(JonesMatrix, size(raw_data,3), size(raw_data,2))
+    for α = 1:size(raw_data,3), β = 1:size(raw_data,2)
+        data[α,β] = JonesMatrix(raw_data[1,β,α], raw_data[2,β,α],
+                                raw_data[3,β,α], raw_data[4,β,α])
+    end
+    data
+end
+
+function resolve_flags(data_flags, row_flags)
+    flags = zeros(Bool, size(data_flags,3), size(data_flags,2))
+    for β = 1:size(data_flags,2), α = 1:size(data_flags,3)
+        if data_flags[1,β,α] || data_flags[2,β,α] || data_flags[3,β,α] || data_flags[4,β,α]
+            flags[α,β] = true
         end
     end
-    data_flags
+    for α = 1:length(row_flags)
+        if row_flags[α]
+            flags[α,:] = true
+        end
+    end
+    flags
 end
 
-function set_flags!(ms::MeasurementSet,flags)
-    ms.table["FLAG"] = flags
+function get_data(ms::Table)
+    read_data_column(ms, "DATA")
 end
 
-function get_data(ms::MeasurementSet)
-    ms.table["DATA"]
+function set_data!(ms::Table, data)
+    write_data_column(ms, "DATA", data)
 end
 
-function set_model_data!(ms::MeasurementSet, model,
-                         force_imaging_columns = false)
-    if force_imaging_columns || Tables.exists(ms.table,"MODEL_DATA")
-        ms.table["MODEL_DATA"] = model
+function get_model_data(ms::Table)
+    read_data_column(ms, "MODEL_DATA")
+end
+
+function set_model_data!(ms::Table, data, force_imaging_columns = false)
+    if force_imaging_columns || Tables.exists(ms,"MODEL_DATA")
+        write_data_column(ms, "MODEL_DATA", data)
     end
 end
 
@@ -120,39 +197,42 @@ end
 
 Get the CORRECTED_DATA column if it exists. Otherwise settle for the DATA column.
 """
-function get_corrected_data(ms::MeasurementSet)
-    if Tables.exists(ms.table,"CORRECTED_DATA")
-        return ms.table["CORRECTED_DATA"]
+function get_corrected_data(ms::Table)
+    if Tables.exists(ms, "CORRECTED_DATA")
+        return read_data_column(ms, "CORRECTED_DATA")
     else
-        return ms.table["DATA"]
+        return read_data_column(ms, "DATA")
     end
 end
 
-function set_corrected_data!(ms::MeasurementSet, data,
-                             force_imaging_columns = false)
-    if force_imaging_columns || Tables.exists(ms.table,"CORRECTED_DATA")
-        ms.table["CORRECTED_DATA"] = data
+function set_corrected_data!(ms::Table, data, force_imaging_columns = false)
+    if force_imaging_columns || Tables.exists(ms, "CORRECTED_DATA")
+        write_data_column(ms, "CORRECTED_DATA", data)
     else
-        ms.table["DATA"] = data
+        write_data_column(ms, "DATA", data)
     end
 end
 
-"""
-    flag_short_baselines!(flags, minuvw, u, v, w, ν)
+#function set_flags!(ms::MeasurementSet,flags)
+#    ms.table["FLAG"] = flags
+#end
 
-Flag all of the baselines whose length is less than `minuvw` wavelengths.
-
-This is a common operation that can mitigate contamination by unmodeled
-diffuse emission.
-"""
-function flag_short_baselines!(flags, minuvw, u, v, w, ν)
-    Nbase = length(u)
-    Nfreq = length(ν)
-    for α = 1:Nbase, β = 1:Nfreq
-        if u[α]^2 + v[α]^2 + w[α]^2 < (minuvw*c/ν[β])^2
-            flags[:,β,α] = true
+function flag_short_baselines!(data, meta, minuvw)
+    for α = 1:Nbase(meta)
+        antenna1 = meta.baselines[α].antenna1
+        antenna2 = meta.baselines[α].antenna2
+        u = antenna1.position.x - antenna2.position.x
+        v = antenna1.position.y - antenna2.position.y
+        w = antenna1.position.z - antenna2.position.z
+        b = sqrt(u^2 + v^2 + w^2)
+        for β = 1:Nfreq(meta)
+            ν = meta.channels[β]
+            λ = c / ν
+            if b < minuvw * λ
+                data.flags[α,β] = true
+            end
         end
     end
-    flags
+    data
 end
 

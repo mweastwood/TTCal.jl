@@ -1,4 +1,4 @@
-@testset "Ionosphere Tests" begin
+@testset "ionosphere.jl" begin
     # index of refraction is unity when the plasma frequency is zero
     @test TTCal.appleton_hartree(10e6, 0.0) == 1.0
     @test TTCal.appleton_hartree(10e6, 1e6) == sqrt(1 - 0.1^2) < 1
@@ -39,6 +39,18 @@
         new_elevation = TTCal.ray_trace(elevation, frequency, plasma_frequency)
         answer = deg2rad(dθ[i]) + elevation
         @test new_elevation ≈ answer
+    end
+
+    # test the rule of thumb that the plasma frequency is roughly 9√(n)
+    # this rule of thumb is good to about 1%
+    @test abs(TTCal.plasma_frequency(1) - 9)/9 < 0.01
+    @test abs(TTCal.plasma_frequency(100) - 90)/90 < 0.01
+
+    @test TTCal.refract(π/2, frequency, plasma_frequency) == π/2
+    for i = 1:length(θ)
+        elevation = deg2rad(θ[i])
+        new_elevation = TTCal.ray_trace(elevation, frequency, plasma_frequency)
+        @test abs(elevation - TTCal.refract(new_elevation, frequency, plasma_frequency)) < deg2rad(0.1/3600)
     end
 end
 

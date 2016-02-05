@@ -15,51 +15,90 @@
 
 abstract BeamModel
 
+function call(beam::BeamModel, ν, direction::Direction)
+    direction.sys == dir"AZEL" || error("Direction must be in the AZEL coordinate system.")
+    azimuth   = longitude(direction)
+    elevation =  latitude(direction)
+    beam(ν, azimuth, elevation)
+end
+
 """
     ConstantBeam <: BeamModel
 
-In this beam model, the Jones matrix is assumed to be unity
-in every direction.
+In this beam model the Jones matrix is assumed to be the identity
+in every direction. This is the simplest possible beam model
+and should be used if you wish to avoid the application of
+a beam model.
+
+For example, if you wish to calculate model visibilities but
+you have already manually attenuating the flux by a beam model,
+you should use `ConstantBeam` to avoid applying a beam model again.
+
+    beam = ConstantBeam()
+    sources = readsources("mysources.json")
+    # ...
+    # attenuate the sources with your own custom beam model here
+    # ...
+    metadata = collect_metadata(measurement_set, beam)
+    model_visibilities = genvis(metadata, sources)
 """
 immutable ConstantBeam <: BeamModel end
-call(::ConstantBeam,ν,az,el) = one(JonesMatrix)
+call(::ConstantBeam, ν, az, el) = one(JonesMatrix)
 
 doc"""
     SineBeam <: BeamModel
 
 This beam is azimuthally symmetric and independent of frequency.
-The gain of an individual dipole scales as $\sin(elevation)^\alpha$.
+The gain of an antenna scales as $\sin(\rm el)^\alpha$.
+For an LWA dipole a reasonable approximation to the the antenna gain
+is $\sin(\rm el)^{1.6}$, so $1.6$ is the default value of $\alpha$.
+
+Note that because Jones matrices operate on the electric field
+which must be squared to get power, the diagonal elements of the Jones matrix
+are $\sin(\rm el)^{\alpha/2}$.
+
+    beam = SineBeam() # equivalent to SineBeam(1.6)
+    beam = SineBeam(2.0)
 """
 immutable SineBeam <: BeamModel
-    α::Float64
+    α :: Float64
 end
 
 SineBeam() = SineBeam(1.6)
 
-function call(beam::SineBeam,ν,az,el)
+function call(beam::SineBeam, ν, az, el)
     # note that the factor of 1/2 in the exponent
     # comes from the fact that the Jones matrix
     # operates on electric fields, which must be
     # squared to get the power
     s = sin(el)^(beam.α/2)
-    JonesMatrix(s,0,0,s)
+    JonesMatrix(s, 0, 0, s)
 end
 
-"""
+doc"""
     Memo178Beam <: BeamModel
 
 This beam is based on the parametric fit to EM simulations
-presented in LWA memo 178 by Jayce Dowell.
+presented in [LWA memo 178](http://www.faculty.ece.vt.edu/swe/lwa/memo/lwa0178a.pdf)
+by Jayce Dowell.
 
-[http://www.faculty.ece.vt.edu/swe/lwa/memo/lwa0178a.pdf]
+The dipole gain is expressed as
+
+\\\\[
+    p(\theta) = \left[1-\left(\frac{\theta}{\pi/2}\right)^\alpha\right]\cos^\beta\theta
+              + \gamma\left(\frac{\theta}{\pi/2}\right)\cos^\delta\theta,
+\\\\]
+
+where $\theta$ is the zenith angle, and $\alpha$, $\beta$, $\gamma$, and $\delta$ are
+parameters that were fit for in the E- and H-planes of the dipole.
 """
 immutable Memo178Beam <: BeamModel end
 
-function call(::Memo178Beam,ν,az,el)
+function call(::Memo178Beam, ν, az, el)
     # NOTE: I might have the x and y dipoles swapped here
-    x = P178(ν,az,el) |> sqrt
-    y = P178(ν,az+π/2,el) |> sqrt
-    JonesMatrix(x,0,0,y)
+    x = P178(ν, az, el) |> sqrt
+    y = P178(ν, az+π/2, el) |> sqrt
+    JonesMatrix(x, 0, 0, y)
 end
 
 const _E178 = [-4.529931167425190e+01 -3.066691727279789e+01 +7.111192148086860e+01 +1.131338637814271e+01
@@ -90,26 +129,26 @@ const _H178 = [+4.062920357822495e+02 +3.038713068453467e+01
                -1.740005497709271e-03 -1.908989166200470e-04
                +2.892116885178882e-05 +3.223985512686652e-06]
 
-@eval function E178(ν,el)
+@eval function E178(ν, el)
     x = ν / 10e6
     θ = π/2 - el
-    α = @evalpoly(x,$(_E178[:,1]...))
-    β = @evalpoly(x,$(_E178[:,2]...))
-    γ = @evalpoly(x,$(_E178[:,3]...))
-    δ = @evalpoly(x,$(_E178[:,4]...))
+    α = @evalpoly(x, $(_E178[:,1]...))
+    β = @evalpoly(x, $(_E178[:,2]...))
+    γ = @evalpoly(x, $(_E178[:,3]...))
+    δ = @evalpoly(x, $(_E178[:,4]...))
     (1-(θ/(π/2))^α)*cos(θ)^β + γ*(θ/(π/2))*cos(θ)^δ
 end
 
-@eval function H178(ν,el)
+@eval function H178(ν, el)
     x = ν / 10e6
     θ = π/2 - el
-    α = @evalpoly(x,$(_H178[:,1]...))
-    β = @evalpoly(x,$(_H178[:,2]...))
+    α = @evalpoly(x, $(_H178[:,1]...))
+    β = @evalpoly(x, $(_H178[:,2]...))
     # γ and δ are neglected on the H plane
     (1-(θ/(π/2))^α)*cos(θ)^β
 end
 
-function P178(ν,az,el)
+function P178(ν, az, el)
     sqrt((E178(ν,el)*cos(az))^2 + (H178(ν,el)*sin(az))^2)
 end
 

@@ -1,15 +1,17 @@
-let
-    u = [1.0; 10.0; 20.0]
-    v = [0.0;  0.0;  0.0]
-    w = [0.0;  0.0;  0.0]
-    ν = [TTCal.c/6.0; TTCal.c/4.0]
+@testset "measurementsets.jl" begin
+    Nant  = 5
+    Nfreq = 10
+    name, ms = createms(Nant, Nfreq)
+    meta = TTCal.collect_metadata(ms, ConstantBeam())
+    @test TTCal.Nant(meta)  == Nant
+    @test TTCal.Nfreq(meta) == Nfreq
+    @test TTCal.Nbase(meta) == (Nant*(Nant+1))÷2
 
-    flags = zeros(4,length(ν),length(u))
-    TTCal.flag_short_baselines!(flags,2.0,u,v,w,ν)
-
-    manual_flags = zeros(4,length(ν),length(u))
-    manual_flags[:,:,1] = true
-    manual_flags[:,1,2] = true
-    @test flags == manual_flags
+    data_flags = zeros(Bool,4,5,6)
+    row_flags = ones(Bool,6)
+    @test TTCal.resolve_flags(data_flags, row_flags) == ones(Bool,6,5)
+    data_flags = ones(Bool,4,5,6)
+    row_flags = zeros(Bool,6)
+    @test TTCal.resolve_flags(data_flags, row_flags) == ones(Bool,6,5)
 end
 

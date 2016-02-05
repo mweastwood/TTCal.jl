@@ -136,9 +136,9 @@ The conversion from azimuth and elevation to an ITRF direction is
 straightforward. CasaCore's implementation is slow and requires
 unnecessary information (the current time).
 """
-function direction_to_itrf(direction, location)
-    direction.sys == dir"AZEL" || error("Direction must have the AZEL coordinate system.")
-    location.sys  == pos"ITRF" || error("Location must have the ITRF coordinate system.")
+function azel_to_itrf(direction, location)
+    direction.sys == dir"AZEL" || error("Direction must be in the AZEL coordinate system.")
+    location.sys  == pos"ITRF" || error("Location must be in the ITRF coordinate system.")
     z     = [0, 0, 1]
     loc   = [ location.x,  location.y,  location.z]
     up    = loc / norm(loc)

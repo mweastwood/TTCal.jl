@@ -1,4 +1,4 @@
-let
+@testset "fitvis.jl" begin
     Nant = 10
     Nfreq = 2
     name,ms = createms(Nant,Nfreq)

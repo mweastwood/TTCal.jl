@@ -14,19 +14,15 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 """
-    fitvis(ms::MeasurementSet, direction::Direction;
-           maxiter = 20, tolerance = 1e-3, minuvw = 0.0) -> l,m
+    fitvis(visibilities::Visibilities, meta::Metadata, direction::Direction;
+           maxiter = 20, tolerance = 1e-3)
 
 Fit for the location of a point source near the given direction.
 """
-function fitvis(ms::MeasurementSet,
-                direction::Direction;
-                maxiter::Int = 20,
-                tolerance::Float64 = 1e-3,
-                minuvw::Float64 = 0.0)
-    if !isabovehorizon(ms.frame,direction)
-        error("Direction is below the horizon.")
-    end
+function fitvis(visibilities::Visibilities, meta::Metadata, direction::Direction;
+                maxiter::Int = 20, tolerance::Float64 = 1e-3)
+    frame = reference_frame(meta)
+    isabovehorizon(frame, direction) || error("Direction is below the horizon.")
 
     j2000 = measure(ms.frame,direction,dir"J2000")
     l,m   = direction_cosines(ms.phase_direction,j2000)
@@ -35,7 +31,7 @@ function fitvis(ms::MeasurementSet,
     flags = get_flags(ms)
     flag_short_baselines!(flags,minuvw,ms.u,ms.v,ms.w,ms.ν)
 
-    fitvis(data,flags,l,m,
+    fitvis_internal(visibilities, l,m,
            ms.u,ms.v,ms.w,ms.ν,
            ms.ant1,ms.ant2,
            maxiter,tolerance)
