@@ -41,12 +41,12 @@ end
     # test that genvis agrees with the above reference implementation
     visibilities = genvis(meta, sources)
     model = old_genvis_equivalent(meta, sources)
-    @test vecnorm(visibilities.data - model) < eps(Float64) * vecnorm(visibilities.data)
+    @test vecnorm(visibilities.data - model) < sqrt(eps(Float64)) * vecnorm(visibilities.data)
 
     # a source at the phase center should have unity visibilities
     sources = [PointSource("Cristiano Ronaldo", meta.phase_center, PowerLaw(1,0,0,0,10e6,[0.0]))]
     visibilities = genvis(meta, sources)
     model = ones(JonesMatrix, TTCal.Nbase(meta), Nfreq)
-    @test vecnorm(visibilities.data - model) < eps(Float64) * vecnorm(visibilities.data)
+    @test vecnorm(visibilities.data - model) < sqrt(eps(Float64)) * vecnorm(visibilities.data)
 end
 

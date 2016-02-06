@@ -31,7 +31,8 @@ function createms(Nant,Nfreq)
     Nbase = div(Nant*(Nant-1),2) + Nant
 
     frame = ReferenceFrame()
-    pos = measure(frame,observatory("OVRO_MMA"),pos"ITRF")
+    OVRO  = Position(pos"WGS84", 1207.969meters, -118.284441degrees, 37.232271degrees)
+    pos   = measure(frame, OVRO, pos"ITRF")
     t = (2015.-1858.)*365.*24.*60.*60. # a rough current Julian date (in seconds)
     set!(frame,Epoch(epoch"UTC",t*seconds))
     set!(frame,pos)
@@ -56,8 +57,7 @@ function createms(Nant,Nfreq)
 
     subtable = Table("$name/ANTENNA")
     Tables.addrows!(subtable,Nant)
-    x,y,z = pos.x, pos.y, pos.z
-    subtable["POSITION"] = [x;y;z]*ones(1,Nant)
+    subtable["POSITION"] = [x y z]'
     unlock(subtable)
 
     subtable = Table("$name/FIELD")
