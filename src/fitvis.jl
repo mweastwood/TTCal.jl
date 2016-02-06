@@ -14,6 +14,36 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 """
+    FitvisVariables
+
+This type is simply a container for variables that need to be calculated
+once and shared between functions while fitting source positions.
+"""
+type FitvisVariables
+    phase_center :: Direction # should always be ITRF
+    u :: Vector{Float64}
+    v :: Vector{Float64}
+    w :: Vector{Float64}
+    function FitvisVariables(meta::Metadata)
+        frame = reference_frame(meta)
+        phase_center = measure(frame, meta.phase_center, dir"ITRF")
+        u = zeros(Nbase(meta))
+        v = zeros(Nbase(meta))
+        w = zeros(Nbase(meta))
+        for α = 1:Nbase(meta)
+            antenna1 = meta.baselines[α].antenna1
+            antenna2 = meta.baselines[α].antenna2
+            r1 = meta.antennas[antenna1].position
+            r2 = meta.antennas[antenna2].position
+            u[α] = r1.x - r2.x
+            v[α] = r1.y - r2.y
+            w[α] = r1.z - r2.z
+        end
+        new(phase_center, u, v, w)
+    end
+end
+
+"""
     fitvis(visibilities::Visibilities, meta::Metadata, direction::Direction;
            maxiter = 20, tolerance = 1e-3)
 
@@ -23,113 +53,89 @@ function fitvis(visibilities::Visibilities, meta::Metadata, direction::Direction
                 maxiter::Int = 20, tolerance::Float64 = 1e-3)
     frame = reference_frame(meta)
     isabovehorizon(frame, direction) || error("Direction is below the horizon.")
-
-    j2000 = measure(ms.frame,direction,dir"J2000")
-    l,m   = direction_cosines(ms.phase_direction,j2000)
-
-    data  = get_corrected_data(ms)
-    flags = get_flags(ms)
-    flag_short_baselines!(flags,minuvw,ms.u,ms.v,ms.w,ms.ν)
-
-    fitvis_internal(visibilities, l,m,
-           ms.u,ms.v,ms.w,ms.ν,
-           ms.ant1,ms.ant2,
-           maxiter,tolerance)
+    direction = measure(frame, direction, dir"ITRF")
+    variables = FitvisVariables(meta)
+    newdirection = fitvis_internal(visibilities, meta, variables, direction, maxiter, tolerance)
+    measure(frame, newdirection, dir"J2000")
 end
 
-function fitvis(data,flags,l,m,
-                u,v,w,ν,ant1,ant2,
-                maxiter,tolerance)
-    lm = [l;m]
-    converged = iterate(FitVisStep(),RK4,maxiter,tolerance,false,
-                        lm,data,flags,u,v,w,ν,ant1,ant2)
-    lm[1],lm[2]
+function fitvis_internal(visibilities, meta, variables, direction, maxiter, tolerance)
+    vector = [direction.x, direction.y, direction.z, 1.0]
+    converged = iterate(FitvisStep(), RK4, maxiter, tolerance, false,
+                        vector, visibilities, meta, variables)
+    Direction(dir"ITRF", vector[1], vector[2], vector[3])
 end
 
-function fitvis_step(lm,data,flags,
-                     u,v,w,ν,ant1,ant2)
-    l = lm[1]
-    m = lm[2]
-    Nfreq = length(ν)
-    Nbase = length(u)
-
-    # Calculate the flux in the given direction
-    # and its derivatives with respect to direction.
-    fringe = fringepattern(l,m,u,v,w,ν)
-    F   = 0.0        # flux
-    dF  = [0.0, 0.0] # [ ∂F/∂l ∂F/∂m ]
-    d2F = [0.0 0.0;  # [ ∂²F/∂l²  ∂²F/∂l∂m
-           0.0 0.0]  #   ∂²F/∂l∂m ∂²F/∂m² ]
-    count = 0 # the number of baselines used in the calculation
+function fitvis_step(vector, visibilities, meta, variables)
+    x = vector[1]
+    y = vector[2]
+    z = vector[3]
+    lagrange = vector[4] # the Lagrange multiplier
+    direction = Direction(dir"ITRF", x, y, z)
+    delays = geometric_delays(meta.antennas, direction, variables.phase_center)
 
     πi = π*1im
-    λ = [c/ν[β] for β = 1:Nfreq]
-    @inbounds for α = 1:Nbase
-        ant1[α] == ant2[α] && continue # don't use auto-correlations
-        for β = 1:Nfreq
-            any(slice(flags,:,β,α)) && continue
-            # use the Stokes I visibilities only
-            V = 0.5*(data[1,β,α]+data[4,β,α])*conj(fringe[β,α])
-            uλ = u[α]/λ[β]
-            vλ = v[α]/λ[β]
-            F        += real(V)
-            dF[1]    += real(V * -2πi * uλ)
-            dF[2]    += real(V * -2πi * vλ)
-            d2F[1,1] += real(V * (-2πi)^2 * uλ^2)
-            d2F[2,1] += real(V * (-2πi)^2 * uλ*vλ)
-            d2F[1,2] += real(V * (-2πi)^2 * uλ*vλ)
-            d2F[2,2] += real(V * (-2πi)^2 * vλ^2)
+    gradient = [0.0, 0.0, 0.0, 0.0]
+    hessian  = [0.0  0.0  0.0  0.0
+                0.0  0.0  0.0  0.0
+                0.0  0.0  0.0  0.0
+                0.0  0.0  0.0  0.0]
+
+    count = 1
+    for β = 1:Nfreq(meta)
+        ν = meta.channels[β]
+        λ = c/ν
+        fringes = delays_to_fringes(delays, ν)
+        for α = 1:Nbase(meta)
+            antenna1 = meta.baselines[α].antenna1
+            antenna2 = meta.baselines[α].antenna2
+            antenna1 == antenna2 && continue # don't use auto-correlations
+            visibilities.flags[α,β] && continue
+            fringe = conj(fringes[antenna1]) * fringes[antenna2]
+            # use the Stokes I flux only
+            V = 0.5*(visibilities.data[α,β].xx+visibilities.data[α,β].yy) * fringe
+            uλ = variables.u[α]/λ
+            vλ = variables.v[α]/λ
+            wλ = variables.w[α]/λ
+            gradient[1]  += real(V * -2πi * uλ)
+            gradient[2]  += real(V * -2πi * vλ)
+            gradient[3]  += real(V * -2πi * wλ)
+            hessian[1,1] += real(V * (-2πi)^2 * uλ^2)
+            hessian[2,1] += real(V * (-2πi)^2 * uλ*vλ)
+            hessian[3,1] += real(V * (-2πi)^2 * uλ*wλ)
+            hessian[2,2] += real(V * (-2πi)^2 * vλ^2)
+            hessian[3,2] += real(V * (-2πi)^2 * vλ*wλ)
+            hessian[3,3] += real(V * (-2πi)^2 * wλ^2)
             count += 1
         end
     end
+    gradient /= count
+    hessian  /= count
 
-    # Normalizing isn't strictly necessary because we care
-    # about the ratio of the Hessian to the gradient, but
-    # we do it here just to avoid confusion later in life
-    F /= count
-    dF /= count
-    d2F /= count
+    # Add the contribution of the Lagrange multiplier
+    gradient[1]  += lagrange * 2x
+    gradient[2]  += lagrange * 2y
+    gradient[3]  += lagrange * 2z
+    gradient[4]   = x^2 + y^2 + z^2 - 1
+    hessian[1,1] += lagrange * 2
+    hessian[2,2] += lagrange * 2
+    hessian[3,3] += lagrange * 2
+    hessian[4,1]  = 2x
+    hessian[4,2]  = 2y
+    hessian[4,3]  = 2z
 
-    # Calculate how far to step in each direction
-    δ = -d2F \ dF
-    dl = δ[1]
-    dm = δ[2]
-    l′,m′ = force_to_horizon(l+dl,m+dm)
+    # The Hessian should be symmetric
+    hessian[1,2] = hessian[2,1]
+    hessian[1,3] = hessian[3,1]
+    hessian[1,4] = hessian[4,1]
+    hessian[2,3] = hessian[3,2]
+    hessian[2,4] = hessian[4,2]
+    hessian[3,4] = hessian[4,3]
 
-    # If the step size is larger than a resolution element
-    # we will stay put because the fitting process is about
-    # to diverge.
-    n  = sqrt(1-l^2-m^2)
-    n′ = sqrt(1-l′^2-m′^2)
-    dθ = acos(l*l′+m*m′+n*n′)
-    baseline_length = [sqrt(u[α]^2+v[α]^2+w[α]^2) for α = 1:Nbase]
-    resolution = minimum(λ) / maximum(baseline_length)
-    if dθ > resolution
-        l′ = l
-        m′ = m
-    end
-
-    [l′-l, m′-m]
+    # Compute the step
+    δ = -hessian\gradient
 end
 
-immutable FitVisStep <: StepFunction end
-call(::FitVisStep,lm,data,flags,u,v,w,ν,ant1,ant2) = fitvis_step(lm,data,flags,u,v,w,ν,ant1,ant2)
-
-doc"""
-    force_to_horizon(l,m)
-
-This function forces the coordinates $(l,m)$ to be above the horizon.
-
-Although this is a nasty hack, it is necessary for fitting
-some sources that are near the horizon.
-"""
-function force_to_horizon(l,m)
-    r2 = l^2+m^2
-    if r2 > 1
-        θ = atan2(l,m)
-        l = (1.0-1e-12)*sin(θ)
-        m = (1.0-1e-12)*cos(θ)
-    end
-    l,m
-end
+immutable FitvisStep <: StepFunction end
+call(::FitvisStep, vector, visibilities, meta, variables) = fitvis_step(vector, visibilities, meta, variables)
 
