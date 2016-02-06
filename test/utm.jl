@@ -30,5 +30,9 @@
     @test measure(frame,   east, dir"ITRF") ≈ TTCal.azel_to_itrf(east, position)
     @test measure(frame,  south, dir"ITRF") ≈ TTCal.azel_to_itrf(south, position)
     @test measure(frame,   west, dir"ITRF") ≈ TTCal.azel_to_itrf(west, position)
+    dir  = Direction(dir"J2000", "19h59m28.35663s", "+40d44m02.0970s")
+    azel = measure(frame, dir, dir"AZEL")
+    @test measure(frame, azel, dir"ITRF") ≈ TTCal.azel_to_itrf(azel, position)
+    @test measure(frame,  dir, dir"ITRF") ≈ TTCal.azel_to_itrf(azel, position)
 end
 

@@ -140,12 +140,12 @@ function azel_to_itrf(direction, location)
     direction.sys == dir"AZEL" || error("Direction must be in the AZEL coordinate system.")
     location.sys  == pos"ITRF" || error("Location must be in the ITRF coordinate system.")
     z     = [0, 0, 1]
-    loc   = [ location.x,  location.y,  location.z]
+    loc   = [location.x, location.y, location.z]
     up    = loc / norm(loc)
     north = z - dot(z, up)*up
+    north = north / norm(north)
     east  = cross(north, up)
     dir   = direction.x * north + direction.y * east + direction.z * up
-    dir  /= norm(dir)
     Direction(dir"ITRF", dir[1], dir[2], dir[3])
 end
 
