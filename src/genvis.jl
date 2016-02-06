@@ -50,7 +50,8 @@ function genvis_onesource!(visibilities, meta, variables, source::PointSource)
     for β = 1:Nfreq(meta)
         frequency = meta.channels[β]
         # refraction through the ionosphere
-        refracted_direction = refract(direction, frequency, 5e6)
+        # TODO: allow the plasma frequency to be set to something nonzero
+        refracted_direction = refract(direction, frequency, 0.0)
         # corruption by the primary beam
         flux  = (source.spectrum(frequency) |> linear) :: HermitianJonesMatrix
         jones = meta.beam(frequency, refracted_direction) :: JonesMatrix
