@@ -2,7 +2,7 @@
     Nant = 10
     Nfreq = 2
     name,ms = createms(Nant,Nfreq)
-    meta = TTCal.collect_metadata(ms, ConstantBeam())
+    meta = collect_metadata(ms, ConstantBeam())
 
     # Generate the data column with only one source
     # to prevent sidelobe contamination in the tests

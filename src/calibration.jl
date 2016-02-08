@@ -22,59 +22,30 @@ macro generate_calibration(name, jones)
             flags::Matrix{Bool}
         end
         function $name(Nant, Nfreq)
-            $name(ones($jones,Nant,Nfreq), zeros(Bool,Nant,Nfreq))
+            $name(ones($jones, Nant, Nfreq), zeros(Bool, Nant, Nfreq))
         end
         Base.similar(cal::$name) = $name(Nant(cal), Nfreq(cal))
     end |> esc
 end
 
-"""
-    immutable GainCalibration <: Calibration
-
-This type stores the information for calibrating the
-electronic gains of the interferometer. That is, it stores
-complex gains and flags for each antenna, frequency channel,
-and polarization.
-
-    GainCalibration(Nant, Nfreq)
-
-Create a calibration table for `Nant` antennas with
-`Nfreq` frequency channels where all the gains are
-initially set to unity.
-"""
 @generate_calibration GainCalibration DiagonalJonesMatrix
-
-"""
-    immutable PolarizationCalibration <: Calibration
-
-This type stores the information for calibrating the
-polarization of the interferometer. That is, it stores
-Jones matrices and flags for each antenna and each
-frequency channel.
-
-    PolarizationCalibration(Nant, Nfreq)
-
-Create a calibration table for `Nant` antennas with
-`Nfreq` frequency channels where all the Jones matrices
-are initially set to the identity matrix.
-"""
 @generate_calibration PolarizationCalibration JonesMatrix
 
-Nant( cal::Calibration) = size(cal.jones,1)
-Nfreq(cal::Calibration) = size(cal.jones,2)
+Nant( cal::Calibration) = size(cal.jones, 1)
+Nfreq(cal::Calibration) = size(cal.jones, 2)
 
 doc"""
-    invert(cal::Calibration)
+    invert(calibration::Calibration)
 
 Returns the inverse of the given calibration.
 The Jones matrix $J$ of each antenna is set to $J^{-1}$.
 """
-function invert(cal::Calibration)
-    output = similar(cal)
-    for i in eachindex(output.jones, output.flags,
-                          cal.jones,    cal.flags)
-        output.jones[i] = inv(cal.jones[i])
-        output.flags[i] = cal.flags[i]
+function invert(calibration::Calibration)
+    output = similar(calibration)
+    for i in eachindex(     output.jones,      output.flags,
+                       calibration.jones, calibration.flags)
+        output.jones[i] = inv(calibration.jones[i])
+        output.flags[i] = calibration.flags[i]
     end
     output
 end
@@ -96,81 +67,40 @@ end
 # corrupt / applycal
 
 """
-    corrupt!(data::Array{Complex64,3}, flags::Array{Bool,3},
-             cal::Calibration, ant1, ant2)
+    corrupt!(visibilities::Visibilities, meta::Metadata, calibration::Calibration)
 
-Corrupt the data as if it was observed with the given calibration.
+Corrupt the visibilities as if they were observed with the given calibration.
 """
-function corrupt!(data::Array{Complex64,3}, flags::Array{Bool,3},
-                  cal::Calibration, ant1, ant2)
-    Nbase = length(ant1)
-    for α = 1:Nbase, β = 1:Nfreq(cal)
-        if cal.flags[ant1[α],β] || cal.flags[ant2[α],β]
-            flags[:,β,α] = true
+function corrupt!(visibilities::Visibilities, meta::Metadata, calibration::Calibration)
+    for β = 1:Nfreq(meta), α = 1:Nbase(meta)
+        antenna1 = meta.baselines[α].antenna1
+        antenna2 = meta.baselines[α].antenna2
+        if calibration.flags[antenna1,β] || calibration.flags[antenna2,β]
+            visibilities.flags[α,β] = true
         end
-        V = JonesMatrix(data[1,β,α], data[2,β,α],
-                        data[3,β,α], data[4,β,α])
-        J1 = cal.jones[ant1[α],β]
-        J2 = cal.jones[ant2[α],β]
-        V = J1*V*J2'
-        data[1,β,α] = V.xx
-        data[2,β,α] = V.xy
-        data[3,β,α] = V.yx
-        data[4,β,α] = V.yy
+        V  = visibilities.data[α,β]
+        J₁ = calibration.jones[antenna1,β]
+        J₂ = calibration.jones[antenna2,β]
+        visibilities.data[α,β] = J₁*V*J₂'
     end
+    visibilities
 end
 
-"""
-    corrupt!(data::Array{Complex64,3}, cal::Calibration, ant1, ant2)
-
-Corrupt the model data as if it had been observed
-with an instrument with the given calibration.
-"""
-function corrupt!(data::Array{Complex64,3},
-                  cal::Calibration, ant1, ant2)
-    flags = fill(false, size(data))
-    corrupt!(data, flags, cal, ant1, ant2)
-end
 
 """
-    applycal!(ms::MeasurementSet, calibration::Calibration;
-              apply_to_corrected = false, force_imaging_columns = false)
+    applycal!(visibilities::Visibilities, meta::Metadata, calibration::Calibration)
 
-Apply the calibration to the given measurement set.
-
-**Arguments:**
-
-* `ms` - the measurement set to which the calibration will be applied
-* `calibration` - the calibration that will be applied
-
-**Keyword Arguments:**
-
-* `apply_to_corrected` - if this is set to true, the calibration will be
-    applied to the CORRECTED_DATA column instead of the DATA column
-* `force_imaging_columns` - if this is set to true, the calibrated data
-    will be written to the CORRECTED_DATA column regardless of whether
-    or not the column already exists
+Apply the calibration to the given visibilities.
 """
-function applycal!(ms::MeasurementSet, calibration::Calibration;
-                   apply_to_corrected::Bool = false,
-                   force_imaging_columns::Bool = false)
-    data  = apply_to_corrected? get_corrected_data(ms) : get_data(ms)
-    flags = get_flags(ms)
-    applycal!(data, flags, calibration, ms.ant1, ms.ant2)
-    set_corrected_data!(ms, data, force_imaging_columns)
-    set_flags!(ms, flags)
-    data
-end
-
-function applycal!(data::Array{Complex64,3}, flags::Array{Bool,3},
-                   cal::Calibration, ant1, ant2)
-    inverse_cal = invert(cal)
-    corrupt!(data, flags, inverse_cal, ant1, ant2)
-    data
+function applycal!(visibilities::Visibilities, meta::Metadata, calibration::Calibration)
+    inverse_cal = invert(calibration)
+    corrupt!(visibilities, meta, inverse_cal)
+    visibilities
 end
 
 # gaincal / polcal
 
+#=
 const argument_docs = """
 **Arguments:**
 
@@ -489,4 +419,5 @@ function check!(::StefCalStep, input, data, model)
 
     nothing
 end
+=#
 

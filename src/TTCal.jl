@@ -20,7 +20,7 @@ module TTCal
 export JonesMatrix, DiagonalJonesMatrix, HermitianJonesMatrix
 export StokesVector, MuellerMatrix
 
-export Visibilities, Metadata
+export Visibilities, Metadata, collect_metadata
 
 export PointSource, MultiSource, PowerLaw
 export readsources, writesources
@@ -56,9 +56,9 @@ include("genvis.jl")
 include("getspec.jl")
 include("subsrc.jl")
 include("fitvis.jl")
-#include("calibration.jl")
+include("calibration.jl")
 #include("peel.jl")
-#include("commandline.jl")
+include("commandline.jl")
 
 end
 

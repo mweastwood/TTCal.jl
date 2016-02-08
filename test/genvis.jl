@@ -35,7 +35,7 @@ end
     Nant  = 5
     Nfreq = 10
     name, ms = createms(Nant, Nfreq)
-    meta = TTCal.collect_metadata(ms, ConstantBeam())
+    meta = collect_metadata(ms, ConstantBeam())
     sources = readsources("sources.json")
 
     # test that genvis agrees with the above reference implementation

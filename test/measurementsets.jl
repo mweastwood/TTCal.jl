@@ -2,7 +2,7 @@
     Nant  = 5
     Nfreq = 10
     name, ms = createms(Nant, Nfreq)
-    meta = TTCal.collect_metadata(ms, ConstantBeam())
+    meta = collect_metadata(ms, ConstantBeam())
     @test TTCal.Nant(meta)  == Nant
     @test TTCal.Nfreq(meta) == Nfreq
     @test TTCal.Nbase(meta) == (Nant*(Nant+1))÷2

@@ -202,14 +202,16 @@ end
 
 function run_applycal(args)
     println("Running `applycal` on $(args["input"])")
-    ms = MeasurementSet(ascii(args["input"]))
+    ms  = Table(ascii(args["input"]))
     cal = read(args["calibration"])
-    force_imaging_columns = haskey(args,"force-imaging")
-    apply_to_corrected = haskey(args,"corrected")
-    applycal!(ms,cal,
-              force_imaging_columns=args["force-imaging"],
-              apply_to_corrected=args["corrected"])
-    cal
+    force_imaging_columns = args["force-imaging"]
+    apply_to_corrected    = args["corrected"]
+    meta = collect_metadata(ms, ConstantBeam())
+    data = apply_to_corrected? get_corrected_data(ms) : get_data(ms)
+    applycal!(data, meta, cal)
+    set_corrected_data!(ms, data, force_imaging_columns)
+    unlock(ms)
+    data
 end
 
 precompile(main,(Vector{UTF8String},))
