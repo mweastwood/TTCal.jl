@@ -104,7 +104,7 @@ function genvis_onesource_onechannel!(visibilities, meta, flux, source, phase_ce
 end
 
 function geometric_delays(antennas, source_direction::Direction, phase_center)
-    # farfield
+    # far field
     l = source_direction.x - phase_center.x
     m = source_direction.y - phase_center.y
     n = source_direction.z - phase_center.z
@@ -120,7 +120,7 @@ function geometric_delays(antennas, source_direction::Direction, phase_center)
 end
 
 function geometric_delays(antennas, source_position::Position, phase_center)
-    # nearfield
+    # near field
     l = -phase_center.x
     m = -phase_center.y
     n = -phase_center.z

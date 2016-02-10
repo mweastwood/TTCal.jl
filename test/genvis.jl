@@ -48,5 +48,17 @@ end
     visibilities = genvis(meta, sources)
     model = ones(JonesMatrix, TTCal.Nbase(meta), Nfreq)
     @test vecnorm(visibilities.data - model) < sqrt(eps(Float64)) * vecnorm(visibilities.data)
+
+    # check that the near field and far field routines give equal geometric delays
+    # in the far field
+    position = TTCal.position(meta)
+    vector = [position.x; position.y; position.z]
+    farfield_vector  = vector / norm(vector)
+    nearfield_vector = vector * 1e5
+    farfield_direction = Direction(dir"ITRF",  farfield_vector[1],  farfield_vector[2],  farfield_vector[3])
+    nearfield_position =  Position(pos"ITRF", nearfield_vector[1], nearfield_vector[2], nearfield_vector[3])
+    farfield_delays  = TTCal.geometric_delays(meta.antennas, farfield_direction, meta.phase_center)
+    nearfield_delays = TTCal.geometric_delays(meta.antennas, nearfield_position, meta.phase_center)
+    @test vecnorm(farfield_delays - nearfield_delays)/vecnorm(farfield_delays) < 1e-8
 end
 
