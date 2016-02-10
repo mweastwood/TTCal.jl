@@ -44,6 +44,8 @@ function genvis(meta::Metadata, sources)
     Visibilities(model, flags)
 end
 
+genvis(meta::Metadata, source::Source) = genvis(meta, [source])
+
 function genvis_onesource!(visibilities, meta, variables, source::PointSource)
     direction = measure(variables.frame, source.direction, dir"AZEL")
     phase_center = variables.phase_center

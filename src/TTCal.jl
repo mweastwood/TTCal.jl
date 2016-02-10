@@ -57,7 +57,7 @@ include("getspec.jl")
 include("subsrc.jl")
 include("fitvis.jl")
 include("calibration.jl")
-#include("peel.jl")
+include("peel.jl")
 include("commandline.jl")
 
 end
