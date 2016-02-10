@@ -1,5 +1,5 @@
 @testset "calibration.jl" begin
-    Nant  = 100
+    Nant  = 256
     Nfreq = 2
     name, ms = createms(Nant, Nfreq)
     meta = collect_metadata(ms, ConstantBeam())
@@ -61,7 +61,6 @@
         end
     end
 
-    #=
     @testset "stefcal" begin
         N = 100
         data  = [rand(JonesMatrix) for i = 1:N, j = 1:N]
@@ -98,19 +97,19 @@
     function test_solve(cal,data,model,maxiter,tolerance)
         # Run as `solve!(...)`
         mycal = similar(cal)
-        flags = zeros(Bool,size(data))
-        TTCal.solve!(mycal,data,model,flags,ant1,ant2,maxiter,tolerance,false,quiet=true)
+        TTCal.solve!(mycal,data,model,meta,maxiter,tolerance,quiet=true)
+        TTCal.fixphase!(cal,"1x")
         TTCal.fixphase!(mycal,"1x")
         @test !any(mycal.flags)
         @test vecnorm(mycal.jones-cal.jones) < eps(Float32)*vecnorm(cal.jones)
     end
 
     @testset "unity gains" begin
-        data  = Array{Complex64,3}(complex(randn(4,Nfreq,Nbase),randn(4,Nfreq,Nbase)))
-        model = copy(data)
+        measured = deepcopy(visibilities)
+        model = deepcopy(visibilities)
         for T in (GainCalibration,PolarizationCalibration)
             cal = T(Nant,Nfreq)
-            test_solve(cal,data,model,100,eps(Float64))
+            test_solve(cal,measured,model,100,eps(Float64))
         end
     end
 
@@ -120,11 +119,11 @@
             for i in eachindex(cal.jones)
                 cal.jones[i] = rand(eltype(cal.jones))
             end
-            TTCal.fixphase!(cal,"1x")
-            data  = Array{Complex64,3}(complex(randn(4,Nfreq,Nbase),randn(4,Nfreq,Nbase)))
-            model = copy(data)
-            corrupt!(data,cal,ant1,ant2)
-            test_solve(cal,data,model,200,eps(Float64))
+            measured = Visibilities([rand(JonesMatrix) for α = 1:TTCal.Nbase(meta), β = 1:Nfreq],
+                                    zeros(Bool, TTCal.Nbase(meta), Nfreq))
+            model = deepcopy(measured)
+            corrupt!(measured,meta,cal)
+            test_solve(cal,measured,model,200,10eps(Float64))
         end
     end
 
@@ -134,46 +133,31 @@
             for i in eachindex(cal.jones)
                 cal.jones[i] = rand(eltype(cal.jones))
             end
-            TTCal.fixphase!(cal,"1x")
-            data  = Array{Complex64,3}(complex(randn(4,Nfreq,Nbase),randn(4,Nfreq,Nbase)))
-            model = copy(data)
-            corrupt!(data,cal,ant1,ant2)
+            measured = Visibilities([rand(JonesMatrix) for α = 1:TTCal.Nbase(meta), β = 1:Nfreq],
+                                    zeros(Bool, TTCal.Nbase(meta), Nfreq))
+            model = deepcopy(measured)
+            corrupt!(measured,meta,cal)
             α = 1
             for ant = 1:Nant
-                data[:,:,α] = rand(4,Nfreq)
+                for β = 1:Nfreq
+                    measured.data[α,β] = rand(JonesMatrix)
+                end
                 α += Nant-ant+1
             end
-            test_solve(cal,data,model,200,eps(Float64))
-        end
-    end
-
-    @testset "one bad antenna" begin
-        data  = Array{Complex64,3}(complex(randn(4,Nfreq,Nbase),randn(4,Nfreq,Nbase)))
-        model = copy(data)
-        for α = 1:Nant
-            data[:,:,α] = 0
-        end
-        for T in (GainCalibration,PolarizationCalibration)
-            cal = T(Nant,Nfreq)
-            mycal = T(Nant,Nfreq)
-            flags = zeros(Bool,size(data))
-            TTCal.solve!(mycal,data,model,flags,ant1,ant2,200,eps(Float64),true)
-            TTCal.fixphase!(mycal,"1y")
-            @test all(mycal.flags[1,:])
-            @test !any(mycal.flags[2:end,:])
-            @test vecnorm(mycal.jones[2:end,:]-cal.jones[2:end,:]) < eps(Float32)*vecnorm(cal.jones[2:end,:])
+            test_solve(cal,measured,model,200,10eps(Float64))
         end
     end
 
     @testset "gaincal" begin
-        # Run as `gaincal(...)`
-        name,ms = createms(Nant,Nfreq)
-        sources = readsources("sources.json")
-        ms.table["DATA"] = genvis(ms,sources,ConstantBeam())
+        δ = sqrt(eps(Float64))*vecnorm(ones(DiagonalJonesMatrix,Nant,Nfreq))
 
-        mycal = gaincal(ms,sources,ConstantBeam(),maxiter=100,tolerance=eps(Float64))
+        # Run as `gaincal(...)`
+        mycal = gaincal(visibilities, meta, sources ,maxiter=100, tolerance=eps(Float64))
+        TTCal.fixphase!(mycal,"1x")
         @test !any(mycal.flags)
-        @test vecnorm(mycal.jones - ones(DiagonalJonesMatrix,Nant,Nfreq)) < sqrt(eps(Float64))
+        @test vecnorm(mycal.jones - ones(DiagonalJonesMatrix,Nant,Nfreq)) < δ
+
+        TTCal.set_data!(ms, visibilities)
         unlock(ms)
 
         # Run from `main(...)`
@@ -181,19 +165,21 @@
         TTCal.main(["gaincal","--input",name,"--output",output_name,"--sources","sources.json",
                     "--maxiter","100","--tolerance","$(eps(Float64))","--beam","constant"])
         mycal = TTCal.read(output_name)
+        TTCal.fixphase!(mycal,"1x")
         @test !any(mycal.flags)
-        @test vecnorm(mycal.jones - ones(DiagonalJonesMatrix,Nant,Nfreq)) < sqrt(eps(Float64))
+        @test vecnorm(mycal.jones - ones(DiagonalJonesMatrix,Nant,Nfreq)) < δ
     end
 
     @testset "polcal" begin
-        # Run as `polcal(...)`
-        name,ms = createms(Nant,Nfreq)
-        sources = readsources("sources.json")
-        ms.table["DATA"] = genvis(ms,sources,ConstantBeam())
+        δ = sqrt(eps(Float64))*vecnorm(ones(JonesMatrix,Nant,Nfreq))
 
-        mycal = polcal(ms,sources,ConstantBeam(),maxiter=100,tolerance=eps(Float64))
+        # Run as `polcal(...)`
+        mycal = polcal(visibilities, meta, sources ,maxiter=100, tolerance=eps(Float64))
+        TTCal.fixphase!(mycal,"1x")
         @test !any(mycal.flags)
-        @test vecnorm(mycal.jones - ones(JonesMatrix,Nant,Nfreq)) < sqrt(eps(Float64))
+        @test vecnorm(mycal.jones - ones(JonesMatrix,Nant,Nfreq)) < δ
+
+        TTCal.set_data!(ms, visibilities)
         unlock(ms)
 
         # Run from `main(...)`
@@ -201,9 +187,9 @@
         TTCal.main(["polcal","--input",name,"--output",output_name,"--sources","sources.json",
                     "--maxiter","100","--tolerance","$(eps(Float64))","--beam","constant"])
         mycal = TTCal.read(output_name)
+        TTCal.fixphase!(mycal,"1x")
         @test !any(mycal.flags)
-        @test vecnorm(mycal.jones - ones(JonesMatrix,Nant,Nfreq)) < sqrt(eps(Float64))
+        @test vecnorm(mycal.jones - ones(JonesMatrix,Nant,Nfreq)) < δ
     end
-    =#
 end
 

@@ -158,28 +158,32 @@ end
 
 function run_gaincal(args)
     println("Running `gaincal` on $(args["input"])")
-    ms = MeasurementSet(ascii(args["input"]))
+    ms = Table(ascii(args["input"]))
     sources = readsources(args["sources"])
     beam = beam_dictionary[args["beam"]]()
-    cal = gaincal(ms,sources,beam,
-                  maxiter=args["maxiter"],
-                  tolerance=args["tolerance"],
-                  force_imaging_columns=args["force-imaging"])
-    write(args["output"],cal)
-    cal
+    meta = collect_metadata(ms, beam)
+    data = get_data(ms)
+    maxiter = args["maxiter"]
+    tolerance = args["tolerance"]
+    cal = gaincal(data, meta, sources, maxiter=maxiter, tolerance=tolerance)
+    write(args["output"], cal)
+    unlock(ms)
+    nothing
 end
 
 function run_polcal(args)
-    println("Running `polcal` on $(args["input"])")
-    ms = MeasurementSet(ascii(args["input"]))
+    println("Running `gaincal` on $(args["input"])")
+    ms = Table(ascii(args["input"]))
     sources = readsources(args["sources"])
     beam = beam_dictionary[args["beam"]]()
-    cal = polcal(ms,sources,beam,
-                 maxiter=args["maxiter"],
-                 tolerance=args["tolerance"],
-                 force_imaging_columns=args["force-imaging"])
-    write(args["output"],cal)
-    cal
+    meta = collect_metadata(ms, beam)
+    data = get_corrected_data(ms)
+    maxiter = args["maxiter"]
+    tolerance = args["tolerance"]
+    cal = polcal(data, meta, sources, maxiter=maxiter, tolerance=tolerance)
+    write(args["output"], cal)
+    unlock(ms)
+    nothing
 end
 
 function run_peel(args)
@@ -211,7 +215,7 @@ function run_applycal(args)
     applycal!(data, meta, cal)
     set_corrected_data!(ms, data, force_imaging_columns)
     unlock(ms)
-    data
+    nothing
 end
 
 precompile(main,(Vector{UTF8String},))

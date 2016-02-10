@@ -61,7 +61,7 @@ end
 
 function fitvis_internal(visibilities, meta, variables, direction, maxiter, tolerance)
     vector = [direction.x, direction.y, direction.z, 1.0]
-    converged = iterate(FitvisStep(), RK4, maxiter, tolerance, false,
+    converged = iterate(fitvisstep, RK4, maxiter, tolerance, false,
                         vector, visibilities, meta, variables)
     Direction(dir"ITRF", vector[1], vector[2], vector[3])
 end
@@ -137,5 +137,7 @@ function fitvis_step(vector, visibilities, meta, variables)
 end
 
 immutable FitvisStep <: StepFunction end
+const fitvisstep = FitvisStep()
 call(::FitvisStep, vector, visibilities, meta, variables) = fitvis_step(vector, visibilities, meta, variables)
+return_type(::FitvisStep, vector) = Vector{Float64}
 
