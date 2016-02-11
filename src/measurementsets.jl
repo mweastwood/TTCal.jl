@@ -105,6 +105,16 @@ function write_data_column(ms::Table, column, data::Visibilities)
     ms[column] = reorganized_data
 end
 
+function write_flags(ms::Table, data::Visibilities)
+    flags = zeros(Bool, 4, Nfreq(data), Nbase(data))
+    for α = 1:Nbase(data), β = 1:Nfreq(data)
+        if data.flags[α,β]
+            flags[:,β,α] = true
+        end
+    end
+    ms["FLAG"] = flags
+end
+
 """
     read_antennas(ms::Table)
 
@@ -213,9 +223,7 @@ function set_corrected_data!(ms::Table, data, force_imaging_columns = false)
     end
 end
 
-#function set_flags!(ms::MeasurementSet,flags)
-#    ms.table["FLAG"] = flags
-#end
+set_flags!(ms::Table, data) = write_flags(ms, data)
 
 function flag_short_baselines!(data, meta, minuvw)
     for β = 1:Nfreq(meta)
