@@ -218,16 +218,16 @@ end
 #end
 
 function flag_short_baselines!(data, meta, minuvw)
-    for α = 1:Nbase(meta)
-        antenna1 = meta.baselines[α].antenna1
-        antenna2 = meta.baselines[α].antenna2
-        u = antenna1.position.x - antenna2.position.x
-        v = antenna1.position.y - antenna2.position.y
-        w = antenna1.position.z - antenna2.position.z
-        b = sqrt(u^2 + v^2 + w^2)
-        for β = 1:Nfreq(meta)
-            ν = meta.channels[β]
-            λ = c / ν
+    for β = 1:Nfreq(meta)
+        ν = meta.channels[β]
+        λ = c / ν
+        for α = 1:Nbase(meta)
+            antenna1 = meta.antennas[meta.baselines[α].antenna1]
+            antenna2 = meta.antennas[meta.baselines[α].antenna2]
+            u = antenna1.position.x - antenna2.position.x
+            v = antenna1.position.y - antenna2.position.y
+            w = antenna1.position.z - antenna2.position.z
+            b = sqrt(u^2 + v^2 + w^2)
             if b < minuvw * λ
                 data.flags[α,β] = true
             end
