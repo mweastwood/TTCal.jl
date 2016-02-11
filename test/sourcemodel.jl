@@ -36,5 +36,17 @@
     writesources(filename,sources1)
     sources2 = readsources(filename)
     @test sources1 == sources2
+
+    multisources1 = [MultiSource("M", [PointSource("S1",Direction(dir"J2000","1h","0d"),
+                                                   PowerLaw(1.0,2.0,3.0,4.0,10e6,[0.0])),
+                                       PointSource("S2",Direction(dir"J2000","2h","0d"),
+                                                   PowerLaw(1.0,2.0,3.0,4.0,10e6,[0.0])),
+                                       PointSource("S3",Direction(dir"J2000","3h","0d"),
+                                                   PowerLaw(1.0,2.0,3.0,4.0,10e6,[0.0]))])]
+
+    filename = tempname()*".json"
+    writesources(filename,multisources1)
+    multisources2 = readsources(filename)
+    @test multisources1 == multisources2
 end
 
