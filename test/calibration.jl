@@ -48,6 +48,22 @@
             @test vecnorm(myvis.data - visibilities.data/abs2(g)) < δ64
             @test myvis.flags == visibilities.flags
 
+            # Test that flags are propagated properly
+            myvis = deepcopy(visibilities)
+            mycal = deepcopy(constant_cal)
+            mycal.flags[1,:] = true
+            expected_flags = zeros(Bool, TTCal.Nbase(meta), Nfreq)
+            for α = 1:TTCal.Nbase(meta)
+                antenna1 = meta.baselines[α].antenna1
+                antenna2 = meta.baselines[α].antenna2
+                if antenna1 == 1 || antenna2 == 1
+                    expected_flags[α,:] = true
+                end
+            end
+            applycal!(myvis, meta, mycal)
+            @test vecnorm(myvis.data - visibilities.data/abs2(g)) < δ64
+            @test myvis.flags == expected_flags
+
             # Test the command line interface
             cal_name = tempname()*".jld"
             TTCal.write(cal_name,constant_cal)
@@ -100,8 +116,12 @@
         TTCal.solve!(mycal,data,model,meta,maxiter,tolerance,quiet=true)
         TTCal.fixphase!(cal,"1x")
         TTCal.fixphase!(mycal,"1x")
-        @test !any(mycal.flags)
-        @test vecnorm(mycal.jones-cal.jones) < eps(Float32)*vecnorm(cal.jones)
+        jones = cal.jones
+        myjones = mycal.jones
+        jones[cal.flags] = zero(eltype(jones))
+        myjones[mycal.flags] = zero(eltype(myjones))
+        @test cal.flags == mycal.flags
+        @test vecnorm(myjones-jones) < eps(Float32)*vecnorm(jones)
     end
 
     @testset "unity gains" begin
@@ -144,6 +164,21 @@
                 end
                 α += Nant-ant+1
             end
+            test_solve(cal,measured,model,200,10eps(Float64))
+        end
+    end
+
+    @testset "flagged antenna" begin
+        for T in (GainCalibration,PolarizationCalibration)
+            cal = T(Nant,Nfreq)
+            for i in eachindex(cal.jones)
+                cal.jones[i] = rand(eltype(cal.jones))
+            end
+            cal.flags[2,:] = true
+            measured = Visibilities([rand(JonesMatrix) for α = 1:TTCal.Nbase(meta), β = 1:Nfreq],
+                                    zeros(Bool, TTCal.Nbase(meta), Nfreq))
+            model = deepcopy(measured)
+            corrupt!(measured,meta,cal)
             test_solve(cal,measured,model,200,10eps(Float64))
         end
     end
