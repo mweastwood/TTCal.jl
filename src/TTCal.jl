@@ -20,7 +20,7 @@ module TTCal
 export JonesMatrix, DiagonalJonesMatrix, HermitianJonesMatrix
 export StokesVector, MuellerMatrix
 
-export Visibilities, Metadata
+export Visibilities, Metadata, Nant, Nfreq, Nbase
 export collect_metadata, flag_short_baselines!
 
 export PointSource, MultiSource, PowerLaw
