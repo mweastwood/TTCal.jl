@@ -133,7 +133,7 @@ end
 function solve!(calibration::Calibration, measured_visibilities, model_visibilities,
                 meta, maxiter, tolerance; quiet::Bool = false)
     square_measured, square_model = makesquare(measured_visibilities, model_visibilities, meta)
-    quiet || (p = Progress(Nfreq(meta)))
+    quiet || (p = Progress(Nfreq(meta), "Calibrating: "))
     for β = 1:Nfreq(meta)
         solve_onechannel!(slice(calibration.jones, :, β),
                           slice(calibration.flags, :, β),
