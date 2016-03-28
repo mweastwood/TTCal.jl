@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<!--[if lt IE 7 ]><html class="no-js ie6"><![endif]-->
+<!--[if IE 7 ]><html class="no-js ie7"><![endif]-->
+<!--[if IE 8 ]><html class="no-js ie8"><![endif]-->
+<!--[if IE 9 ]><html class="no-js ie9"><![endif]-->
+<!--[if (gt IE 9)|!(IE)]><!--> <html class="no-js"> <!--<![endif]-->
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,user-scalable=no,initial-scale=1,maximum-scale=1">
+    
+      
+        <title>Sky Models - TTCal</title>
+      
+      
+      
+      
+        <meta name="author" content="Michael Eastwood">
+      
+    
+    <meta property="og:url" content="None">
+    <meta property="og:title" content="TTCal">
+    <meta property="og:image" content="None/../ttcal.png">
+    <meta name="apple-mobile-web-app-title" content="TTCal">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+      <link rel="apple-touch-icon" href="../ttcal.png">
+    
+    
+    <link rel="shortcut icon" type="image/x-icon" href="../None">
+    <link rel="icon" type="image/x-icon" href="../None">
+    <style>
+      @font-face {
+      	font-family: 'Icon';
+      	src: url('../assets/fonts/icon.eot?52m981');
+      	src: url('../assets/fonts/icon.eot?#iefix52m981')
+               format('embedded-opentype'),
+      		   url('../assets/fonts/icon.woff?52m981')
+               format('woff'),
+      		   url('../assets/fonts/icon.ttf?52m981')
+               format('truetype'),
+      		   url('../assets/fonts/icon.svg?52m981#icon')
+               format('svg');
+      	font-weight: normal;
+      	font-style: normal;
+      }
+    </style>
+    <link rel="stylesheet" href="../assets/stylesheets/application-54f87043f3.css">
+    
+      <link rel="stylesheet" href="../assets/stylesheets/palettes-05ab2406df.css">
+    
+    
+      
+      
+      
+      <link rel="stylesheet" href="//fonts.googleapis.com/css?family=Roboto:400,700|Roboto+Mono">
+      <style>
+        body, input {
+          font-family: 'Roboto', Helvetica, Arial, sans-serif;
+        }
+        pre, code {
+          font-family: 'Roboto Mono', 'Courier New', 'Courier', monospace;
+        }
+      </style>
+    
+    
+      <link rel="stylesheet" href="../mathjaxstyle.css">
+    
+    <script src="../assets/javascripts/modernizr-4ab42b99fd.js"></script>
+    
+  </head>
+  
+  
+  
+  <body class="palette-primary-deep-purple palette-accent-deep-purple">
+    
+      
+      
+    
+    <div class="backdrop">
+      <div class="backdrop-paper"></div>
+    </div>
+    <input class="toggle" type="checkbox" id="toggle-drawer">
+    <input class="toggle" type="checkbox" id="toggle-search">
+    <label class="toggle-button overlay" for="toggle-drawer"></label>
+    <header class="header">
+      <nav aria-label="Header">
+  <div class="bar default">
+    <div class="button button-menu" role="button" aria-label="Menu">
+      <label class="toggle-button icon icon-menu" for="toggle-drawer">
+        <span></span>
+      </label>
+    </div>
+    <div class="stretch">
+      <div class="title">
+        
+          <span class="path">
+            
+          </span>
+        
+        Sky Models
+      </div>
+    </div>
+    
+    
+      
+      <div class="button button-github" role="button" aria-label="GitHub">
+        <a href="https://github.com/mweastwood" title="@mweastwood on GitHub" target="_blank" class="toggle-button icon icon-github"></a>
+      </div>
+    
+    <div class="button button-search" role="button" aria-label="Search">
+      <label class="toggle-button icon icon-search" title="Search" for="toggle-search"></label>
+    </div>
+  </div>
+  <div class="bar search">
+    <div class="button button-close" role="button" aria-label="Close">
+      <label class="toggle-button icon icon-back" for="toggle-search"></label>
+    </div>
+    <div class="stretch">
+      <div class="field">
+        <input class="query" type="text" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck>
+      </div>
+    </div>
+    <div class="button button-reset" role="button" aria-label="Search">
+      <button class="toggle-button icon icon-close" id="reset-search"></button>
+    </div>
+  </div>
+</nav>
+    </header>
+    <main class="main">
+      
+      <div class="drawer">
+        <nav aria-label="Navigation">
+  
+  <a href="https://github.com/mweastwood/TTCal.jl" class="project">
+    <div class="banner">
+      
+        <div class="logo">
+          <img src="../ttcal.png">
+        </div>
+      
+      <div class="name">
+        <strong>
+          TTCal
+          <span class="version">
+            0.1.0
+          </span>
+        </strong>
+        
+          <br>
+          mweastwood/TTCal.jl
+        
+      </div>
+    </div>
+  </a>
+  <div class="scrollable">
+    <div class="wrapper">
+      
+        <ul class="repo">
+          <li class="repo-download">
+            
+            <a href="https://github.com/mweastwood/TTCal.jl/archive/0.1.0.zip" target="_blank" title="Download" data-action="download">
+              <i class="icon icon-download"></i> Download
+            </a>
+          </li>
+          <li class="repo-stars">
+            <a href="https://github.com/mweastwood/TTCal.jl/stargazers" target="_blank" title="Stargazers" data-action="star">
+              <i class="icon icon-star"></i> Stars
+              <span class="count">&ndash;</span>
+            </a>
+          </li>
+        </ul>
+        <hr>
+      
+      <div class="toc">
+        <ul>
+          
+            
+  <li>
+    <a class="" title="Home" href="..">
+      Home
+    </a>
+    
+  </li>
+
+          
+            
+  <li>
+    <a class="" title="Cookbook" href="../cookbook/">
+      Cookbook
+    </a>
+    
+  </li>
+
+          
+            
+  <li>
+    <a class="" title="Calibration" href="../calibration/">
+      Calibration
+    </a>
+    
+  </li>
+
+          
+            
+  <li>
+    <a class="current" title="Sky Models" href="./">
+      Sky Models
+    </a>
+    
+      
+        
+      
+      
+        <ul>
+          
+            <li class="anchor">
+              <a title="Point Sources" href="#point-sources">
+                Point Sources
+              </a>
+            </li>
+          
+            <li class="anchor">
+              <a title="Gaussian Sources" href="#gaussian-sources">
+                Gaussian Sources
+              </a>
+            </li>
+          
+            <li class="anchor">
+              <a title="Near-Field Sources" href="#near-field-sources">
+                Near-Field Sources
+              </a>
+            </li>
+          
+            <li class="anchor">
+              <a title="Diffuse Emission" href="#diffuse-emission">
+                Diffuse Emission
+              </a>
+            </li>
+          
+        </ul>
+      
+    
+  </li>
+
+          
+            
+  <li>
+    <a class="" title="Beam Models" href="../beammodel/">
+      Beam Models
+    </a>
+    
+  </li>
+
+          
+            
+  <li>
+    <a class="" title="The Ionosphere" href="../ionosphere/">
+      The Ionosphere
+    </a>
+    
+  </li>
+
+          
+            
+  <li>
+    <span class="section">Developer Documentation</span>
+    <ul>
+      
+        
+  <li>
+    <a class="" title="Building this Website" href="../website/">
+      Building this Website
+    </a>
+    
+  </li>
+
+      
+    </ul>
+  </li>
+
+          
+        </ul>
+        
+          <hr>
+          <span class="section">The author</span>
+          <ul>
+            
+            
+              
+              <li>
+                <a href="https://github.com/mweastwood" target="_blank" title="@mweastwood on GitHub">
+                  @mweastwood on GitHub
+                </a>
+              </li>
+            
+          </ul>
+        
+      </div>
+    </div>
+  </div>
+</nav>
+      </div>
+      <article class="article">
+        <div class="wrapper">
+          
+          <h1 id="sky-models">Sky Models<a class="headerlink" href="#sky-models" title="Permanent link">¶</a></h1>
+<h2 id="point-sources">Point Sources<a class="headerlink" href="#point-sources" title="Permanent link">¶</a></h2>
+<p>For the OVRO LWA the two most important point sources for calibration are
+<a href="https://en.wikipedia.org/wiki/Cassiopeia_A">Cas A</a> and
+<a href="https://en.wikipedia.org/wiki/Cygnus_A">Cyg A</a>, which are the two brightest
+sources on the sky. The optimal time to solve for a calibration is when both
+of these sources are above the horizon.</p>
+<p>Currently TTCal expects the sky model to be specified as a list of point sources.
+This is accomplished by listing the sources in a <a href="http://www.json.org/">JSON</a> file.
+For example the following file defines a sky model consisting of Cas A and Cyg A
+using the published spectra for <a href="http://adsabs.harvard.edu/abs/1977A%26A....61...99B">Baars et al. 1977</a>.</p>
+<div class="code"><pre><span></span>[
+    {
+        &quot;ref&quot;: &quot;Baars et al. 1977&quot;,
+        &quot;name&quot;: &quot;Cas A&quot;,
+        &quot;ra&quot;: &quot;23h23m24s&quot;,
+        &quot;dec&quot;: &quot;58d48m54s&quot;,
+        &quot;I&quot;: 555904.26,
+        &quot;Q&quot;: 0.0,
+        &quot;U&quot;: 0.0,
+        &quot;V&quot;: 0.0,
+        &quot;freq&quot;: 1.0e6,
+        &quot;index&quot;: [-0.770]
+    },
+    {
+        &quot;ref&quot;: &quot;Baars et al. 1977&quot;,
+        &quot;name&quot;: &quot;Cyg A&quot;,
+        &quot;ra&quot;: &quot;19h59m28.35663s&quot;,
+        &quot;dec&quot;: &quot;+40d44m02.0970s&quot;,
+        &quot;I&quot;: 49545.02,
+        &quot;Q&quot;: 0.0,
+        &quot;U&quot;: 0.0,
+        &quot;V&quot;: 0.0,
+        &quot;freq&quot;: 1.0e6,
+        &quot;index&quot;: [+0.085,-0.178]
+    }
+]
+</pre></div>
+
+
+<p><strong>Fields:</strong></p>
+<ul>
+<li><code>ref</code> is not used by TTCal, but is intended to be a record of the origin
+  of the information used to define the source</li>
+<li><code>name</code> is the name of the source</li>
+<li><code>ra</code> and <code>dec</code> define the J2000 location of the source</li>
+<li><code>I</code>, <code>Q</code>, <code>U</code>, and <code>V</code> define the Stokes parameters (in Jy) at the frequency <code>freq</code> (in Hz)
+  <code>Q</code>, <code>U</code>, and <code>V</code> are optional and will be assumed to be zero if they are not given</li>
+<li><code>index</code> defines the spectral index of the source (and higher order terms)</li>
+</ul>
+<p>Higher order terms are defined such that</p>
+<p>
+<script type="math/tex; mode=display">
+    \log_{10} I = \log_{10} I_0 + \sum_{n=1}^N \alpha_n \log_{10}\left(\frac{\nu}{\nu_0}\right)^n
+</script>
+</p>
+<p>where $I_0$ is the Stokes-I flux at the reference frequency and $\alpha_n$ represents
+the values contained in <code>index</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The Sun, the Moon, and Jupiter are special cases. These solar system objects do not
+need to have their position specified. TTCal will automatically determine their
+location based on the current time. This works based on the name of the source.
+If you name a source &ldquo;Sun&rdquo;, &ldquo;Moon&rdquo;, or &ldquo;Jupiter&rdquo; it will be placed at the
+correct location.</p>
+</div>
+<h2 id="gaussian-sources">Gaussian Sources<a class="headerlink" href="#gaussian-sources" title="Permanent link">¶</a></h2>
+<p>Support for Gaussian sources is coming!</p>
+<h2 id="near-field-sources">Near-Field Sources<a class="headerlink" href="#near-field-sources" title="Permanent link">¶</a></h2>
+<p>Experimental support for near-field sources is currently available in the latest version
+of TTCal. Because this is an experimental feature it is not yet very easy to use.</p>
+<h2 id="diffuse-emission">Diffuse Emission<a class="headerlink" href="#diffuse-emission" title="Permanent link">¶</a></h2>
+<p>Diffuse emission is currently not supported within TTCal. Eventual support is on the
+horizon.</p>
+          <aside class="copyright" role="note">
+            
+            Documentation built with
+            <a href="http://www.mkdocs.org" target="_blank">MkDocs</a>
+            using the
+            <a href="http://squidfunk.github.io/mkdocs-material/" target="_blank">
+              Material
+            </a>
+            theme.
+          </aside>
+          
+            <footer class="footer">
+              
+  <nav class="pagination" aria-label="Footer">
+    <div class="previous">
+      
+        <a href="../calibration/" title="Calibration">
+          <span class="direction">
+            Previous
+          </span>
+          <div class="page">
+            <div class="button button-previous" role="button" aria-label="Previous">
+              <i class="icon icon-back"></i>
+            </div>
+            <div class="stretch">
+              <div class="title">
+                Calibration
+              </div>
+            </div>
+          </div>
+        </a>
+      
+    </div>
+    <div class="next">
+      
+        <a href="../beammodel/" title="Beam Models">
+          <span class="direction">
+            Next
+          </span>
+          <div class="page">
+            <div class="stretch">
+              <div class="title">
+                Beam Models
+              </div>
+            </div>
+            <div class="button button-next" role="button" aria-label="Next">
+              <i class="icon icon-forward"></i>
+            </div>
+          </div>
+        </a>
+      
+    </div>
+  </nav>
+
+            </footer>
+          
+        </div>
+      </article>
+      <div class="results" role="status" aria-live="polite">
+        <div class="scrollable">
+          <div class="wrapper">
+            <div class="meta"></div>
+            <div class="list"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+    <script>
+      var base_url = '..';
+      var repo_id  = 'mweastwood/TTCal.jl';
+    </script>
+    <script src="../assets/javascripts/application-997097ee0c.js"></script>
+    
+      <script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML"></script>
+    
+      <script src="../mathjaxhelper.js"></script>
+    
+    
+  </body>
+</html>

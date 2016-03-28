@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<!--[if lt IE 7 ]><html class="no-js ie6"><![endif]-->
+<!--[if IE 7 ]><html class="no-js ie7"><![endif]-->
+<!--[if IE 8 ]><html class="no-js ie8"><![endif]-->
+<!--[if IE 9 ]><html class="no-js ie9"><![endif]-->
+<!--[if (gt IE 9)|!(IE)]><!--> <html class="no-js"> <!--<![endif]-->
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,user-scalable=no,initial-scale=1,maximum-scale=1">
+    
+      
+        <title>Beam Models - TTCal</title>
+      
+      
+      
+      
+        <meta name="author" content="Michael Eastwood">
+      
+    
+    <meta property="og:url" content="None">
+    <meta property="og:title" content="TTCal">
+    <meta property="og:image" content="None/../ttcal.png">
+    <meta name="apple-mobile-web-app-title" content="TTCal">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+      <link rel="apple-touch-icon" href="../ttcal.png">
+    
+    
+    <link rel="shortcut icon" type="image/x-icon" href="../None">
+    <link rel="icon" type="image/x-icon" href="../None">
+    <style>
+      @font-face {
+      	font-family: 'Icon';
+      	src: url('../assets/fonts/icon.eot?52m981');
+      	src: url('../assets/fonts/icon.eot?#iefix52m981')
+               format('embedded-opentype'),
+      		   url('../assets/fonts/icon.woff?52m981')
+               format('woff'),
+      		   url('../assets/fonts/icon.ttf?52m981')
+               format('truetype'),
+      		   url('../assets/fonts/icon.svg?52m981#icon')
+               format('svg');
+      	font-weight: normal;
+      	font-style: normal;
+      }
+    </style>
+    <link rel="stylesheet" href="../assets/stylesheets/application-54f87043f3.css">
+    
+      <link rel="stylesheet" href="../assets/stylesheets/palettes-05ab2406df.css">
+    
+    
+      
+      
+      
+      <link rel="stylesheet" href="//fonts.googleapis.com/css?family=Roboto:400,700|Roboto+Mono">
+      <style>
+        body, input {
+          font-family: 'Roboto', Helvetica, Arial, sans-serif;
+        }
+        pre, code {
+          font-family: 'Roboto Mono', 'Courier New', 'Courier', monospace;
+        }
+      </style>
+    
+    
+      <link rel="stylesheet" href="../mathjaxstyle.css">
+    
+    <script src="../assets/javascripts/modernizr-4ab42b99fd.js"></script>
+    
+  </head>
+  
+  
+  
+  <body class="palette-primary-deep-purple palette-accent-deep-purple">
+    
+      
+      
+    
+    <div class="backdrop">
+      <div class="backdrop-paper"></div>
+    </div>
+    <input class="toggle" type="checkbox" id="toggle-drawer">
+    <input class="toggle" type="checkbox" id="toggle-search">
+    <label class="toggle-button overlay" for="toggle-drawer"></label>
+    <header class="header">
+      <nav aria-label="Header">
+  <div class="bar default">
+    <div class="button button-menu" role="button" aria-label="Menu">
+      <label class="toggle-button icon icon-menu" for="toggle-drawer">
+        <span></span>
+      </label>
+    </div>
+    <div class="stretch">
+      <div class="title">
+        
+          <span class="path">
+            
+          </span>
+        
+        Beam Models
+      </div>
+    </div>
+    
+    
+      
+      <div class="button button-github" role="button" aria-label="GitHub">
+        <a href="https://github.com/mweastwood" title="@mweastwood on GitHub" target="_blank" class="toggle-button icon icon-github"></a>
+      </div>
+    
+    <div class="button button-search" role="button" aria-label="Search">
+      <label class="toggle-button icon icon-search" title="Search" for="toggle-search"></label>
+    </div>
+  </div>
+  <div class="bar search">
+    <div class="button button-close" role="button" aria-label="Close">
+      <label class="toggle-button icon icon-back" for="toggle-search"></label>
+    </div>
+    <div class="stretch">
+      <div class="field">
+        <input class="query" type="text" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck>
+      </div>
+    </div>
+    <div class="button button-reset" role="button" aria-label="Search">
+      <button class="toggle-button icon icon-close" id="reset-search"></button>
+    </div>
+  </div>
+</nav>
+    </header>
+    <main class="main">
+      
+      <div class="drawer">
+        <nav aria-label="Navigation">
+  
+  <a href="https://github.com/mweastwood/TTCal.jl" class="project">
+    <div class="banner">
+      
+        <div class="logo">
+          <img src="../ttcal.png">
+        </div>
+      
+      <div class="name">
+        <strong>
+          TTCal
+          <span class="version">
+            0.1.0
+          </span>
+        </strong>
+        
+          <br>
+          mweastwood/TTCal.jl
+        
+      </div>
+    </div>
+  </a>
+  <div class="scrollable">
+    <div class="wrapper">
+      
+        <ul class="repo">
+          <li class="repo-download">
+            
+            <a href="https://github.com/mweastwood/TTCal.jl/archive/0.1.0.zip" target="_blank" title="Download" data-action="download">
+              <i class="icon icon-download"></i> Download
+            </a>
+          </li>
+          <li class="repo-stars">
+            <a href="https://github.com/mweastwood/TTCal.jl/stargazers" target="_blank" title="Stargazers" data-action="star">
+              <i class="icon icon-star"></i> Stars
+              <span class="count">&ndash;</span>
+            </a>
+          </li>
+        </ul>
+        <hr>
+      
+      <div class="toc">
+        <ul>
+          
+            
+  <li>
+    <a class="" title="Home" href="..">
+      Home
+    </a>
+    
+  </li>
+
+          
+            
+  <li>
+    <a class="" title="Cookbook" href="../cookbook/">
+      Cookbook
+    </a>
+    
+  </li>
+
+          
+            
+  <li>
+    <a class="" title="Calibration" href="../calibration/">
+      Calibration
+    </a>
+    
+  </li>
+
+          
+            
+  <li>
+    <a class="" title="Sky Models" href="../sourcemodel/">
+      Sky Models
+    </a>
+    
+  </li>
+
+          
+            
+  <li>
+    <a class="current" title="Beam Models" href="./">
+      Beam Models
+    </a>
+    
+      
+        
+      
+      
+        <ul>
+          
+            <li class="anchor">
+              <a title="Constant Beam" href="#constant-beam">
+                Constant Beam
+              </a>
+            </li>
+          
+            <li class="anchor">
+              <a title="Sine Beam" href="#sine-beam">
+                Sine Beam
+              </a>
+            </li>
+          
+            <li class="anchor">
+              <a title="LWA Memo 178 Beam" href="#lwa-memo-178-beam">
+                LWA Memo 178 Beam
+              </a>
+            </li>
+          
+        </ul>
+      
+    
+  </li>
+
+          
+            
+  <li>
+    <a class="" title="The Ionosphere" href="../ionosphere/">
+      The Ionosphere
+    </a>
+    
+  </li>
+
+          
+            
+  <li>
+    <span class="section">Developer Documentation</span>
+    <ul>
+      
+        
+  <li>
+    <a class="" title="Building this Website" href="../website/">
+      Building this Website
+    </a>
+    
+  </li>
+
+      
+    </ul>
+  </li>
+
+          
+        </ul>
+        
+          <hr>
+          <span class="section">The author</span>
+          <ul>
+            
+            
+              
+              <li>
+                <a href="https://github.com/mweastwood" target="_blank" title="@mweastwood on GitHub">
+                  @mweastwood on GitHub
+                </a>
+              </li>
+            
+          </ul>
+        
+      </div>
+    </div>
+  </div>
+</nav>
+      </div>
+      <article class="article">
+        <div class="wrapper">
+          
+          <h1 id="beam-models">Beam Models<a class="headerlink" href="#beam-models" title="Permanent link">¶</a></h1>
+<p>In TTCal, a beam model is a function that takes a frequency (measured in Hz), an azimuth,
+and an elevation (both measured in radians) and returns a Jones matrix. This definition
+is only workable for zenith-pointing instruments like the OVRO LWA (for which TTCal was
+developed).</p>
+<p>
+<script type="math/tex; mode=display">
+    \text{beam model}: (\nu, {\rm az}, {\rm el}) \mapsto J
+</script>
+</p>
+<p>Beam models are used during model visibility generation to account for attenuation,
+polarization leakage, and other instrumental effects. This is accomplished by using a
+<a href="http://mathworld.wolfram.com/CongruenceTransformation.html">congruence transform</a>.</p>
+<p>
+<script type="math/tex; mode=display">
+    V_\text{corrupted model} = J V_\text{pristine model} J^*,
+</script>
+</p>
+<p>where $V$ is a 2x2 matrix containing the <code>xx</code>, <code>xy</code>, <code>yx</code>, and <code>yy</code> model visibilities.</p>
+<p>The available beam models are listed below.</p>
+<h2 id="constant-beam">Constant Beam<a class="headerlink" href="#constant-beam" title="Permanent link">¶</a></h2>
+<p>The &ldquo;constant beam&rdquo; simply assumes the Jones matrix is the identity at every frequency
+and in every direction. It goes without saying that this beam model is not realistic
+(especially away from zenith), but it can be useful.
+For example if the flux of a source has already been attenuated by a beam model, you
+should use the constant beam to prevent TTCal applying a second beam model.</p>
+<p>Use <code>ttcal.jl ... --beam constant ...</code> to select the constant beam model from the
+command line or use <code>beam = ConstantBeam()</code> from within a Julia script.</p>
+<h2 id="sine-beam">Sine Beam<a class="headerlink" href="#sine-beam" title="Permanent link">¶</a></h2>
+<p>Also known as &ldquo;ye olde beam model&rdquo;, this beam model has the antenna gains
+proportional to $\sin({\rm el})^\alpha$, where $\alpha$ is set to $1.6$ by default.
+This is a surprisingly good first-order approximation to the LWA beam, but it
+does not include any frequency dependence.</p>
+<p>
+<script type="math/tex; mode=display">
+    J = \begin{pmatrix}
+        \sin({\rm el})^{\alpha/2} && 0 \\
+        0 && \sin({\rm el})^{\alpha/2} \\
+    \end{pmatrix}
+</script>
+</p>
+<p>Use <code>ttcal.jl ... --beam sine ...</code> to select the sine beam model (with $\alpha = 1.6$)
+from the command line or use <code>beam = SineBeam(α)</code> from within a Julia script.</p>
+<h2 id="lwa-memo-178-beam">LWA Memo 178 Beam<a class="headerlink" href="#lwa-memo-178-beam" title="Permanent link">¶</a></h2>
+<p>An even better approximation of the LWA beam comes from the LWA Memo Series.
+<a href="http://www.faculty.ece.vt.edu/swe/lwa/memo/lwa0178a.pdf">LWA Memo 178</a> by
+Jayce Dowell does a parametric fit to the results of EM simulations of the
+antennas.</p>
+<p>The dipole gain is modeled as</p>
+<p>
+<script type="math/tex; mode=display">
+    p(\theta) = \left[1-\left(\frac{\theta}{\pi/2}\right)^\alpha\right]\cos^\beta\theta
+              + \gamma\left(\frac{\theta}{\pi/2}\right)\cos^\delta\theta,
+</script>
+</p>
+<p>where $\theta$ is the zenith angle, and $\alpha$, $\beta$, $\gamma$, and $\delta$ are
+parameters that were fit for in the E- and H-planes of the dipole.</p>
+<p>Use <code>ttcal.jl ... --beam memo178 ...</code> to select the LWA Memo 178 beam model from the
+command line or use <code>beam = Memo178Beam()</code> from within a Julia script.</p>
+          <aside class="copyright" role="note">
+            
+            Documentation built with
+            <a href="http://www.mkdocs.org" target="_blank">MkDocs</a>
+            using the
+            <a href="http://squidfunk.github.io/mkdocs-material/" target="_blank">
+              Material
+            </a>
+            theme.
+          </aside>
+          
+            <footer class="footer">
+              
+  <nav class="pagination" aria-label="Footer">
+    <div class="previous">
+      
+        <a href="../sourcemodel/" title="Sky Models">
+          <span class="direction">
+            Previous
+          </span>
+          <div class="page">
+            <div class="button button-previous" role="button" aria-label="Previous">
+              <i class="icon icon-back"></i>
+            </div>
+            <div class="stretch">
+              <div class="title">
+                Sky Models
+              </div>
+            </div>
+          </div>
+        </a>
+      
+    </div>
+    <div class="next">
+      
+        <a href="../ionosphere/" title="The Ionosphere">
+          <span class="direction">
+            Next
+          </span>
+          <div class="page">
+            <div class="stretch">
+              <div class="title">
+                The Ionosphere
+              </div>
+            </div>
+            <div class="button button-next" role="button" aria-label="Next">
+              <i class="icon icon-forward"></i>
+            </div>
+          </div>
+        </a>
+      
+    </div>
+  </nav>
+
+            </footer>
+          
+        </div>
+      </article>
+      <div class="results" role="status" aria-live="polite">
+        <div class="scrollable">
+          <div class="wrapper">
+            <div class="meta"></div>
+            <div class="list"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+    <script>
+      var base_url = '..';
+      var repo_id  = 'mweastwood/TTCal.jl';
+    </script>
+    <script src="../assets/javascripts/application-997097ee0c.js"></script>
+    
+      <script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML"></script>
+    
+      <script src="../mathjaxhelper.js"></script>
+    
+    
+  </body>
+</html>
