@@ -30,18 +30,20 @@ end
 function createms(Nant,Nfreq)
     Nbase = div(Nant*(Nant-1),2) + Nant
 
-    x = 100*randn(Nant)
-    y = 100*randn(Nant)
-    z = randn(Nant)
-    u,v,w = xyz2uvw(x,y,z)
-    ν = linspace(40e6,60e6,Nfreq) |> collect
-    t = (2015.-1858.)*365.*24.*60.*60. # a rough current Julian date (in seconds)
-    ant1,ant2 = ant1ant2(Nant)
-
     frame = ReferenceFrame()
-    pos = observatory("OVRO_MMA")
+    OVRO  = Position(pos"WGS84", 1207.969meters, -118.284441degrees, 37.232271degrees)
+    pos   = measure(frame, OVRO, pos"ITRF")
+    t = (2015.-1858.)*365.*24.*60.*60. # a rough current Julian date (in seconds)
     set!(frame,Epoch(epoch"UTC",t*seconds))
     set!(frame,pos)
+
+    x = pos.x + 100randn(Nant)
+    y = pos.y + 100randn(Nant)
+    z = pos.z + 100randn(Nant)
+    u,v,w = xyz2uvw(x,y,z)
+    ν = linspace(40e6,60e6,Nfreq) |> collect
+    ant1,ant2 = ant1ant2(Nant)
+
     zenith = Direction(dir"AZEL",0degrees,90degrees)
     phase_dir = measure(frame,zenith,dir"J2000")
 
@@ -55,8 +57,7 @@ function createms(Nant,Nfreq)
 
     subtable = Table("$name/ANTENNA")
     Tables.addrows!(subtable,Nant)
-    x,y,z = pos.x, pos.y, pos.z
-    subtable["POSITION"] = [x;y;z]*ones(1,Nant)
+    subtable["POSITION"] = [x y z]'
     unlock(subtable)
 
     subtable = Table("$name/FIELD")
@@ -74,8 +75,7 @@ function createms(Nant,Nfreq)
     table["TIME"] = fill(float(t),Nbase)
     table["FLAG_ROW"] = zeros(Bool,Nbase)
     table["FLAG"] = zeros(Bool,4,Nfreq,Nbase)
-    unlock(table)
 
-    name,MeasurementSet(name)
+    name, table
 end
 

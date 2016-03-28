@@ -17,12 +17,13 @@ __precompile__()
 
 module TTCal
 
-export MeasurementSet
-
 export JonesMatrix, DiagonalJonesMatrix, HermitianJonesMatrix
 export StokesVector, MuellerMatrix
 
-export Source, Point, Spectrum
+export Visibilities, Metadata, Nant, Nfreq, Nbase
+export collect_metadata, flag_short_baselines!
+
+export PointSource, MultiSource, PowerLaw
 export readsources, writesources
 export ConstantBeam, SineBeam, Memo178Beam
 
@@ -30,8 +31,7 @@ export genvis, subsrc!, getspec, fitvis
 
 export GainCalibration, gaincal
 export PolarizationCalibration, polcal
-export applycal!, corrupt!
-export peel!
+export applycal!, corrupt!, peel!
 
 importall Base.Operators
 import Base: zero, one, rand, conj, det, inv, norm, kron
@@ -46,19 +46,19 @@ using CasaCore.Tables
 
 const c = 2.99792e+8
 
-include("measurementsets.jl")
 include("rungekutta.jl")
 include("stokes.jl")
 include("sourcemodel.jl")
 include("beammodel.jl")
-include("fringepattern.jl")
-include("getspec.jl")
+include("utm.jl")
+include("ionosphere.jl")
+include("measurementsets.jl")
 include("genvis.jl")
+include("getspec.jl")
 include("subsrc.jl")
 include("fitvis.jl")
 include("calibration.jl")
 include("peel.jl")
-include("utm.jl")
 include("commandline.jl")
 
 end

@@ -122,7 +122,7 @@ end
     "--minuvw"
         help = "The minimum baseline length (measured in wavelengths) to use while peeling sources. This parameter can be used to mitigate sensitivity to unmodeled diffuse emission."
         arg_type = Float64
-        default  = 15.0
+        default  = 0.0
 end
 
 @add_arg_table s["applycal"] begin
@@ -158,40 +158,48 @@ end
 
 function run_gaincal(args)
     println("Running `gaincal` on $(args["input"])")
-    ms = MeasurementSet(ascii(args["input"]))
+    ms = Table(ascii(args["input"]))
     sources = readsources(args["sources"])
     beam = beam_dictionary[args["beam"]]()
-    cal = gaincal(ms,sources,beam,
-                  maxiter=args["maxiter"],
-                  tolerance=args["tolerance"],
-                  force_imaging_columns=args["force-imaging"])
-    write(args["output"],cal)
-    cal
+    meta = collect_metadata(ms, beam)
+    data = get_data(ms)
+    maxiter = args["maxiter"]
+    tolerance = args["tolerance"]
+    cal = gaincal(data, meta, sources, maxiter=maxiter, tolerance=tolerance)
+    write(args["output"], cal)
+    unlock(ms)
+    nothing
 end
 
 function run_polcal(args)
     println("Running `polcal` on $(args["input"])")
-    ms = MeasurementSet(ascii(args["input"]))
+    ms = Table(ascii(args["input"]))
     sources = readsources(args["sources"])
     beam = beam_dictionary[args["beam"]]()
-    cal = polcal(ms,sources,beam,
-                 maxiter=args["maxiter"],
-                 tolerance=args["tolerance"],
-                 force_imaging_columns=args["force-imaging"])
-    write(args["output"],cal)
-    cal
+    meta = collect_metadata(ms, beam)
+    data = get_corrected_data(ms)
+    maxiter = args["maxiter"]
+    tolerance = args["tolerance"]
+    cal = polcal(data, meta, sources, maxiter=maxiter, tolerance=tolerance)
+    write(args["output"], cal)
+    unlock(ms)
+    nothing
 end
 
 function run_peel(args)
     println("Running `peel` on $(args["input"])")
-    ms = MeasurementSet(ascii(args["input"]))
+    ms = Table(ascii(args["input"]))
     sources = readsources(args["sources"])
     beam = beam_dictionary[args["beam"]]()
-    calibrations = peel!(GainCalibration,ms,sources,beam,
-                         peeliter=args["peeliter"],
-                         maxiter=args["maxiter"],
-                         tolerance=args["tolerance"],
-                         minuvw=args["minuvw"])
+    meta = collect_metadata(ms, beam)
+    data = get_corrected_data(ms)
+    flag_short_baselines!(data, meta, args["minuvw"])
+    peeliter = args["peeliter"]
+    maxiter = args["maxiter"]
+    tolerance = args["tolerance"]
+    calibrations = peel!(GainCalibration, data, meta, sources,
+                         peeliter=peeliter, maxiter=maxiter, tolerance=tolerance)
+    set_corrected_data!(ms, data)
     if !isempty(args["output"])
         for i = 1:length(calibrations)
             filename = args["output"]*"-$i.npz"
@@ -202,14 +210,16 @@ end
 
 function run_applycal(args)
     println("Running `applycal` on $(args["input"])")
-    ms = MeasurementSet(ascii(args["input"]))
+    ms  = Table(ascii(args["input"]))
     cal = read(args["calibration"])
-    force_imaging_columns = haskey(args,"force-imaging")
-    apply_to_corrected = haskey(args,"corrected")
-    applycal!(ms,cal,
-              force_imaging_columns=args["force-imaging"],
-              apply_to_corrected=args["corrected"])
-    cal
+    force_imaging_columns = args["force-imaging"]
+    apply_to_corrected    = args["corrected"]
+    meta = collect_metadata(ms, ConstantBeam())
+    data = apply_to_corrected? get_corrected_data(ms) : get_data(ms)
+    applycal!(data, meta, cal)
+    set_corrected_data!(ms, data, force_imaging_columns)
+    unlock(ms)
+    nothing
 end
 
 precompile(main,(Vector{UTF8String},))

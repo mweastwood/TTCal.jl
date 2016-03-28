@@ -13,84 +13,140 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-doc"""
-    genvis(ms::MeasurementSet, sources, beam::BeamModel)
-
-Generate model visibilities for the given list of sources
-and the given beam model.
-
-No gridding is performed, so the runtime of this naive
-algorithm scales as $O(N_{base} \times N_{source})$.
 """
-function genvis(ms::MeasurementSet, sources, beam::BeamModel)
-    model = zeros(Complex64,4,ms.Nfreq,ms.Nbase)
-    genvis!(model,ms.frame,ms.phase_direction,sources,beam,ms.u,ms.v,ms.w,ms.ν)
-    model
+    GenvisVariables
+
+This type is simply a container for variables that need to be calculated
+once and shared between functions while generating model visibilities.
+"""
+immutable GenvisVariables
+    frame :: ReferenceFrame
+    phase_center :: Direction # should always be ITRF
+    function GenvisVariables(meta::Metadata)
+        frame = reference_frame(meta)
+        phase_center = measure(frame, meta.phase_center, dir"ITRF")
+        new(frame, phase_center)
+    end
 end
 
-function genvis!(model::Array{Complex64,3},
-                 frame::ReferenceFrame,
-                 phase_direction::Direction,
-                 sources::Vector{Source},
-                 beam::BeamModel,
-                 u,v,w,ν)
+"""
+    genvis(meta::Metadata, sources)
+
+Generate model visibilities for the given list of sources.
+"""
+function genvis(meta::Metadata, sources)
+    variables = GenvisVariables(meta)
+    model = zeros(JonesMatrix, Nbase(meta), Nfreq(meta))
+    flags = zeros(       Bool, Nbase(meta), Nfreq(meta))
     for source in sources
-        genvis!(model,frame,phase_direction,source,beam,u,v,w,ν)
+        genvis_onesource!(model, meta, variables, source)
     end
-    model
+    Visibilities(model, flags)
 end
 
-function genvis!(model::Array{Complex64,3},
-                 frame::ReferenceFrame,
-                 phase_direction::Direction,
-                 source::Source,
-                 beam::BeamModel,
-                 u,v,w,ν)
+genvis(meta::Metadata, source::Source) = genvis(meta, [source])
+
+function genvis_onesource!(visibilities, meta, variables, source::PointSource)
+    direction = measure(variables.frame, source.direction, dir"AZEL")
+    phase_center = variables.phase_center
+    for β = 1:Nfreq(meta)
+        frequency = meta.channels[β]
+        # refraction through the ionosphere
+        # TODO: allow the plasma frequency to be set to something nonzero
+        refracted_direction = refract(direction, frequency, 0.0)
+        # corruption by the primary beam
+        flux  = (source.spectrum(frequency) |> linear) :: HermitianJonesMatrix
+        jones = meta.beam(frequency, refracted_direction) :: JonesMatrix
+        flux  = congruence_transform(jones, flux)
+        # convert the source direction into the correct coordinate system
+        itrf_direction = azel_to_itrf(refracted_direction, position(meta))
+        # generate the visibilities!
+        visibilities_onechannel = slice(visibilities, :, β)
+        genvis_onesource_onechannel!(visibilities_onechannel, meta,
+                                     flux, itrf_direction, phase_center, frequency)
+    end
+    visibilities
+end
+
+function genvis_onesource!(visibilities, meta, variables, source::MultiSource)
     for component in source.components
-        genvis!(model,frame,phase_direction,component,beam,u,v,w,ν)
+        genvis_onesource!(visibilities, meta, variables, component)
     end
-    model
+    visibilities
 end
 
-function genvis!(model::Array{Complex64,3},
-                 frame::ReferenceFrame,
-                 phase_direction::Direction,
-                 point::Point,
-                 beam::BeamModel,
-                 u,v,w,ν)
-    Nfreq  = length(ν)
-    az,el  = local_azel(frame,point)
-    l,m    = direction_cosines(phase_direction,measure(frame,point.direction,dir"J2000"))
-    fringe = fringepattern(l,m,u,v,w,ν)
-
-    flux = Array{HermitianJonesMatrix}(Nfreq)
-    for β = 1:length(ν)
-        jones  = beam(ν[β],az,el)
-        stokes = point.spectrum(ν[β])
-        uncorrupted = linear(stokes) # convert from I,Q,U,V to xx,xy,yx,yy
-        corrupted   = congruence_transform(jones,uncorrupted)
-        flux[β] = corrupted
+function genvis_onesource!(visibilities, meta, variables, source::RFISource)
+    position = measure(variables.frame, source.position, pos"ITRF")
+    phase_center = variables.phase_center
+    for β = 1:Nfreq(meta)
+        frequency = meta.channels[β]
+        # we don't corrupt the flux with the primary beam here because
+        # the spectrum of the RFI was likely measured through the primary beam
+        flux  = (source.spectrum(frequency) |> linear) :: HermitianJonesMatrix
+        # generate the visibilities!
+        visibilities_onechannel = slice(visibilities, :, β)
+        genvis_onesource_onechannel!(visibilities_onechannel, meta,
+                                     flux, position, phase_center, frequency)
     end
-
-    genvis!(model,flux,l,m,u,v,w,ν)
+    visibilities
 end
 
-function genvis(flux,l,m,u,v,w,ν)
-    model = zeros(Complex64,4,length(ν),length(u))
-    genvis!(model,flux,l,m,u,v,w,ν)
-    model
+function genvis_onesource_onechannel!(visibilities, meta, flux, source, phase_center, frequency)
+    delays  = geometric_delays(meta.antennas, source, phase_center)
+    fringes = delays_to_fringes(delays, frequency)
+    for α = 1:Nbase(meta)
+        antenna1 = meta.baselines[α].antenna1
+        antenna2 = meta.baselines[α].antenna2
+        fringe = fringes[antenna1] * conj(fringes[antenna2])
+        visibilities[α] += flux * fringe
+    end
+    visibilities
 end
 
-function genvis!(model::Array{Complex64,3},
-                 flux,l,m,u,v,w,ν)
-    fringe = fringepattern(l,m,u,v,w,ν)
-    Nfreq,Nbase = size(fringe)
-    @inbounds for α = 1:Nbase, β = 1:Nfreq
-        model[1,β,α] += flux[β].xx*fringe[β,α]
-        model[2,β,α] += flux[β].xy*fringe[β,α]
-        model[3,β,α] += conj(flux[β].xy)*fringe[β,α]
-        model[4,β,α] += flux[β].yy*fringe[β,α]
+function geometric_delays(antennas, source_direction::Direction, phase_center)
+    # far field
+    l = source_direction.x - phase_center.x
+    m = source_direction.y - phase_center.y
+    n = source_direction.z - phase_center.z
+    delays = zeros(length(antennas))
+    for i = 1:length(antennas)
+        antenna_position = antennas[i].position
+        x = antenna_position.x
+        y = antenna_position.y
+        z = antenna_position.z
+        delays[i] = (x*l + y*m + z*n) / c
     end
-    model
+    delays
+end
+
+function geometric_delays(antennas, source_position::Position, phase_center)
+    # near field
+    l = -phase_center.x
+    m = -phase_center.y
+    n = -phase_center.z
+    ξ = source_position.x
+    η = source_position.y
+    ζ = source_position.z
+    D = sqrt(ξ^2 + η^2 + ζ^2)
+    delays = zeros(length(antennas))
+    for i = 1:length(antennas)
+        antenna_position = antennas[i].position
+        x = antenna_position.x
+        y = antenna_position.y
+        z = antenna_position.z
+        delays[i] = (D - sqrt((x-ξ)^2 + (y-η)^2 + (z-ζ)^2) + x*l + y*m + z*n) / c
+    end
+    delays
+end
+
+function delays_to_fringes(delays, frequency)
+    i2π = 1im * 2π
+    Nant = length(delays)
+    fringes = zeros(Complex128, Nant)
+    for i = 1:Nant
+        ϕ = i2π * frequency * delays[i]
+        fringes[i] = exp(ϕ)
+    end
+    fringes
 end
 

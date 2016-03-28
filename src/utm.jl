@@ -78,8 +78,7 @@ function latlong_to_utm(zone, latitude, longitude)
 end
 
 """
-    utm_to_latlong(zone, easting, northing,
-                   hemisphere = north)
+    utm_to_latlong(zone, easting, northing, hemisphere = north)
 
 Convert the easting and northing (both in meters) to
 a latitude and longitude (both in degrees).
@@ -128,5 +127,25 @@ function utm_to_latlong{N}(zone, easting, northing,
     latitude *= 180/π
 
     latitude,longitude
+end
+
+"""
+    azel_to_itrf(direction, location)
+
+The conversion from azimuth and elevation to an ITRF direction is
+straightforward. CasaCore's implementation is slow and requires
+unnecessary information (the current time).
+"""
+function azel_to_itrf(direction, location)
+    direction.sys == dir"AZEL" || error("Direction must be in the AZEL coordinate system.")
+    location.sys  == pos"ITRF" || error("Location must be in the ITRF coordinate system.")
+    z     = [0, 0, 1]
+    loc   = [location.x, location.y, location.z]
+    up    = loc / norm(loc)
+    north = z - dot(z, up)*up
+    north = north / norm(north)
+    east  = cross(north, up)
+    dir   = direction.x * north + direction.y * east + direction.z * up
+    Direction(dir"ITRF", dir[1], dir[2], dir[3])
 end
 

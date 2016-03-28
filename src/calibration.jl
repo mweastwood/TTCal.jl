@@ -22,59 +22,30 @@ macro generate_calibration(name, jones)
             flags::Matrix{Bool}
         end
         function $name(Nant, Nfreq)
-            $name(ones($jones,Nant,Nfreq), zeros(Bool,Nant,Nfreq))
+            $name(ones($jones, Nant, Nfreq), zeros(Bool, Nant, Nfreq))
         end
         Base.similar(cal::$name) = $name(Nant(cal), Nfreq(cal))
     end |> esc
 end
 
-"""
-    immutable GainCalibration <: Calibration
-
-This type stores the information for calibrating the
-electronic gains of the interferometer. That is, it stores
-complex gains and flags for each antenna, frequency channel,
-and polarization.
-
-    GainCalibration(Nant, Nfreq)
-
-Create a calibration table for `Nant` antennas with
-`Nfreq` frequency channels where all the gains are
-initially set to unity.
-"""
 @generate_calibration GainCalibration DiagonalJonesMatrix
-
-"""
-    immutable PolarizationCalibration <: Calibration
-
-This type stores the information for calibrating the
-polarization of the interferometer. That is, it stores
-Jones matrices and flags for each antenna and each
-frequency channel.
-
-    PolarizationCalibration(Nant, Nfreq)
-
-Create a calibration table for `Nant` antennas with
-`Nfreq` frequency channels where all the Jones matrices
-are initially set to the identity matrix.
-"""
 @generate_calibration PolarizationCalibration JonesMatrix
 
-Nant( cal::Calibration) = size(cal.jones,1)
-Nfreq(cal::Calibration) = size(cal.jones,2)
+Nant( cal::Calibration) = size(cal.jones, 1)
+Nfreq(cal::Calibration) = size(cal.jones, 2)
 
 doc"""
-    invert(cal::Calibration)
+    invert(calibration::Calibration)
 
 Returns the inverse of the given calibration.
 The Jones matrix $J$ of each antenna is set to $J^{-1}$.
 """
-function invert(cal::Calibration)
-    output = similar(cal)
-    for i in eachindex(output.jones, output.flags,
-                          cal.jones,    cal.flags)
-        output.jones[i] = inv(cal.jones[i])
-        output.flags[i] = cal.flags[i]
+function invert(calibration::Calibration)
+    output = similar(calibration)
+    for i in eachindex(     output.jones,      output.flags,
+                       calibration.jones, calibration.flags)
+        output.jones[i] = inv(calibration.jones[i])
+        output.flags[i] = calibration.flags[i]
     end
     output
 end
@@ -96,175 +67,87 @@ end
 # corrupt / applycal
 
 """
-    corrupt!(data::Array{Complex64,3}, flags::Array{Bool,3},
-             cal::Calibration, ant1, ant2)
+    corrupt!(visibilities::Visibilities, meta::Metadata, calibration::Calibration)
 
-Corrupt the data as if it was observed with the given calibration.
+Corrupt the visibilities as if they were observed with the given calibration.
 """
-function corrupt!(data::Array{Complex64,3}, flags::Array{Bool,3},
-                  cal::Calibration, ant1, ant2)
-    Nbase = length(ant1)
-    for α = 1:Nbase, β = 1:Nfreq(cal)
-        if cal.flags[ant1[α],β] || cal.flags[ant2[α],β]
-            flags[:,β,α] = true
+function corrupt!(visibilities::Visibilities, meta::Metadata, calibration::Calibration)
+    for β = 1:Nfreq(meta), α = 1:Nbase(meta)
+        antenna1 = meta.baselines[α].antenna1
+        antenna2 = meta.baselines[α].antenna2
+        if calibration.flags[antenna1,β] || calibration.flags[antenna2,β]
+            visibilities.flags[α,β] = true
         end
-        V = JonesMatrix(data[1,β,α], data[2,β,α],
-                        data[3,β,α], data[4,β,α])
-        J1 = cal.jones[ant1[α],β]
-        J2 = cal.jones[ant2[α],β]
-        V = J1*V*J2'
-        data[1,β,α] = V.xx
-        data[2,β,α] = V.xy
-        data[3,β,α] = V.yx
-        data[4,β,α] = V.yy
+        V  = visibilities.data[α,β]
+        J₁ = calibration.jones[antenna1,β]
+        J₂ = calibration.jones[antenna2,β]
+        visibilities.data[α,β] = J₁*V*J₂'
     end
+    visibilities
 end
 
-"""
-    corrupt!(data::Array{Complex64,3}, cal::Calibration, ant1, ant2)
-
-Corrupt the model data as if it had been observed
-with an instrument with the given calibration.
-"""
-function corrupt!(data::Array{Complex64,3},
-                  cal::Calibration, ant1, ant2)
-    flags = fill(false, size(data))
-    corrupt!(data, flags, cal, ant1, ant2)
-end
 
 """
-    applycal!(ms::MeasurementSet, calibration::Calibration;
-              apply_to_corrected = false, force_imaging_columns = false)
+    applycal!(visibilities::Visibilities, meta::Metadata, calibration::Calibration)
 
-Apply the calibration to the given measurement set.
-
-**Arguments:**
-
-* `ms` - the measurement set to which the calibration will be applied
-* `calibration` - the calibration that will be applied
-
-**Keyword Arguments:**
-
-* `apply_to_corrected` - if this is set to true, the calibration will be
-    applied to the CORRECTED_DATA column instead of the DATA column
-* `force_imaging_columns` - if this is set to true, the calibrated data
-    will be written to the CORRECTED_DATA column regardless of whether
-    or not the column already exists
+Apply the calibration to the given visibilities.
 """
-function applycal!(ms::MeasurementSet, calibration::Calibration;
-                   apply_to_corrected::Bool = false,
-                   force_imaging_columns::Bool = false)
-    data  = apply_to_corrected? get_corrected_data(ms) : get_data(ms)
-    flags = get_flags(ms)
-    applycal!(data, flags, calibration, ms.ant1, ms.ant2)
-    set_corrected_data!(ms, data, force_imaging_columns)
-    set_flags!(ms, flags)
-    data
-end
-
-function applycal!(data::Array{Complex64,3}, flags::Array{Bool,3},
-                   cal::Calibration, ant1, ant2)
-    inverse_cal = invert(cal)
-    corrupt!(data, flags, inverse_cal, ant1, ant2)
-    data
+function applycal!(visibilities::Visibilities, meta::Metadata, calibration::Calibration)
+    inverse_cal = invert(calibration)
+    corrupt!(visibilities, meta, inverse_cal)
+    visibilities
 end
 
 # gaincal / polcal
 
-const argument_docs = """
-**Arguments:**
-
-* `ms` - the measurement set from which to derive the calibration
-* `sources` - the list of points sources to use as the sky model
-* `beam` - the beam model
-
-**Keyword Arguments:**
-
-* `maxiter` - the maximum number of Runge-Kutta steps to take on each
-    frequency channel
-* `tolerance` - the relative tolerance to use while checking to see if
-    more iterations are required
-* `flag` - if set to true, attempt to identify and flag slowly converging
-    calibration solutions
-* `minuvw` - the minimum baseline length (measured in wavelengths) to be
-    used during the calibration procedure
-* `reference_antenna` - a string containing the antenna number and polarization
-    whose phase will be chosen to be zero (eg. "14y" or "62x")
-* `force_imaging_columns` - if this is set to true, the MODEL_DATA column
-    will be created and populated with model visibilities even if it
-    doesn't already exist
 """
-
-"""
-    gaincal(ms::MeasurementSet, sources::Vector{Source}, beam::BeamModel;
-            maxiter = 20, tolerance = 1e-3, flag = false, minuvw = 0.0,
-            reference_antenna = "1x", force_imaging_columns = false)
+    gaincal(visibilities::Visibilities, meta::Metadata, sources; maxiter = 20, tolerance = 1e-3)
 
 Solve for the interferometer's electronic gains.
-
-$argument_docs
 """
-function gaincal(ms::MeasurementSet, sources::Vector{Source}, beam::BeamModel;
-                 maxiter::Int = 20, tolerance::Float64 = 1e-3, flag::Bool = false,
-                 minuvw::Float64 = 0.0, reference_antenna::ASCIIString = "1x",
-                 force_imaging_columns::Bool = false)
-    sources = abovehorizon(ms.frame, sources)
-    calibration = GainCalibration(ms.Nant, ms.Nfreq)
-    data  = get_data(ms)
-    model = genvis(ms, sources, beam)
-    flags = get_flags(ms)
-    flag_short_baselines!(flags, minuvw, ms.u, ms.v, ms.w, ms.ν)
-    set_model_data!(ms, model, force_imaging_columns)
-    solve!(calibration, data,model, flags,
-           ms.ant1, ms.ant2, maxiter, tolerance, flag)
-    fixphase!(calibration, reference_antenna)
+function gaincal(visibilities::Visibilities, meta::Metadata, sources::Vector{Source};
+                 maxiter::Int = 20, tolerance::Float64 = 1e-3)
+    frame = reference_frame(meta)
+    sources = abovehorizon(frame, sources)
+    calibration = GainCalibration(Nant(meta), Nfreq(meta))
+    model = genvis(meta, sources)
+    solve!(calibration, visibilities, model, meta, maxiter, tolerance)
     calibration
 end
 
 """
-    polcal(ms::MeasurementSet, sources::Vector{Source}, beam::BeamModel;
-           maxiter = 20, tolerance = 1e-3, flag = false, minuvw = 0.0,
-           reference_antenna = "1x", force_imaging_columns = false)
+    polcal(visibilities::Visibilities, meta::Metadata, sources; maxiter = 20, tolerance = 1e-3)
 
 Solve for the polarization properties of the interferometer.
-
-$argument_docs
 """
-function polcal(ms::MeasurementSet, sources::Vector{Source}, beam::BeamModel;
-                maxiter::Int = 20, tolerance::Float64 = 1e-3, flag::Bool = false,
-                minuvw::Float64 = 0.0, reference_antenna::ASCIIString = "1x",
-                force_imaging_columns::Bool = false)
-    sources = abovehorizon(ms.frame, sources)
-    calibration = PolarizationCalibration(ms.Nant, ms.Nfreq)
-    data  = get_corrected_data(ms)
-    model = genvis(ms, sources, beam)
-    flags = get_flags(ms)
-    flag_short_baselines!(flags, minuvw, ms.u, ms.v, ms.w, ms.ν)
-    set_model_data!(ms, model)
-    solve!(calibration, data, model, flags,
-           ms.ant1, ms.ant2, maxiter, tolerance, flag)
-    fixphase!(calibration, reference_antenna)
+function polcal(visibilities::Visibilities, meta::Metadata, sources;
+                maxiter::Int = 20, tolerance::Float64 = 1e-3)
+    frame = reference_frame(meta)
+    sources = abovehorizon(frame, sources)
+    calibration = PolarizationCalibration(Nant(meta), Nfreq(meta))
+    model = genvis(meta, sources)
+    solve!(calibration, visibilities, model, meta, maxiter, tolerance)
     calibration
 end
 
-function solve!(cal::Calibration, data, model, flags, ant1, ant2,
-                maxiter, tolerance, switch; quiet::Bool = false)
-    quiet || (p = Progress(Nfreq(cal)))
-    for β = 1:Nfreq(cal)
-        solve_onechannel!(slice(cal.jones,:,β),
-                          slice(cal.flags,:,β),
-                          slice(data, :,β,:),
-                          slice(model,:,β,:),
-                          slice(flags,:,β,:),
-                          ant1, ant2, maxiter, tolerance, switch)
+function solve!(calibration::Calibration, measured_visibilities, model_visibilities,
+                meta, maxiter, tolerance; quiet::Bool = false)
+    square_measured, square_model = makesquare(measured_visibilities, model_visibilities, meta)
+    quiet || (p = Progress(Nfreq(meta), "Calibrating: "))
+    for β = 1:Nfreq(meta)
+        solve_onechannel!(slice(calibration.jones, :, β),
+                          slice(calibration.flags, :, β),
+                          slice(square_measured, :, :, β),
+                          slice(square_model,    :, :, β),
+                          maxiter, tolerance)
         quiet || next!(p)
     end
     if !quiet
         # Print a summary of the flags
         print("Flagging summary: ")
-        percentage = [sum(cal.flags[ant,:]) / Nfreq(cal) for ant = 1:Nant(cal)]
+        percentage = [sum(calibration.flags[ant,:]) / Nfreq(meta) for ant = 1:Nant(meta)]
         idx = percentage .> 0.25
-        antennas   = (1:Nant(cal))[idx]
+        antennas   = (1:Nant(meta))[idx]
         percentage = percentage[idx]
         if length(antennas) > 0
             for i = 1:length(antennas)
@@ -285,30 +168,17 @@ function solve!(cal::Calibration, data, model, flags, ant1, ant2,
     end
 end
 
-function solve_onechannel!(jones, jones_flags, data, model, data_flags,
-                           ant1, ant2, maxiter, tolerance, switch)
-    # If the entire channel is flagged, don't bother calibrating.
-    all(data_flags) && (jones_flags[:] = true; return)
-
-    N = length(jones)
-    T = eltype(jones)
-    square_data  = makesquare( data, data_flags, ant1, ant2)
-    square_model = makesquare(model, data_flags, ant1, ant2)
-    best_jones   = copy(jones)
-
-    converged = iterate(stefcal, RK4, maxiter, tolerance, switch,
-                        best_jones, square_data, square_model)
-
-    jones[:] = best_jones
-    jones_flags[:] = solution_flags(best_jones, square_data, square_model, converged)
-    jones,jones_flags
+function solve_onechannel!(jones, flags, measured, model, maxiter, tolerance)
+    converged = iterate(stefcalstep, RK4, maxiter, tolerance, false, jones, measured, model)
+    flag_solution!(jones, flags, measured, model, converged)
+    jones
 end
 
 doc"""
-    makesquare(data, flags, ant1, ant2)
+    makesquare(measured, model, meta)
 
-Pack the data into a square Hermitian matrix such that
-the data is ordered as follows:
+Pack the visibilities into a square Hermitian matrices such that
+the visibilities are ordered as follows:
 
 \\[
     \begin{pmatrix}
@@ -319,27 +189,26 @@ the data is ordered as follows:
     \end{pmatrix}
 \\]
 
-Flagged correlations and autocorrelations are set to zero.
+Auto-correlations and flagged cross-correlations are set to zero.
 """
-function makesquare(data, flags, ant1, ant2)
-    Nbase = length(ant1)
-    Nant = maximum(ant1)
-    output = zeros(JonesMatrix, Nant, Nant)
-    for α = 1:Nbase
-        (flags[1,α] || flags[2,α] || flags[3,α] || flags[4,α]) && continue
-        ant1[α] == ant2[α] && continue
-
-        V = JonesMatrix(data[1,α], data[2,α],
-                        data[3,α], data[4,α])
-        output[ant1[α],ant2[α]] = V
-        output[ant2[α],ant1[α]] = output[ant1[α],ant2[α]]'
+function makesquare(measured, model, meta)
+    output_measured = zeros(JonesMatrix, Nant(meta), Nant(meta), Nfreq(meta))
+    output_model    = zeros(JonesMatrix, Nant(meta), Nant(meta), Nfreq(meta))
+    for β = 1:Nfreq(meta), α = 1:Nbase(meta)
+        measured.flags[α,β] && continue
+        antenna1 = meta.baselines[α].antenna1
+        antenna2 = meta.baselines[α].antenna2
+        antenna1 == antenna2 && continue
+        output_measured[antenna1,antenna2,β] = measured.data[α,β]
+        output_measured[antenna2,antenna1,β] = measured.data[α,β]'
+        output_model[antenna1,antenna2,β] = model.data[α,β]
+        output_model[antenna2,antenna1,β] = model.data[α,β]'
     end
-    output
+    output_measured, output_model
 end
 
-function solution_flags(jones, data, model, converged)
+function flag_solution!(jones, flags, measured, model, converged)
     Nant  = length(jones)
-    flags = fill(false, Nant)
 
     # Flag everything if the solution did not converge.
     if !converged
@@ -351,7 +220,7 @@ function solution_flags(jones, data, model, converged)
     for j = 1:Nant
         isflagged = true
         for i = 1:Nant
-            if data[i,j] != zero(JonesMatrix)
+            if measured[i,j] != zero(JonesMatrix)
                 isflagged = false
                 break
             end
@@ -380,7 +249,6 @@ function fixphase!(cal::Calibration, reference_antenna)
     m = match(regex,reference_antenna)
     refant = parse(Int,m.captures[1])
     refpol = m.captures[2] == "x"? 1 : 2
-
     for β = 1:Nfreq(cal)
         ref = refpol == 1? cal.jones[refant,β].xx : cal.jones[refant,β].yy
         factor = conj(ref) / abs(ref)
@@ -394,9 +262,9 @@ end
 # step functions
 
 doc"""
-    stefcal_step(input, data, model) -> step
+    stefcal_step(input, measured, model) -> step
 
-Given the `data` and `model` visibilities, and the current
+Given the `measured` and `model` visibilities, and the current
 guess for the Jones matrices, solve for `step` such
 that the new value of the Jones matrices is `input+step`.
 
@@ -416,7 +284,7 @@ labels the Jones matrices.
 * Michell, D. et al. 2008, JSTSP, 2, 5.
 * Salvini, S. & Wijnholds, S. 2014, A&A, 571, 97.
 """
-function stefcal_step{T}(input::AbstractVector{T}, data, model)
+function stefcal_step{T}(input::AbstractVector{T}, measured, model)
     Nant = length(input)
     step = similar(input)
     @inbounds for j = 1:Nant
@@ -424,7 +292,7 @@ function stefcal_step{T}(input::AbstractVector{T}, data, model)
         denominator = zero(T)
         for i = 1:Nant
             GM = input[i]*model[i,j]
-            V  = data[i,j]
+            V  = measured[i,j]
             numerator   += inner_multiply(T, GM, V)
             denominator += inner_multiply(T, GM, GM)
         end
@@ -441,52 +309,8 @@ end
 
 @inline inner_multiply(::Type{JonesMatrix}, X, Y) = X'*Y
 
-immutable StefCalStep <: StepFunction end
-const stefcal = StefCalStep()
-call(::StefCalStep, input, data, model) = step = stefcal_step(input, data, model)
-
-function check!(::StefCalStep, input, data, model)
-    Nant = length(input)
-
-    # There are two types of residuals that we can compute:
-    #
-    # 1. |Vᵢⱼ - GᵢMᵢⱼGⱼ|, and
-    # 2. |Gᵢ⁻¹VᵢⱼGⱼ⁻¹ - Mᵢⱼ|.
-    #
-    # The calibration algorithm used by TTCal attempts to minimize
-    # the first kind of residual. In my experience TTCal is very good
-    # at finding a solution where the first residual is low even when
-    # there exists a number of antennas that are feeding garbage into
-    # the algorithm and should be flagged.
-    #
-    # For example an antenna that is unplugged and is simply picking
-    # up noise can be made to minimize the first residual by dialing
-    # down the gain amplitudes. However this will make the second
-    # residual large.
-    #
-    # Therefore, let's look for antennas where the second kind of
-    # residual is exploding.
-
-    residual = zeros(Nant, Nant)
-    for j = 1:Nant, i = j+1:Nant
-        data[i,j] == zero(JonesMatrix) && continue
-        residual[i,j] = norm(input[i]\data[i,j]/input[j]' - model[i,j])
-        residual[j,i] = residual[i,j]
-    end
-
-    δ = zeros(Nant)
-    for i = 1:Nant
-        δ[i] = median(slice(residual, :, i))
-    end
-
-    worst_antenna = indmax(δ)
-    if δ[worst_antenna] > 10median(δ)
-        data[worst_antenna,:] = zero(JonesMatrix)
-        data[:,worst_antenna] = zero(JonesMatrix)
-        model[worst_antenna,:] = zero(JonesMatrix)
-        model[:,worst_antenna] = zero(JonesMatrix)
-    end
-
-    nothing
-end
+immutable StefcalStep <: StepFunction end
+const stefcalstep = StefcalStep()
+call(::StefcalStep, input, measured, model) = step = stefcal_step(input, measured, model)
+return_type(::StefcalStep, input) = Vector{eltype(input)}
 

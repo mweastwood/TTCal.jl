@@ -1,7 +1,5 @@
 # TTCal
 
-![TTCal](ttcal.png)
-
 TTCal is a calibration routine developed for the OVRO LWA.
 
 ## Overview
@@ -21,6 +19,10 @@ the demand for a new and effective calibration technique
 is best met by a simple, adaptable, and relatively fast software package.
 This is why I wrote TTCal.
 
+| Figure 1. An OVRO LWA snapshot image made using data calibrated exclusively with TTCal. |
+|-----------------------------------------------------------------------------------------|
+| ![Example image from the OVRO LWA](img/ovro-lwa-example-image.png)                      |
+
 ## Getting Started
 
 TTCal requires version 0.4 of the [Julia](http://julialang.org/) programming
@@ -32,7 +34,7 @@ that the first element of an array is accessed with `x[1]`.
 
 Once Julia is installed, the REPL (read-eval-print loop) can be started by
 typing `julia` from the command line. Try running the following examples:
-```
+``` julia
 julia> 1+1
 2
 
@@ -49,14 +51,16 @@ package, which is a Julia wrapper of the [casacore](http://casacore.github.io/ca
 library. It is used to interface with measurement sets and perform
 coordinate conversions.
 
-To install TTCal, run:
-```
+To install TTCal run:
+``` julia
+julia> Pkg.update()
+
 # Get the latest version of CasaCore.jl and build the wrapper
 julia> Pkg.clone("CasaCore")
 julia> Pkg.build("CasaCore")
+
 # Get the latest version of TTCal
 julia> Pkg.clone("https://github.com/mweastwood/TTCal.jl.git")
-julia> Pkg.update()
 julia> Pkg.test("TTCal")
 ```
 If all the tests pass, you are ready to begin using TTCal.
@@ -87,12 +91,19 @@ Julia version 0.4 introduced code caching to help mitigate this,
 running TTCal will always be faster from a Julia script
 than from the command line.
 
-## Bugs
+!!! note
+    TTCal expects data to be provided as a measurement set. Furthermore each
+    measurement set must contain only a single spectral window and a single time integration.
 
-If you encounter any problems, please
+## Bugs, Errors, and Questions (oh my!)
+
+If you encounter any problems or errors, please
 [open an issue](https://github.com/mweastwood/TTCal.jl/issues/new)
-on Github.
-
-Known problems are listed as
+on Github. Known problems are listed as
 [open issues](https://github.com/mweastwood/TTCal.jl/issues).
+
+If you have any questions after reading through this documentation
+let Michael know by
+[opening an issue](https://github.com/mweastwood/TTCal.jl/issues/new)
+on Github.
 

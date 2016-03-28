@@ -1,24 +1,18 @@
-let
+@testset "fitvis.jl" begin
     Nant = 10
     Nfreq = 2
     name,ms = createms(Nant,Nfreq)
-
-    # Regenerate the data column with only one source
-    # to prevent sidelobe contamination in the tests
+    meta = collect_metadata(ms, ConstantBeam())
     sources = readsources("sources.json")[1:1]
-    point   = sources[1].components[1]
-    ms.table["DATA"] = genvis(ms,sources,TTCal.ConstantBeam())
-
+    data = genvis(meta, sources)
     # Perturb the source position
-    az,el = TTCal.local_azel(ms.frame,point)
-    lold,mold = TTCal.direction_cosines(ms.phase_direction,point.direction)
-    az += 0.1 * π/180
-    el += 0.1 * π/180
-    dir = Direction(dir"AZEL",az*radians,el*radians)
-
-    l,m = fitvis(ms,dir,maxiter = 100, tolerance = sqrt(eps(Float64)))
-
-    @test l[1] ≈ lold
-    @test m[1] ≈ mold
+    direction = sources[1].direction
+    ra   = longitude(direction)
+    dec  =  latitude(direction)
+    ra  += 0.1 * π/180 * randn()
+    dec += 0.1 * π/180 * randn()
+    newdirection = Direction(dir"J2000", ra*radians, dec*radians)
+    fitdirection = fitvis(data, meta, newdirection, maxiter = 100, tolerance = sqrt(eps(Float64)))
+    @test fitdirection ≈ direction
 end
 

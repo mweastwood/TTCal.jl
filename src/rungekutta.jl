@@ -46,7 +46,7 @@ macro generate_step(name, tableau)
             order = size($tableau, 1)
 
             # Calculate the intermediate steps
-            k = Array(typeof(x), order)
+            k = Array(return_type(step, x), order)
             k[1] = step(x, args...)
             for row = 1:order-1
                 x′ = copy(x)

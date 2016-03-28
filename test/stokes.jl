@@ -1,39 +1,33 @@
-let
-    mat = eye(2,2)
-    J = one(JonesMatrix)
-    @test Matrix(J) == mat
-    @test J == JonesMatrix(mat)
-    
-    mat = zeros(2,2)
-    J = zero(JonesMatrix)
-    @test Matrix(J) == mat
-    @test J == JonesMatrix(mat)
+@testset "stokes.jl" begin
+    for T in (JonesMatrix, DiagonalJonesMatrix, HermitianJonesMatrix)
+        @test zero(T) |> Matrix == [0 0; 0 0]
+        @test  one(T) |> Matrix == [1 0; 0 1]
 
-    mat = rand(Complex128,2,2)
-    J = JonesMatrix(mat)
-    @test Matrix(J) == mat
-    
-    mat1 = rand(Complex128,2,2)
-    mat2 = rand(Complex128,2,2)
-    J1 = JonesMatrix(mat1)
-    J2 = JonesMatrix(mat2)
-    @test Matrix(J1+J2) == mat1+mat2
-    @test Matrix(J1-J2) == mat1-mat2
-    @test Matrix(J1*J2) == mat1*mat2
-    @test Matrix(J1\J2) ≈ mat1\mat2
-    @test Matrix(J1') == mat1'
-    @test det(J1) ≈ det(mat1)
-    @test Matrix(inv(J1)) ≈ inv(mat1)
-    @test norm(J1) ≈ vecnorm(mat1)
+        a = rand(Complex128)
+        J1 = rand(T)
+        J2 = rand(T)
+        mat1 = Matrix(J1)
+        mat2 = Matrix(J2)
+        @test Matrix(a*J1) == a*mat1
+        @test Matrix(J1*a) == mat1*a
+        @test Matrix(J1/a) ≈ mat1/a
+        @test Matrix(J1./a) ≈ mat1/a
+        @test Matrix(J1+J2) == mat1+mat2
+        @test Matrix(J1-J2) == mat1-mat2
+        @test Matrix(J1*J2) == mat1*mat2
+        @test Matrix(J1\J2) ≈ mat1\mat2
+        @test Matrix(J1/J2) ≈ mat1/mat2
+        @test det(J1) ≈ det(mat1)
+        @test Matrix(inv(J1)) ≈ inv(mat1)
+        @test norm(J1) ≈ vecnorm(mat1)
+        @test Matrix(J1') == mat1'
+        @test Matrix(conj(J1)) == conj(mat1)
 
-    a = rand()
-    @test Matrix(a*J1) == a*mat1
-    @test Matrix(J1*a) == mat1*a
+        if T == JonesMatrix
+            @test kron(J1,J2) == kron(mat1,mat2)
+        end
+    end
 
-    @test kron(J1,J2) == kron(mat1,mat2)
-end
-
-let
     v1 = rand(4)
     v2 = rand(4)
     s1 = StokesVector(v1)
@@ -44,9 +38,7 @@ let
     a = rand()
     @test Vector(a*s1) == a*v1
     @test Vector(s1*a) == v1*a
-end
 
-let
     @test TTCal.to_linear*TTCal.to_stokes ≈ eye(4)
 
     stokes  = rand(StokesVector)
@@ -62,9 +54,7 @@ let
     @test TTCal.linear(stokes) == HermitianJonesMatrix(0,1,0)
     stokes = StokesVector(0,0,0,1)
     @test TTCal.linear(stokes) == HermitianJonesMatrix(0,-1im,0)
-end
 
-let
     # test the Mueller matrix generation from the
     # example Jones and Mueller matrices given on:
     # http://scienceworld.wolfram.com/physics/JonesMatrix.html
@@ -72,7 +62,7 @@ let
 
     # note that because I have chosen to apply Jones matrices
     # as JAJ' instead of J'AJ, the sign of some elements of the
-    # Jones matrices is swapped
+    # Jones matrices are swapped
 
     i = 1im
 
@@ -147,9 +137,7 @@ let
               0 0 0  0;
              -1 0 0  1] |> MuellerMatrix
     @test norm(MuellerMatrix(J) - M) < eps(Float64)
-end
 
-let
     stokes = rand(StokesVector)
     flux   = TTCal.linear(stokes)
     J = rand(JonesMatrix)
