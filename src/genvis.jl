@@ -149,8 +149,6 @@ function baseline_coherency(source::GaussianSource, frequency, antenna1, antenna
     # project the baseline onto the major and minor axes
     major_proj = u*major_axis.x + v*major_axis.y + w*major_axis.z
     minor_proj = u*minor_axis.x + v*minor_axis.y + w*minor_axis.z
-    #if frequency == 24.768e6
-    #end
     # flux is attenuated on long baselines due to souce being a Gaussian
     exp(-major_width*major_proj^2 - minor_width*minor_proj^2)
 end
