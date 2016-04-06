@@ -75,9 +75,23 @@ abstract Source
 An astronomical point source.
 """
 type PointSource <: Source
-    name      :: ASCIIString
+    name :: ASCIIString
     direction :: Direction
     spectrum  :: PowerLaw
+end
+
+"""
+    GaussianSource <: Source
+
+An astronomical Gaussian source.
+"""
+type GaussianSource <: Source
+    name :: ASCIIString
+    direction :: Direction
+    spectrum  :: PowerLaw
+    major_fwhm :: Float64 # FWHM along the major axis (radians)
+    minor_fwhm :: Float64 # FWHM along the minor axis (radians)
+    position_angle :: Float64 # (radians)
 end
 
 """
