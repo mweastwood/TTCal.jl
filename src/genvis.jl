@@ -86,6 +86,7 @@ baseline_coherency(source, frequency, antenna1, antenna2, variables) = 1
 
 function genvis_onesource!(visibilities, meta, source)
     frame, phase_center = frame_and_phase_center(meta)
+    isabovehorizon(frame, source) || (return visibilities)
     flux, itrf_direction = refract_and_corrupt(meta, frame, source)
     variables = additional_precomputation(meta, frame, source)
     for β = 1:Nfreq(meta)

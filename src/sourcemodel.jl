@@ -130,7 +130,7 @@ function isabovehorizon(frame::ReferenceFrame, direction::Direction)
     el > 0
 end
 
-function isabovehorizon(frame::ReferenceFrame, source::PointSource)
+function isabovehorizon(frame::ReferenceFrame, source)
     isabovehorizon(frame, source.direction)
 end
 
