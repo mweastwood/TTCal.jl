@@ -75,9 +75,23 @@ abstract Source
 An astronomical point source.
 """
 type PointSource <: Source
-    name      :: ASCIIString
+    name :: ASCIIString
     direction :: Direction
     spectrum  :: PowerLaw
+end
+
+"""
+    GaussianSource <: Source
+
+An astronomical Gaussian source.
+"""
+type GaussianSource <: Source
+    name :: ASCIIString
+    direction :: Direction
+    spectrum  :: PowerLaw
+    major_fwhm :: Float64 # FWHM along the major axis (radians)
+    minor_fwhm :: Float64 # FWHM along the minor axis (radians)
+    position_angle :: Float64 # (radians)
 end
 
 """
@@ -106,6 +120,12 @@ function ==(lhs::PointSource, rhs::PointSource)
     lhs.name == rhs.name && lhs.direction == rhs.direction && lhs.spectrum == rhs.spectrum
 end
 
+function ==(lhs::GaussianSource, rhs::GaussianSource)
+    lhs.name == rhs.name && lhs.direction == rhs.direction && lhs.spectrum == rhs.spectrum &&
+        lhs.major_fwhm == rhs.major_fwhm && lhs.minor_fwhm == rhs.minor_fwhm &&
+        lhs.position_angle == rhs.position_angle
+end
+
 function ==(lhs::MultiSource, rhs::MultiSource)
     lhs.name == rhs.name && lhs.components == rhs.components
 end
@@ -116,7 +136,7 @@ function isabovehorizon(frame::ReferenceFrame, direction::Direction)
     el > 0
 end
 
-function isabovehorizon(frame::ReferenceFrame, source::PointSource)
+function isabovehorizon(frame::ReferenceFrame, source)
     isabovehorizon(frame, source.direction)
 end
 
@@ -189,45 +209,49 @@ end
 
 function construct_source(c)
     name = get(c, "name", "")
-
     if haskey(c, "components")
         # MultiSource
         components = Source[construct_source(dict) for dict in c["components"]]
         source = MultiSource(name, components)
     else
-        # PointSource
-        if name == "Sun"
-            dir = Direction(dir"SUN")
-        elseif name == "Moon"
-            dir = Direction(dir"MOON")
-        elseif name == "Jupiter"
-            dir = Direction(dir"JUPITER")
+        dir  = get_source_direction(c)
+        spec = get_source_spectrum(c)
+        if haskey(c, "major-fwhm") && haskey(c, "minor-fwhm") && haskey(c, "position-angle")
+            # GaussianSource
+            major_fwhm = deg2rad(c["major-fwhm"]/3600)
+            minor_fwhm = deg2rad(c["minor-fwhm"]/3600)
+            position_angle = deg2rad(c["position-angle"])
+            source = GaussianSource(name, dir, spec, major_fwhm, minor_fwhm, position_angle)
         else
-            dir = Direction(dir"J2000", c["ra"], c["dec"])
+            # PointSource
+            source = PointSource(name, dir, spec)
         end
-
-        if haskey(c, "flux")
-            warn("""
-                $filename is out of date
-                Replace "flux" with "I" (for the Stokes I flux).
-                Additional entries for "Q", "U", and "V" may also be added.
-            """)
-            # for compatibility with old sources.json files,
-            # which used "flux" in place of the Stokes parameters.
-            I = c["flux"]
-        else
-            I = c["I"]
-        end
-        Q = get(c, "Q", 0.0)
-        U = get(c, "U", 0.0)
-        V = get(c, "V", 0.0)
-
-        freq  = c["freq"]
-        index = c["index"]
-
-        source = PointSource(name, dir, PowerLaw(I, Q, U, V, freq, index))
     end
     source
+end
+
+function get_source_direction(c)
+    name = get(c, "name", "")
+    if name == "Sun"
+        dir = Direction(dir"SUN")
+    elseif name == "Moon"
+        dir = Direction(dir"MOON")
+    elseif name == "Jupiter"
+        dir = Direction(dir"JUPITER")
+    else
+        dir = Direction(dir"J2000", c["ra"], c["dec"])
+    end
+    dir
+end
+
+function get_source_spectrum(c)
+    I = c["I"]
+    Q = get(c, "Q", 0.0)
+    U = get(c, "U", 0.0)
+    V = get(c, "V", 0.0)
+    freq  = c["freq"]
+    index = c["index"]
+    PowerLaw(I, Q, U, V, freq, index)
 end
 
 """
@@ -240,10 +264,10 @@ function writesources{T<:Source}(filename, sources::Vector{T})
     dicts = Dict{UTF8String,Any}[]
     for source in sources
         source_dict = deconstruct_source(source)
-        push!(dicts,source_dict)
+        push!(dicts, source_dict)
     end
-    file = open(filename,"w")
-    JSON.print(file,dicts)
+    file = open(filename, "w")
+    JSON.print(file, dicts)
     close(file)
     sources
 end
@@ -251,18 +275,19 @@ end
 function deconstruct_source(source::PointSource)
     c = Dict{UTF8String,Any}()
     c["name"] = source.name
-    if source.name != "Sun" && source.name != "Moon" && source.name != "Jupiter"
-        ra  = longitude(source.direction) * radians
-        dec =  latitude(source.direction) * radians
-        c["ra"]  = sexagesimal(ra, hours = true)
-        c["dec"] = sexagesimal(dec)
-    end
-    c["I"]     = source.spectrum.stokes.I
-    c["Q"]     = source.spectrum.stokes.Q
-    c["U"]     = source.spectrum.stokes.U
-    c["V"]     = source.spectrum.stokes.V
-    c["freq"]  = source.spectrum.ν
-    c["index"] = source.spectrum.α
+    put_source_direction(c, source)
+    put_source_spectrum(c, source)
+    c
+end
+
+function deconstruct_source(source::GaussianSource)
+    c = Dict{UTF8String,Any}()
+    c["name"] = source.name
+    put_source_direction(c, source)
+    put_source_spectrum(c, source)
+    c["major-fwhm"] = 3600*rad2deg(source.major_fwhm)
+    c["minor-fwhm"] = 3600*rad2deg(source.minor_fwhm)
+    c["position-angle"] = rad2deg(source.position_angle)
     c
 end
 
@@ -271,5 +296,23 @@ function deconstruct_source(source::MultiSource)
     c["name"] = source.name
     c["components"] = [deconstruct_source(s) for s in source.components]
     c
+end
+
+function put_source_direction(c, source)
+    if source.name != "Sun" && source.name != "Moon" && source.name != "Jupiter"
+        ra  = longitude(source.direction) * radians
+        dec =  latitude(source.direction) * radians
+        c["ra"]  = sexagesimal(ra, hours = true)
+        c["dec"] = sexagesimal(dec)
+    end
+end
+
+function put_source_spectrum(c, source)
+    c["I"]     = source.spectrum.stokes.I
+    c["Q"]     = source.spectrum.stokes.Q
+    c["U"]     = source.spectrum.stokes.U
+    c["V"]     = source.spectrum.stokes.V
+    c["freq"]  = source.spectrum.ν
+    c["index"] = source.spectrum.α
 end
 

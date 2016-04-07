@@ -14,95 +14,152 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 """
-    GenvisVariables
-
-This type is simply a container for variables that need to be calculated
-once and shared between functions while generating model visibilities.
-"""
-immutable GenvisVariables
-    frame :: ReferenceFrame
-    phase_center :: Direction # should always be ITRF
-    function GenvisVariables(meta::Metadata)
-        frame = reference_frame(meta)
-        phase_center = measure(frame, meta.phase_center, dir"ITRF")
-        new(frame, phase_center)
-    end
-end
-
-"""
     genvis(meta::Metadata, sources)
 
 Generate model visibilities for the given list of sources.
 """
 function genvis(meta::Metadata, sources)
-    variables = GenvisVariables(meta)
     model = zeros(JonesMatrix, Nbase(meta), Nfreq(meta))
     flags = zeros(       Bool, Nbase(meta), Nfreq(meta))
     for source in sources
-        genvis_onesource!(model, meta, variables, source)
+        genvis_onesource!(model, meta, source)
     end
     Visibilities(model, flags)
 end
 
 genvis(meta::Metadata, source::Source) = genvis(meta, [source])
 
-function genvis_onesource!(visibilities, meta, variables, source::PointSource)
-    direction = measure(variables.frame, source.direction, dir"AZEL")
-    phase_center = variables.phase_center
+function frame_and_phase_center(meta::Metadata)
+    frame = reference_frame(meta)
+    phase_center = measure(frame, meta.phase_center, dir"ITRF")
+    frame, phase_center
+end
+
+"""
+    refract_and_corrupt(meta, frame, source)
+
+This function returns the flux and ITRF direction to the source
+at each frequency channel after refraction through the ionosphere
+and corruption by the primary beam.
+"""
+function refract_and_corrupt(meta, frame, source)
+    pos  = position(meta)
+    azel = measure(frame, source.direction, dir"AZEL")
+    flux = zeros(HermitianJonesMatrix, Nfreq(meta))
+    itrf = fill(Direction(dir"ITRF", 1.0, 0.0, 0.0), Nfreq(meta))
     for β = 1:Nfreq(meta)
         frequency = meta.channels[β]
         # refraction through the ionosphere
         # TODO: allow the plasma frequency to be set to something nonzero
-        refracted_direction = refract(direction, frequency, 0.0)
+        refracted_direction = refract(azel, frequency, 0.0)
         # corruption by the primary beam
-        flux  = (source.spectrum(frequency) |> linear) :: HermitianJonesMatrix
-        jones = meta.beam(frequency, refracted_direction) :: JonesMatrix
-        flux  = congruence_transform(jones, flux)
+        my_flux = (source.spectrum(frequency) |> linear) :: HermitianJonesMatrix
+        jones   = meta.beam(frequency, refracted_direction) :: JonesMatrix
+        flux[β] = congruence_transform(jones, my_flux)
         # convert the source direction into the correct coordinate system
-        itrf_direction = azel_to_itrf(refracted_direction, position(meta))
-        # generate the visibilities!
-        visibilities_onechannel = slice(visibilities, :, β)
-        genvis_onesource_onechannel!(visibilities_onechannel, meta,
-                                     flux, itrf_direction, phase_center, frequency)
+        itrf[β] = azel_to_itrf(refracted_direction, pos)
     end
-    visibilities
+    flux, itrf
 end
 
-function genvis_onesource!(visibilities, meta, variables, source::MultiSource)
-    for component in source.components
-        genvis_onesource!(visibilities, meta, variables, component)
-    end
-    visibilities
-end
+"""
+    additional_precomputation(meta, frame, source)
 
-function genvis_onesource!(visibilities, meta, variables, source::RFISource)
-    position = measure(variables.frame, source.position, pos"ITRF")
-    phase_center = variables.phase_center
+This function is used to do any computations we would like to only do
+once per source. For example it is used to compute the major and minor
+axes for Gaussian sources.
+"""
+additional_precomputation(meta, frame, source) = nothing
+
+"""
+    baseline_coherency(source, frequency, antenna1, antenna2, variables)
+
+This function computes the coherency between the two given antennas for
+the given source. For a point source this is unity for all baselines.
+For a Gaussian source this is a Gaussian function of the baseline length
+and orientation.
+
+Note that the `variables` argument is the output of the
+`additional_precomputation` function.
+"""
+baseline_coherency(source, frequency, antenna1, antenna2, variables) = 1
+
+function genvis_onesource!(visibilities, meta, source)
+    frame, phase_center = frame_and_phase_center(meta)
+    isabovehorizon(frame, source) || (return visibilities)
+    flux, itrf_direction = refract_and_corrupt(meta, frame, source)
+    variables = additional_precomputation(meta, frame, source)
     for β = 1:Nfreq(meta)
         frequency = meta.channels[β]
-        # we don't corrupt the flux with the primary beam here because
-        # the spectrum of the RFI was likely measured through the primary beam
-        flux  = (source.spectrum(frequency) |> linear) :: HermitianJonesMatrix
-        # generate the visibilities!
         visibilities_onechannel = slice(visibilities, :, β)
-        genvis_onesource_onechannel!(visibilities_onechannel, meta,
-                                     flux, position, phase_center, frequency)
+        genvis_onesource_onechannel!(visibilities_onechannel, meta, source, frequency,
+                                     flux[β], itrf_direction[β], phase_center, variables)
     end
     visibilities
 end
 
-function genvis_onesource_onechannel!(visibilities, meta, flux, source, phase_center, frequency)
-    delays  = geometric_delays(meta.antennas, source, phase_center)
+function genvis_onesource!(visibilities, meta, source::MultiSource)
+    for component in source.components
+        genvis_onesource!(visibilities, meta, component)
+    end
+    visibilities
+end
+
+function genvis_onesource_onechannel!(visibilities, meta, source, frequency,
+                                      flux, itrf, phase_center, variables)
+    delays  = geometric_delays(meta.antennas, itrf, phase_center)
     fringes = delays_to_fringes(delays, frequency)
     for α = 1:Nbase(meta)
-        antenna1 = meta.baselines[α].antenna1
-        antenna2 = meta.baselines[α].antenna2
-        fringe = fringes[antenna1] * conj(fringes[antenna2])
-        visibilities[α] += flux * fringe
+        idx1 = meta.baselines[α].antenna1
+        idx2 = meta.baselines[α].antenna2
+        antenna1 = meta.antennas[idx1]
+        antenna2 = meta.antennas[idx2]
+        fringe = fringes[idx1] * conj(fringes[idx2])
+        coherency = baseline_coherency(source, frequency, antenna1, antenna2, variables)
+        visibilities[α] += flux * fringe * coherency
     end
     visibilities
 end
 
+function additional_precomputation(meta, frame, source::GaussianSource)
+    j2000 = measure(frame, source.direction, dir"J2000")
+    rhat  = [j2000.x, j2000.y, j2000.z] # the source location
+    north = [0, 0, 1] - j2000.z*rhat    # local north on the celestial sphere
+    east  = cross(north, rhat)          # local east on the celestial sphere
+    north = north / norm(north)
+    east  = east / norm(east)
+    θ = source.position_angle
+    major_axis =  cos(θ)*north + sin(θ)*east
+    minor_axis = -sin(θ)*north + cos(θ)*east
+    major_width = π^2 * sin(source.major_fwhm)^2 / (4log(2))
+    minor_width = π^2 * sin(source.minor_fwhm)^2 / (4log(2))
+    # convert the major and minor axes to the ITRF coordinate system
+    major_j2000 = Direction(dir"J2000", major_axis[1], major_axis[2], major_axis[3])
+    minor_j2000 = Direction(dir"J2000", minor_axis[1], minor_axis[2], minor_axis[3])
+    major_itrf = measure(frame, major_j2000, dir"ITRF")
+    minor_itrf = measure(frame, minor_j2000, dir"ITRF")
+    major_itrf, minor_itrf, major_width, minor_width
+end
+
+function baseline_coherency(source::GaussianSource, frequency, antenna1, antenna2, variables)
+    λ = c / frequency
+    u = (antenna1.position.x - antenna2.position.x) / λ
+    v = (antenna1.position.y - antenna2.position.y) / λ
+    w = (antenna1.position.z - antenna2.position.z) / λ
+    major_axis, minor_axis, major_width, minor_width = variables
+    # project the baseline onto the major and minor axes
+    major_proj = u*major_axis.x + v*major_axis.y + w*major_axis.z
+    minor_proj = u*minor_axis.x + v*minor_axis.y + w*minor_axis.z
+    # flux is attenuated on long baselines due to souce being a Gaussian
+    exp(-major_width*major_proj^2 - minor_width*minor_proj^2)
+end
+
+"""
+    geometric_delays(antennas, source_direction::Direction, phase_center)
+
+Compute the geometric delay to each antenna for a source in the far field
+of the interferometer.
+"""
 function geometric_delays(antennas, source_direction::Direction, phase_center)
     # far field
     l = source_direction.x - phase_center.x
@@ -119,6 +176,12 @@ function geometric_delays(antennas, source_direction::Direction, phase_center)
     delays
 end
 
+"""
+    geometric_delays(antennas, source_position::Position, phase_center)
+
+Compute the geometric delay to each antenna for a source in the near field
+of the interferometer.
+"""
 function geometric_delays(antennas, source_position::Position, phase_center)
     # near field
     l = -phase_center.x
@@ -139,6 +202,15 @@ function geometric_delays(antennas, source_position::Position, phase_center)
     delays
 end
 
+doc"""
+    delays_to_fringes(delays, frequency)
+
+Compute
+\[
+    \exp\left(2\pi i \nu \tau\right)
+\]
+for each delay $\tau$ and the frequency $\nu$.
+"""
 function delays_to_fringes(delays, frequency)
     i2π = 1im * 2π
     Nant = length(delays)
