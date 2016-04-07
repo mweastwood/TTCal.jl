@@ -120,6 +120,12 @@ function ==(lhs::PointSource, rhs::PointSource)
     lhs.name == rhs.name && lhs.direction == rhs.direction && lhs.spectrum == rhs.spectrum
 end
 
+function ==(lhs::GaussianSource, rhs::GaussianSource)
+    lhs.name == rhs.name && lhs.direction == rhs.direction && lhs.spectrum == rhs.spectrum &&
+        lhs.major_fwhm == rhs.major_fwhm && lhs.minor_fwhm == rhs.minor_fwhm &&
+        lhs.position_angle == rhs.position_angle
+end
+
 function ==(lhs::MultiSource, rhs::MultiSource)
     lhs.name == rhs.name && lhs.components == rhs.components
 end
@@ -281,7 +287,7 @@ function deconstruct_source(source::GaussianSource)
     put_source_spectrum(c, source)
     c["major-fwhm"] = 3600*rad2deg(source.major_fwhm)
     c["minor-fwhm"] = 3600*rad2deg(source.minor_fwhm)
-    c["position-angle"] = rad2deg(source.position-angle)
+    c["position-angle"] = rad2deg(source.position_angle)
     c
 end
 

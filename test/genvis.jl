@@ -49,6 +49,26 @@ end
     model = ones(JonesMatrix, TTCal.Nbase(meta), Nfreq)
     @test vecnorm(visibilities.data - model) < sqrt(eps(Float64)) * vecnorm(visibilities.data)
 
+    # a point source and a Gaussian source with no width should have equal visibilities
+    point = PointSource("point", Direction(dir"AZEL", 45degrees, 45degrees),
+                                 PowerLaw(4, 3, 2, 1, 10e6, [1.0]))
+    gaussian = GaussianSource("gaussian", Direction(dir"AZEL", 45degrees, 45degrees),
+                                          PowerLaw(4, 3, 2, 1, 10e6, [1.0]), 0, 0, 0)
+    point_visibilities = genvis(meta, point)
+    gaussian_visibilities = genvis(meta, gaussian)
+    @test vecnorm(point_visibilities.data - gaussian_visibilities.data) < eps(Float64) * vecnorm(point_visibilities.data)
+
+    # a multi-component source should get the same visibilities as each of those sources together
+    sources = [PointSource("point", Direction(dir"AZEL", 45degrees, 45degrees),
+                                    PowerLaw(4, 3, 2, 1, 10e6, [1.0])),
+               GaussianSource("gaussian", Direction(dir"AZEL", 45degrees, 45degrees),
+                                          PowerLaw(4, 3, 2, 1, 10e6, [1.0]),
+                                          deg2rad(500/3600), deg2rad(300/3600), deg2rad(50))]
+    multi = MultiSource("multi", sources)
+    vis1 = genvis(meta, sources)
+    vis2 = genvis(meta, multi)
+    @test vecnorm(vis1.data - vis2.data) < eps(Float64) * vecnorm(vis1.data)
+
     # check that the near field and far field routines give equal geometric delays
     # in the far field
     position = TTCal.position(meta)
