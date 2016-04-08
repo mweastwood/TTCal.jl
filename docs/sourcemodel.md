@@ -70,15 +70,61 @@ the values contained in `index`.
 
 ## Gaussian Sources
 
-Support for Gaussian sources is coming!
+Gaussians sources can be added to the sky model by defining `major-fwhm`, `minor-fwhm`,
+and `position-angle`.
+
+* `major-fwhm` is the full width at half maximum (FWHM) of the major axis in arcseconds
+* `minor-fwhm` is the FWHM of the minor axis in arcseconds
+* `position-angle` is the angle the major axis makes with J2000 north where a positive angle is east of north
+
+Note that the Stokes parameters `I`, `Q`, `U`, and `V` now give the integrated flux
+over the entire source. An example Gaussian source is given below:
+
+```
+    ...
+    {
+        "ref": "Michael's imagination",
+        "name": "A Gaussian source",
+        "ra": "12h34m56.78s",
+        "dec": "+12d34m56.78s",
+        "I": 123.45,
+        "freq": 70e6,
+        "index": [-0.770],
+        "major-fwhm": 200,
+        "minor-fwhm": 100,
+        "position-angle": -70
+    }
+    ...
+```
+
+## Multi-Component Sources
+
+When peeling sources with TTCal each source receives its own peeling solution. This is not
+always the desired behavior. For example if you are trying to peel Cyg A you might want to
+use two sources to describe the two radio lobes, but both sources should be peeled with
+the same solution. Multi-component sources allow you to define sources that are composed
+of any number of the other source types. For example:
+
+```
+    ...
+    {
+        "name": "Cyg A",
+        "components": [
+            {
+                "name": "east lobe",
+                ...
+            },
+            {
+                "name": "west lobe",
+                ...
+            }
+        ]
+    }
+    ...
+```
 
 ## Near-Field Sources
 
 Experimental support for near-field sources is currently available in the latest version
 of TTCal. Because this is an experimental feature it is not yet very easy to use.
-
-## Diffuse Emission
-
-Diffuse emission is currently not supported within TTCal. Eventual support is on the
-horizon.
 
