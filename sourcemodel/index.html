@@ -227,14 +227,14 @@
             </li>
           
             <li class="anchor">
-              <a title="Near-Field Sources" href="#near-field-sources">
-                Near-Field Sources
+              <a title="Multi-Component Sources" href="#multi-component-sources">
+                Multi-Component Sources
               </a>
             </li>
           
             <li class="anchor">
-              <a title="Diffuse Emission" href="#diffuse-emission">
-                Diffuse Emission
+              <a title="Near-Field Sources" href="#near-field-sources">
+                Near-Field Sources
               </a>
             </li>
           
@@ -371,13 +371,59 @@ If you name a source &ldquo;Sun&rdquo;, &ldquo;Moon&rdquo;, or &ldquo;Jupiter&rd
 correct location.</p>
 </div>
 <h2 id="gaussian-sources">Gaussian Sources<a class="headerlink" href="#gaussian-sources" title="Permanent link">¶</a></h2>
-<p>Support for Gaussian sources is coming!</p>
+<p>Gaussians sources can be added to the sky model by defining <code>major-fwhm</code>, <code>minor-fwhm</code>,
+and <code>position-angle</code>.</p>
+<ul>
+<li><code>major-fwhm</code> is the full width at half maximum (FWHM) of the major axis in arcseconds</li>
+<li><code>minor-fwhm</code> is the FWHM of the minor axis in arcseconds</li>
+<li><code>position-angle</code> is the angle the major axis makes with J2000 north where a positive angle is east of north</li>
+</ul>
+<p>Note that the Stokes parameters <code>I</code>, <code>Q</code>, <code>U</code>, and <code>V</code> now give the integrated flux
+over the entire source. An example Gaussian source is given below:</p>
+<div class="code"><pre><span></span>    ...
+    {
+        &quot;ref&quot;: &quot;Michael&#39;s imagination&quot;,
+        &quot;name&quot;: &quot;A Gaussian source&quot;,
+        &quot;ra&quot;: &quot;12h34m56.78s&quot;,
+        &quot;dec&quot;: &quot;+12d34m56.78s&quot;,
+        &quot;I&quot;: 123.45,
+        &quot;freq&quot;: 70e6,
+        &quot;index&quot;: [-0.770],
+        &quot;major-fwhm&quot;: 200,
+        &quot;minor-fwhm&quot;: 100,
+        &quot;position-angle&quot;: -70
+    }
+    ...
+</pre></div>
+
+
+<h2 id="multi-component-sources">Multi-Component Sources<a class="headerlink" href="#multi-component-sources" title="Permanent link">¶</a></h2>
+<p>When peeling sources with TTCal each source receives its own peeling solution. This is not
+always the desired behavior. For example if you are trying to peel Cyg A you might want to
+use two sources to describe the two radio lobes, but both sources should be peeled with
+the same solution. Multi-component sources allow you to define sources that are composed
+of any number of the other source types. For example:</p>
+<div class="code"><pre><span></span>    ...
+    {
+        &quot;name&quot;: &quot;Cyg A&quot;,
+        &quot;components&quot;: [
+            {
+                &quot;name&quot;: &quot;east lobe&quot;,
+                ...
+            },
+            {
+                &quot;name&quot;: &quot;west lobe&quot;,
+                ...
+            }
+        ]
+    }
+    ...
+</pre></div>
+
+
 <h2 id="near-field-sources">Near-Field Sources<a class="headerlink" href="#near-field-sources" title="Permanent link">¶</a></h2>
 <p>Experimental support for near-field sources is currently available in the latest version
 of TTCal. Because this is an experimental feature it is not yet very easy to use.</p>
-<h2 id="diffuse-emission">Diffuse Emission<a class="headerlink" href="#diffuse-emission" title="Permanent link">¶</a></h2>
-<p>Diffuse emission is currently not supported within TTCal. Eventual support is on the
-horizon.</p>
           <aside class="copyright" role="note">
             
             Documentation built with
