@@ -8,7 +8,7 @@ model ionosphere is currently hard coded to zero inside TTCal.
 The index of refraction of a cold, collisionless, and unmagnetized plasma is
 
 \[
-    n = \sqrt{1 - \frac{\omega_p}{\omega}},
+    n = \sqrt{1 - \frac{\omega_p^2}{\omega^2}},
 \]
 
 where $\omega_p$ is the
