@@ -238,6 +238,8 @@ function get_source_direction(c)
         dir = Direction(dir"MOON")
     elseif name == "Jupiter"
         dir = Direction(dir"JUPITER")
+    elseif haskey(c, "az") && haskey(c, "el")
+        dir = Direction(dir"AZEL", c["az"], c["el"])
     else
         dir = Direction(dir"J2000", c["ra"], c["dec"])
     end
