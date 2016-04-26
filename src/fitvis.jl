@@ -52,7 +52,7 @@ Fit for the location of a point source near the given direction.
 function fitvis(visibilities::Visibilities, meta::Metadata, direction::Direction;
                 maxiter::Int = 20, tolerance::Float64 = 1e-3)
     frame = reference_frame(meta)
-    isabovehorizon(frame, direction) || error("Direction is below the horizon.")
+    isabovehorizon(frame, direction) || (return direction)
     direction = measure(frame, direction, dir"ITRF")
     variables = FitvisVariables(meta)
     newdirection = fitvis_internal(visibilities, meta, variables, direction, maxiter, tolerance)
