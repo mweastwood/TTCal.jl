@@ -24,7 +24,7 @@ export Visibilities, Metadata, Nant, Nfreq, Nbase
 export collect_metadata, flag_short_baselines!
 export get_data, set_corrected_data!
 
-export PointSource, GaussianSource, MultiSource, PowerLaw
+export PointSource, GaussianSource, DiskSource, MultiSource, PowerLaw
 export readsources, writesources
 export ConstantBeam, SineBeam, Memo178Beam
 

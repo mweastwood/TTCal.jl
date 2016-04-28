@@ -154,6 +154,20 @@ function baseline_coherency(source::GaussianSource, frequency, antenna1, antenna
     exp(-major_width*major_proj^2 - minor_width*minor_proj^2)
 end
 
+function baseline_coherency(source::DiskSource, frequency, antenna1, antenna2, variables)
+    λ = c / frequency
+    u = (antenna1.position.x - antenna2.position.x) / λ
+    v = (antenna1.position.y - antenna2.position.y) / λ
+    w = (antenna1.position.z - antenna2.position.z) / λ
+    b = sqrt(u^2 + v^2 + w^2)
+    δθ = source.radius
+    if b < eps(Float64)
+        return 1.0
+    else
+        return besselj1(2π*δθ*b)/(π*δθ*b)
+    end
+end
+
 """
     geometric_delays(antennas, source_direction::Direction, phase_center)
 

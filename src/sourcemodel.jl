@@ -83,7 +83,7 @@ end
 """
     GaussianSource <: Source
 
-An astronomical Gaussian source.
+An astronomical source in the shape of a Gaussian.
 """
 type GaussianSource <: Source
     name :: ASCIIString
@@ -92,6 +92,18 @@ type GaussianSource <: Source
     major_fwhm :: Float64 # FWHM along the major axis (radians)
     minor_fwhm :: Float64 # FWHM along the minor axis (radians)
     position_angle :: Float64 # (radians)
+end
+
+"""
+    DiskSource <: Source
+
+An astronomical source in the shape of a circular disk.
+"""
+type DiskSource <: Source
+    name :: ASCIIString
+    direction :: Direction
+    spectrum :: PowerLaw
+    radius :: Float64 # radius of the disk (radians)
 end
 
 """
@@ -222,6 +234,10 @@ function construct_source(c)
             minor_fwhm = deg2rad(c["minor-fwhm"]/3600)
             position_angle = deg2rad(c["position-angle"])
             source = GaussianSource(name, dir, spec, major_fwhm, minor_fwhm, position_angle)
+        elseif haskey(c, "radius")
+            # DiskSource
+            radius = deg2rad(c["radius"]/3600)
+            source = DiskSource(name, dir, spec, radius)
         else
             # PointSource
             source = PointSource(name, dir, spec)
