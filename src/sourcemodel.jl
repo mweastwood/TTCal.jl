@@ -106,6 +106,23 @@ type DiskSource <: Source
     radius :: Float64 # radius of the disk (radians)
 end
 
+doc"""
+    ShapeletSource <: Source
+
+An astronomical source composed of shapelets.
+
+Shapelets are eigenfunctions of the fourier transform operator.
+They form an orthonormal basis for real functions mapping
+$\mathbb R^2 \mapsto \mathbb R$.
+"""
+type ShapeletSource <: Source
+    name :: ASCIIString
+    direction :: Direction
+    spectrum :: PowerLaw
+    scale :: Float64 # scale factor of the shapelets (radians)
+    coeff :: Vector{Float64} # list of shapelet coefficients
+end
+
 """
     MultiSource <: Source
 

@@ -121,13 +121,26 @@ function genvis_onesource_onechannel!(visibilities, meta, source, frequency,
     visibilities
 end
 
-function additional_precomputation(meta, frame, source::GaussianSource)
-    j2000 = measure(frame, source.direction, dir"J2000")
+function local_north_east(frame, source_direction)
+    j2000 = measure(frame, source_direction, dir"J2000")
     rhat  = [j2000.x, j2000.y, j2000.z] # the source location
     north = [0, 0, 1] - j2000.z*rhat    # local north on the celestial sphere
     east  = cross(north, rhat)          # local east on the celestial sphere
     north = north / norm(north)
     east  = east / norm(east)
+    north, east
+end
+
+function get_uvw(frequency, antenna1, antenna2)
+    λ = c / frequency
+    u = (antenna1.position.x - antenna2.position.x) / λ
+    v = (antenna1.position.y - antenna2.position.y) / λ
+    w = (antenna1.position.z - antenna2.position.z) / λ
+    u, v, w
+end
+
+function additional_precomputation(meta, frame, source::GaussianSource)
+    north, east = local_north_east(frame, source.direction)
     θ = source.position_angle
     major_axis =  cos(θ)*north + sin(θ)*east
     minor_axis = -sin(θ)*north + cos(θ)*east
@@ -142,10 +155,7 @@ function additional_precomputation(meta, frame, source::GaussianSource)
 end
 
 function baseline_coherency(source::GaussianSource, frequency, antenna1, antenna2, variables)
-    λ = c / frequency
-    u = (antenna1.position.x - antenna2.position.x) / λ
-    v = (antenna1.position.y - antenna2.position.y) / λ
-    w = (antenna1.position.z - antenna2.position.z) / λ
+    u, v, w = get_uvw(frequency, antenna1, antenna2)
     major_axis, minor_axis, major_width, minor_width = variables
     # project the baseline onto the major and minor axes
     major_proj = u*major_axis.x + v*major_axis.y + w*major_axis.z
@@ -155,16 +165,74 @@ function baseline_coherency(source::GaussianSource, frequency, antenna1, antenna
 end
 
 function baseline_coherency(source::DiskSource, frequency, antenna1, antenna2, variables)
-    λ = c / frequency
-    u = (antenna1.position.x - antenna2.position.x) / λ
-    v = (antenna1.position.y - antenna2.position.y) / λ
-    w = (antenna1.position.z - antenna2.position.z) / λ
-    b = sqrt(u^2 + v^2 + w^2)
+    u, v, w = get_uvw(frequency, antenna1, antenna2)
+    b = sqrt(u^2 + v^2 + w^2) # baseline length
     δθ = source.radius
-    if b < eps(Float64)
+    δθb = δθ*b
+    if δθb < eps(Float64)
         return 1.0
     else
-        return besselj1(2π*δθ*b)/(π*δθ*b)
+        return besselj1(2π*δθb)/(π*δθb)
+    end
+end
+
+function additional_precomputation(meta, frame, source::ShapeletSource)
+    north, east = local_north_east(frame, source.direction)
+    north_j2000 = Direction(dir"J2000", north[1], north[2], north[3])
+    east_j2000  = Direction(dir"J2000",  east[1],  east[2],  east[3])
+    north_itrf  = measure(frame, north_j2000, dir"ITRF")
+    east_itrf   = measure(frame,  east_j2000, dir"ITRF")
+    north_itrf, east_itrf
+end
+
+function baseline_coherency(source::ShapeletSource, frequency, antenna1, antenna2, variables)
+    u, v, w = get_uvw(frequency, antenna1, antenna2)
+    north, east = variables
+    β = source.scale
+    # project the baseline onto the sky
+    x = u*east.x  + v*east.y  + w*east.z
+    y = u*north.x + v*north.y + w*north.z
+    # compute the contribution from each shapelet component
+    out = 0.0
+    idx = 1
+    nmax = round(Int, sqrt(length(source.coeff))) - 1
+    for n2 = 0:nmax, n1 = 0:nmax
+        normalization = 2β * sqrt(π / (2^(n1+n2) * factorial(n1) * factorial(n2))) * (1im)^(n1+n2)
+        shapelet =  normalization * hermite(n1, 2π*x*β) * hermite(n2, 2π*y*β) * exp(-2π^2*β^2*(x^2+y^2))
+        out += source.coeff[idx] * shapelet
+        idx += 1
+    end
+    out
+end
+
+doc"""
+    hermite(n, x)
+
+Compute the value of the $n$th Hermite polynomial at $x$.
+"""
+function hermite(n, x)
+    if n == 0
+        return one(typeof(x))
+    elseif n == 1
+        return 2x
+    else
+        # Note that the naive thing to do here is:
+        #
+        #     return 2x*hermite(n-1, x) - 2*(n-1)*hermite(n-2, x)
+        #
+        # This is sub-optimal because you end up calculating `hermite(n-2, x)`
+        # two times, and `hermite(n-3, x)` three times, etc. So instead of
+        # using recursion we will just write out the for-loop because you end
+        # up doing less work (especially for large-n).
+        local output
+        minus_two = hermite(0, x)
+        minus_one = hermite(1, x)
+        for n′ = 2:n
+            output = 2x*minus_one - 2*(n′-1)*minus_two
+            minus_two = minus_one
+            minus_one = output
+        end
+        return output
     end
 end
 
