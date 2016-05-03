@@ -192,13 +192,14 @@ function baseline_coherency(source::ShapeletSource, frequency, antenna1, antenna
     # project the baseline onto the sky
     x = u*east.x  + v*east.y  + w*east.z
     y = u*north.x + v*north.y + w*north.z
+    exponential = exp(-2π^2*β^2*(x^2+y^2))
     # compute the contribution from each shapelet component
     out = 0.0
     idx = 1
     nmax = round(Int, sqrt(length(source.coeff))) - 1
     for n2 = 0:nmax, n1 = 0:nmax
-        normalization = 2β * sqrt(π / (2^(n1+n2) * factorial(n1) * factorial(n2))) * (1im)^(n1+n2)
-        shapelet =  normalization * hermite(n1, 2π*x*β) * hermite(n2, 2π*y*β) * exp(-2π^2*β^2*(x^2+y^2))
+        phase = (1im)^(n1+n2)
+        shapelet = phase * hermite(n1, 2π*x*β) * hermite(n2, 2π*y*β) * exponential
         out += source.coeff[idx] * shapelet
         idx += 1
     end
