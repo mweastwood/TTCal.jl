@@ -18,7 +18,7 @@
 
 Remove the list of sources from the measurement set.
 """
-function subsrc!(visibilities::Visibilities, meta::Metadata, sources::Vector{Source})
+function subsrc!{T<:Source}(visibilities::Visibilities, meta::Metadata, sources::Vector{T})
     frame = reference_frame(meta)
     sources = abovehorizon(frame, sources)
     model = genvis(meta, sources)
