@@ -105,6 +105,18 @@ function genvis_onesource!(visibilities, meta, source::MultiSource)
     visibilities
 end
 
+function genvis_onesource!(visibilities, meta, source::RFISource)
+    frame, phase_center = frame_and_phase_center(meta)
+    itrf_position = measure(frame, source.position, pos"ITRF")
+    for β = 1:Nfreq(meta)
+        frequency = meta.channels[β]
+        flux = source.spectrum(frequency) |> linear
+        visibilities_onechannel = slice(visibilities, :, β)
+        genvis_onesource_onechannel!(visibilities_onechannel, meta, source, frequency,
+                                     flux, itrf_position, phase_center, ())
+    end
+end
+
 function genvis_onesource_onechannel!(visibilities, meta, source, frequency,
                                       flux, itrf, phase_center, variables)
     delays  = geometric_delays(meta.antennas, itrf, phase_center)
@@ -120,6 +132,7 @@ function genvis_onesource_onechannel!(visibilities, meta, source, frequency,
     end
     visibilities
 end
+
 
 function local_north_east(frame, source_direction)
     j2000 = measure(frame, source_direction, dir"J2000")
