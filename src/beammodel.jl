@@ -174,6 +174,7 @@ function call(::ZernikeBeam, ν, az, el)
     JonesMatrix(sqrt(value), 0, 0, sqrt(value))
 end
 
+# TODO: these coefficients need to be refit
 const _Zcoeff = [ 0.5925713994750834,
                  -0.4622486219893028,
                  -0.054924184973998307,
@@ -193,7 +194,8 @@ function zernike_radial_part(n, m, ρ)
     n == m && return R0
     R2 = ((m+2)*ρ^2 - (m+1))*R0
     for n′ = m+4:2:n
-        recurrence_relation = (2*(n-1)*(2n*(n-2)*ρ^2-m^2-n*(n-2))*R2 - n*(n+m-2)*(n-m-2)*R0) / ((n+m)*(n-m)*(n-2))
+        recurrence_relation = ((2*(n′-1)*(2n′*(n′-2)*ρ^2-m^2-n′*(n′-2))*R2 - n′*(n′+m-2)*(n′-m-2)*R0)
+                                    / ((n′+m)*(n′-m)*(n′-2)))
         R0 = R2
         R2 = recurrence_relation
     end
@@ -206,7 +208,7 @@ function zernike_azimuthal_part(m, θ)
     elseif m > 0
         return cos(m*θ)
     else
-        return sin(m*θ)
+        return sin(-m*θ)
     end
 end
 
