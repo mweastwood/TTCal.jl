@@ -152,7 +152,66 @@ function P178(ν, az, el)
     sqrt((E178(ν,el)*cos(az))^2 + (H178(ν,el)*sin(az))^2)
 end
 
+doc"""
+    ZernikeBeam <: BeamModel
+
+This beam is composed of Zernike polynomials.
+"""
+immutable ZernikeBeam <: BeamModel end
+
+function call(::ZernikeBeam, ν, az, el)
+    ρ = cos(el)
+    θ = az
+    value = (_Zcoeff[1]*zernike(0, 0, ρ, θ)
+            + _Zcoeff[2]*zernike(2, 0, ρ, θ)
+            + _Zcoeff[3]*zernike(4, 0, ρ, θ)
+            + _Zcoeff[4]*zernike(4, 4, ρ, θ)
+            + _Zcoeff[5]*zernike(6, 0, ρ, θ)
+            + _Zcoeff[6]*zernike(6, 4, ρ, θ)
+            + _Zcoeff[7]*zernike(8, 0, ρ, θ)
+            + _Zcoeff[8]*zernike(8, 4, ρ, θ)
+            + _Zcoeff[9]*zernike(8, 8, ρ, θ))
+    JonesMatrix(sqrt(value), 0, 0, sqrt(value))
+end
+
+const _Zcoeff = [ 0.5925713994750834,
+                 -0.4622486219893028,
+                 -0.054924184973998307,
+                 -0.0028805328944419696,
+                 -0.02407776673368796,
+                 -0.006155457593922782,
+                 -0.023973603224075223,
+                 -0.003090132046373044,
+                  0.00497413312773207]
+
+function zernike(n, m, ρ, θ)
+    zernike_radial_part(n, abs(m), ρ) * zernike_azimuthal_part(m, θ)
+end
+
+function zernike_radial_part(n, m, ρ)
+    R0 = ρ^m
+    n == m && return R0
+    R2 = ((m+2)*ρ^2 - (m+1))*R0
+    for n′ = m+4:2:n
+        recurrence_relation = (2*(n-1)*(2n*(n-2)*ρ^2-m^2-n*(n-2))*R2 - n*(n+m-2)*(n-m-2)*R0) / ((n+m)*(n-m)*(n-2))
+        R0 = R2
+        R2 = recurrence_relation
+    end
+    R2
+end
+
+function zernike_azimuthal_part(m, θ)
+    if m == 0
+        return 1.0
+    elseif m > 0
+        return cos(m*θ)
+    else
+        return sin(m*θ)
+    end
+end
+
 const beam_dictionary = Dict("constant" => ConstantBeam,
                              "sine"     => SineBeam,
-                             "memo178"  => Memo178Beam)
+                             "memo178"  => Memo178Beam,
+                             "zernike"  => ZernikeBeam)
 

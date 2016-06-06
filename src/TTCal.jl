@@ -28,7 +28,7 @@ export PointSource, GaussianSource, DiskSource
 export ShapeletSource, MultiSource
 export PowerLaw
 export readsources, writesources
-export ConstantBeam, SineBeam, Memo178Beam
+export ConstantBeam, SineBeam, Memo178Beam, ZernikeBeam
 
 export genvis, subsrc!, getspec, fitvis
 
