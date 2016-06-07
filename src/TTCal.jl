@@ -34,7 +34,7 @@ export genvis, subsrc!, getspec, fitvis
 
 export GainCalibration, gaincal
 export PolarizationCalibration, polcal
-export applycal!, corrupt!, peel!
+export applycal!, corrupt!, peel!, shave!
 
 importall Base.Operators
 import Base: zero, one, rand, conj, det, inv, norm, kron
