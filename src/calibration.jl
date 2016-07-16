@@ -253,9 +253,9 @@ function polcal(visibilities::Visibilities, meta::Metadata, model::Visibilities;
 end
 
 function solve!(calibration, measured_visibilities, model_visibilities, metadata, maxiter, tolerance, quiet)
-    square_measured, square_model = makesquare(measured_visibilities, model_visibilities, meta)
-    quiet || (p = Progress(Nfreq(meta), "Calibrating: "))
-    for β = 1:Nfreq(meta)
+    square_measured, square_model = makesquare(measured_visibilities, model_visibilities, metadata)
+    quiet || (p = Progress(Nfreq(metadata), "Calibrating: "))
+    for β = 1:Nfreq(metadata)
         solve_onechannel!(slice(calibration.jones, :, β),
                           slice(calibration.flags, :, β),
                           slice(square_measured, :, :, β),
@@ -267,9 +267,9 @@ function solve!(calibration, measured_visibilities, model_visibilities, metadata
         # Print a summary of the flags
         flagged_channels = sum(all(calibration.flags, 1))
         flagged_antennas = sum(all(calibration.flags, 2))
-        percentage = sum(calibration.flags) / length(calibration.flags) / 100
+        percentage = 100 * sum(calibration.flags) / length(calibration.flags)
         @printf("(%d antennas flagged, %d channels flagged, %0.2f percent total)\n",
-                flagged_channels, flagged_antennas, percentage)
+                flagged_antennas, flagged_channels, percentage)
     end
 end
 
@@ -283,10 +283,13 @@ end
 "Solve with one solution for all channels."
 function solve_allchannels!(calibration, measured, model, metadata, maxiter, tolerance)
     G = slice(calibration.jones, :, 1)
+    F = fill(false, length(G))
     V, M = makesquare(measured, model, metadata)
     converged = iterate(stefcalstep, RK4, maxiter, tolerance, false, G, V, M)
+    flag_solution!(G, F, V, M, converged)
     for β = 1:size(calibration.jones, 2)
         calibration.jones[:,β] = G
+        calibration.flags[:,β] = F
     end
 end
 

@@ -37,7 +37,7 @@ Note that peeling iterates through the list of sources. A peeling
 iteration is defined as one pass through the full list. Usually 2
 or 3 iterations seems to be sufficient.
 """
-function peel!(visibilities::Visibilities, meta::Metadata, sources,
+function peel!(visibilities::Visibilities, meta::Metadata, sources;
                peeliter = 3, maxiter = 20, tolerance = 1e-3, quiet = false)
     frame = reference_frame(meta)
     sources = abovehorizon(frame, sources)
@@ -123,7 +123,7 @@ Note that peeling iterates through the list of sources. A peeling
 iteration is defined as one pass through the full list. Usually 2
 or 3 iterations seems to be sufficient.
 """
-function shave!(visibilities::Visibilities, meta::Metadata, sources,
+function shave!(visibilities::Visibilities, meta::Metadata, sources;
                 peeliter = 3, maxiter = 20, tolerance = 1e-3, quiet = false)
     frame = reference_frame(meta)
     sources = abovehorizon(frame, sources)
