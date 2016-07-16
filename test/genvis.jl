@@ -80,5 +80,24 @@ end
     farfield_delays  = TTCal.geometric_delays(meta.antennas, farfield_direction, meta.phase_center)
     nearfield_delays = TTCal.geometric_delays(meta.antennas, nearfield_position, meta.phase_center)
     @test vecnorm(farfield_delays - nearfield_delays)/vecnorm(farfield_delays) < 1e-8
+
+    @testset "Hermite polynomials" begin
+        H0(x) = 1
+        H1(x) = 2x
+        H2(x) = 4x^2 - 2
+        H3(x) = 8x^3 - 12x
+        H4(x) = 16x^4 - 48x^2 + 12
+        H5(x) = 32x^5 - 160x^3 + 120x
+
+        for idx = 1:5
+            x = randn()
+            @test TTCal.hermite(0, x) ≈ H0(x)
+            @test TTCal.hermite(1, x) ≈ H1(x)
+            @test TTCal.hermite(2, x) ≈ H2(x)
+            @test TTCal.hermite(3, x) ≈ H3(x)
+            @test TTCal.hermite(4, x) ≈ H4(x)
+            @test TTCal.hermite(5, x) ≈ H5(x)
+        end
+    end
 end
 
