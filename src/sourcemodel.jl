@@ -169,6 +169,10 @@ function isabovehorizon(frame::ReferenceFrame, source)
     isabovehorizon(frame, source.direction)
 end
 
+function isabovehorizon(frame::ReferenceFrame, source::RFISource)
+    true
+end
+
 function isabovehorizon(frame::ReferenceFrame, source::MultiSource)
     for component in source.components
         if !isabovehorizon(frame, component)
