@@ -341,8 +341,8 @@ function put_source_direction(c, source)
     if source.name != "Sun" && source.name != "Moon" && source.name != "Jupiter"
         ra  = longitude(source.direction) * radians
         dec =  latitude(source.direction) * radians
-        c["ra"]  = sexagesimal(ra, hours = true)
-        c["dec"] = sexagesimal(dec)
+        c["ra"]  = sexagesimal(ra, digits = 3, hours = true)
+        c["dec"] = sexagesimal(dec, digits = 2)
     end
 end
 
