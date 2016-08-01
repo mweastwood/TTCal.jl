@@ -211,9 +211,11 @@ function baseline_coherency(source::ShapeletSource, frequency, antenna1, antenna
     idx = 1
     nmax = round(Int, sqrt(length(source.coeff))) - 1
     for n2 = 0:nmax, n1 = 0:nmax
-        phase = (1im)^(n1+n2)
-        shapelet = phase * hermite(n1, 2π*x*β) * hermite(n2, 2π*y*β) * exponential
-        out += source.coeff[idx] * shapelet
+        if source.coeff[idx] != 0
+            phase = (1im)^(n1+n2)
+            shapelet = phase * hermite(n1, 2π*x*β) * hermite(n2, 2π*y*β) * exponential
+            out += source.coeff[idx] * shapelet
+        end
         idx += 1
     end
     out
