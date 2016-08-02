@@ -113,7 +113,7 @@
     function test_solve(cal,data,model,maxiter,tolerance)
         # Run as `solve!(...)`
         mycal = similar(cal)
-        TTCal.solve!(mycal,data,model,meta,maxiter,tolerance,quiet=true)
+        TTCal.solve!(mycal,data,model,meta,maxiter,tolerance,true)
         TTCal.fixphase!(cal,"1x")
         TTCal.fixphase!(mycal,"1x")
         jones = cal.jones

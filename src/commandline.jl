@@ -197,8 +197,7 @@ function run_peel(args)
     peeliter = args["peeliter"]
     maxiter = args["maxiter"]
     tolerance = args["tolerance"]
-    calibrations = peel!(GainCalibration, data, meta, sources,
-                         peeliter=peeliter, maxiter=maxiter, tolerance=tolerance)
+    calibrations = peel!(data, meta, sources, peeliter=peeliter, maxiter=maxiter, tolerance=tolerance)
     set_corrected_data!(ms, data)
     if !isempty(args["output"])
         for i = 1:length(calibrations)

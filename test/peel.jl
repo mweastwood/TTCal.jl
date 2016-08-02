@@ -8,7 +8,7 @@
 
     visibilities = genvis(meta, sources)
     δ = sqrt(eps(Float64))*vecnorm(visibilities.data)
-    solutions = peel!(GainCalibration, visibilities, meta, sources, maxiter=100, tolerance=eps(Float64))
+    solutions = peel!(visibilities, meta, sources, maxiter=100, tolerance=eps(Float64))
     for solution in solutions
         @test vecnorm(solution.jones - ones(DiagonalJonesMatrix,Nant,Nfreq)) < 1e-6
     end
