@@ -134,7 +134,7 @@ function peel!(calibrations, coherencies, visibilities, meta, peeliter, maxiter,
 end
 
 function do_peeling_solve!(calibration_toward_source, visibilities, coherency, meta, maxiter, tolerance)
-    if Nfreq(calibration) == 1
+    if Nfreq(calibration_toward_source) == 1
         # shaving
         solve_allchannels!(calibration_toward_source, visibilities, coherency, meta, maxiter, tolerance)
     else
