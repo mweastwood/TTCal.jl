@@ -130,9 +130,17 @@ function corrupt!(visibilities::Visibilities, meta::Metadata, calibration::Calib
         if calibration.flags[antenna1,β] || calibration.flags[antenna2,β]
             visibilities.flags[α,β] = true
         end
+        # If the calibration has only one frequency channel, then it is a wideband
+        # solution and we should apply it to every frequency channel. Otherwise we
+        # should use the calibration from the frequency channel in question.
+        if Nfreq(calibration) == 1
+            J₁ = calibration.jones[antenna1,1]
+            J₂ = calibration.jones[antenna2,1]
+        else
+            J₁ = calibration.jones[antenna1,β]
+            J₂ = calibration.jones[antenna2,β]
+        end
         V  = visibilities.data[α,β]
-        J₁ = calibration.jones[antenna1,β]
-        J₂ = calibration.jones[antenna2,β]
         visibilities.data[α,β] = J₁*V*J₂'
     end
     visibilities
@@ -283,14 +291,11 @@ end
 "Solve with one solution for all channels."
 function solve_allchannels!(calibration, measured, model, metadata, maxiter, tolerance)
     G = slice(calibration.jones, :, 1)
-    F = fill(false, length(G))
+    F = slice(calibration.flags, :, 1)
     V, M = makesquare(measured, model, metadata)
     converged = iterate(stefcalstep, RK4, maxiter, tolerance, false, G, V, M)
     flag_solution!(G, F, V, M, converged)
-    for β = 1:size(calibration.jones, 2)
-        calibration.jones[:,β] = G
-        calibration.flags[:,β] = F
-    end
+    calibration
 end
 
 doc"""

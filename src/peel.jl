@@ -33,7 +33,7 @@ Peel sources from the visibilities.
 * `tolerance` - the relative tolerance used to test for convergence (defaults to `1e-3`)
 * `quiet` - suppresses printing if set to `true` (defaults to `false`)
 
-Note that peeling iterates through the list of sources. A peeling
+Note that peeling iterates through the list of sources in order. A peeling
 iteration is defined as one pass through the full list. Usually 2
 or 3 iterations seems to be sufficient.
 """
@@ -44,51 +44,6 @@ function peel!(visibilities::Visibilities, meta::Metadata, sources;
     calibrations = [GainCalibration(Nant(meta), Nfreq(meta)) for source in sources]
     coherencies  = [genvis(meta, source) for source in sources]
     peel!(calibrations, coherencies, visibilities, meta, peeliter, maxiter, tolerance, quiet)
-    calibrations
-end
-
-function peel!(calibrations, coherencies, visibilities, meta, peeliter, maxiter, tolerance, quiet)
-    Nsource = length(calibrations)
-
-    # Subtract all of the sources
-    # (assuming the beam is unity towards each source)
-    for coherency in coherencies
-        subsrc!(visibilities, coherency)
-    end
-
-    # Derive a calibration towards each source
-    quiet || (p = Progress(peeliter*Nsource, "Peeling: "))
-    for iter = 1:peeliter
-        for s = 1:Nsource
-            coherency = coherencies[s]
-            calibration_toward_source = calibrations[s]
-
-            # Put one source back into the visibilities.
-            corrupted = deepcopy(coherency)
-            corrupt!(corrupted, meta, calibration_toward_source)
-            putsrc!(visibilities, corrupted)
-
-            # Solve for the calibration in the direction
-            # of the current source.
-            solve!(calibration_toward_source, visibilities, coherency, meta, maxiter, tolerance, true)
-
-            # Take the source back out of the measured visibilities,
-            # but this time subtract it with the corrected gains toward
-            # that direction.
-            corrupted = deepcopy(coherency)
-            corrupt!(corrupted, meta, calibration_toward_source)
-            subsrc!(visibilities, corrupted)
-
-            quiet || next!(p)
-        end
-    end
-    if !quiet
-        for calibration in calibrations
-            if sum(calibration.flags) > 0.5length(calibration.flags)
-                warn("Frequently failed to converge. There will likely be large residuals.")
-            end
-        end
-    end
     calibrations
 end
 
@@ -127,13 +82,13 @@ function shave!(visibilities::Visibilities, meta::Metadata, sources;
                 peeliter = 3, maxiter = 20, tolerance = 1e-3, quiet = false)
     frame = reference_frame(meta)
     sources = abovehorizon(frame, sources)
-    calibrations = [GainCalibration(Nant(meta), Nfreq(meta)) for source in sources]
+    calibrations = [GainCalibration(Nant(meta), 1) for source in sources]
     coherencies  = [genvis(meta, source) for source in sources]
-    shave!(calibrations, coherencies, visibilities, meta, peeliter, maxiter, tolerance, quiet)
+    peel!(calibrations, coherencies, visibilities, meta, peeliter, maxiter, tolerance, quiet)
     calibrations
 end
 
-function shave!(calibrations, coherencies, visibilities, meta, peeliter, maxiter, tolerance, quiet)
+function peel!(calibrations, coherencies, visibilities, meta, peeliter, maxiter, tolerance, quiet)
     Nsource = length(calibrations)
 
     # Subtract all of the sources
@@ -156,7 +111,7 @@ function shave!(calibrations, coherencies, visibilities, meta, peeliter, maxiter
 
             # Solve for the calibration in the direction
             # of the current source.
-            solve_allchannels!(calibration_toward_source, visibilities, coherency, meta, maxiter, tolerance)
+            do_peeling_solve!(calibration_toward_source, visibilities, coherency, meta, maxiter, tolerance)
 
             # Take the source back out of the measured visibilities,
             # but this time subtract it with the corrected gains toward
@@ -176,5 +131,15 @@ function shave!(calibrations, coherencies, visibilities, meta, peeliter, maxiter
         end
     end
     calibrations
+end
+
+function do_peeling_solve!(calibration_toward_source, visibilities, coherency, meta, maxiter, tolerance)
+    if Nfreq(calibration) == 1
+        # shaving
+        solve_allchannels!(calibration_toward_source, visibilities, coherency, meta, maxiter, tolerance)
+    else
+        # peeling
+        solve!(calibration_toward_source, visibilities, coherency, meta, maxiter, tolerance, true)
+    end
 end
 
