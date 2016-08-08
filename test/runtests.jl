@@ -7,6 +7,7 @@ else
 end
 using CasaCore.Measures
 using CasaCore.Tables
+using NPZ
 
 include("setup.jl")
 
