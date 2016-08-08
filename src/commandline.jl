@@ -15,6 +15,10 @@
 
 const s = ArgParseSettings(description = "A calibration routine developed for the OVRO LWA.")
 
+const beam_dictionary = Dict("constant" => ConstantBeam,
+                             "sine"     => SineBeam,
+                             "memo178"  => Memo178Beam)
+
 @add_arg_table s begin
     "gaincal"
         help = "Solve for a gain calibration."

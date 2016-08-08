@@ -156,34 +156,31 @@ doc"""
     ZernikeBeam <: BeamModel
 
 This beam is composed of Zernike polynomials.
-"""
-immutable ZernikeBeam <: BeamModel end
 
-function call(::ZernikeBeam, ν, az, el)
-    ρ = cos(el)
-    θ = az
-    value = (_Zcoeff[1]*zernike(0, 0, ρ, θ)
-            + _Zcoeff[2]*zernike(2, 0, ρ, θ)
-            + _Zcoeff[3]*zernike(4, 0, ρ, θ)
-            + _Zcoeff[4]*zernike(4, 4, ρ, θ)
-            + _Zcoeff[5]*zernike(6, 0, ρ, θ)
-            + _Zcoeff[6]*zernike(6, 4, ρ, θ)
-            + _Zcoeff[7]*zernike(8, 0, ρ, θ)
-            + _Zcoeff[8]*zernike(8, 4, ρ, θ)
-            + _Zcoeff[9]*zernike(8, 8, ρ, θ))
-    JonesMatrix(sqrt(value), 0, 0, sqrt(value))
+**TODO**
+
+* Implement the Stokes Q part to the beam model
+* Implement the Stokes U beam as a 45 degree rotation of the Stokes Q beam
+"""
+immutable ZernikeBeam <: BeamModel
+    coeff :: Vector{Float64}
 end
 
-# TODO: these coefficients need to be refit
-const _Zcoeff = [ 0.5925713994750834,
-                 -0.4622486219893028,
-                 -0.054924184973998307,
-                 -0.0028805328944419696,
-                 -0.02407776673368796,
-                 -0.006155457593922782,
-                 -0.023973603224075223,
-                 -0.003090132046373044,
-                  0.00497413312773207]
+function call(beam::ZernikeBeam, ν, az, el)
+    ρ = cos(el)
+    θ = az
+    coeff = beam.coeff
+    value = (coeff[1]*zernike(0, 0, ρ, θ)
+            + coeff[2]*zernike(2, 0, ρ, θ)
+            + coeff[3]*zernike(4, 0, ρ, θ)
+            + coeff[4]*zernike(4, 4, ρ, θ)
+            + coeff[5]*zernike(6, 0, ρ, θ)
+            + coeff[6]*zernike(6, 4, ρ, θ)
+            + coeff[7]*zernike(8, 0, ρ, θ)
+            + coeff[8]*zernike(8, 4, ρ, θ)
+            + coeff[9]*zernike(8, 8, ρ, θ))
+    JonesMatrix(sqrt(value), 0, 0, sqrt(value))
+end
 
 function zernike(n, m, ρ, θ)
     zernike_radial_part(n, abs(m), ρ) * zernike_azimuthal_part(m, θ)
@@ -211,9 +208,4 @@ function zernike_azimuthal_part(m, θ)
         return sin(-m*θ)
     end
 end
-
-const beam_dictionary = Dict("constant" => ConstantBeam,
-                             "sine"     => SineBeam,
-                             "memo178"  => Memo178Beam,
-                             "zernike"  => ZernikeBeam)
 
