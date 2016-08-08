@@ -82,7 +82,36 @@ and orientation.
 Note that the `variables` argument is the output of the
 `additional_precomputation` function.
 """
-baseline_coherency(source, frequency, antenna1, antenna2, variables) = 1
+baseline_coherency(source, frequency, antenna1, antenna2, variables) = 1.0
+
+function time_smearing(itrf, frequency, antenna1, antenna2)
+#    ω = 2π / 86164.09054 # angular rotation speed of the Earth
+#    cosδ = cos(latitude(itrf)) # cosine declination
+#    τ = 13 # hard coded to LWA integration time
+#
+#    # get the east-west component of the baseline
+#    u, v, w = get_uvw(frequency, antenna1, antenna2)
+#    up = [antenna1.position.x, antenna1.position.y, antenna1.position.z]
+#    north = [0, 0, 1]
+#    east = cross(north, up)
+#    east /= norm(east)
+#    baseline_east = abs(u*east[1] + v*east[2] + w*east[3])
+#
+#    sinc(ω * cosδ * baseline_east * τ)
+    1.0
+end
+
+time_smearing(itrf::Position, frequency, antenna1, antenna2) = 1.0
+
+function bandwidth_smearing(itrf, antenna1, antenna2)
+#    λ = c / 24e3 # hard coded to LWA channel width
+#    u = (antenna1.position.x - antenna2.position.x) / λ
+#    v = (antenna1.position.y - antenna2.position.y) / λ
+#    w = (antenna1.position.z - antenna2.position.z) / λ
+#    delay = u*itrf.x + v*itrf.y + w*itrf.z
+#    sinc(delay)
+    1.0
+end
 
 function genvis_onesource!(visibilities, meta, source)
     frame, phase_center = frame_and_phase_center(meta)
@@ -128,11 +157,13 @@ function genvis_onesource_onechannel!(visibilities, meta, source, frequency,
         antenna2 = meta.antennas[idx2]
         fringe = fringes[idx1] * conj(fringes[idx2])
         coherency = baseline_coherency(source, frequency, antenna1, antenna2, variables)
-        visibilities[α] += flux * fringe * coherency
+        smearing1 = bandwidth_smearing(itrf, antenna1, antenna2)
+        smearing2 = time_smearing(itrf, frequency, antenna1, antenna2)
+        smearing = smearing1 * smearing2
+        visibilities[α] += flux * fringe * coherency * smearing
     end
     visibilities
 end
-
 
 function local_north_east(frame, source_direction)
     j2000 = measure(frame, source_direction, dir"J2000")
