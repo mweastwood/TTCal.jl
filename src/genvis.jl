@@ -252,37 +252,6 @@ function baseline_coherency(source::ShapeletSource, frequency, antenna1, antenna
     out
 end
 
-doc"""
-    hermite(n, x)
-
-Compute the value of the $n$th Hermite polynomial at $x$.
-"""
-function hermite(n, x)
-    if n == 0
-        return one(typeof(x))
-    elseif n == 1
-        return 2x
-    else
-        # Note that the naive thing to do here is:
-        #
-        #     return 2x*hermite(n-1, x) - 2*(n-1)*hermite(n-2, x)
-        #
-        # This is sub-optimal because you end up calculating `hermite(n-2, x)`
-        # two times, and `hermite(n-3, x)` three times, etc. So instead of
-        # using recursion we will just write out the for-loop because you end
-        # up doing less work (especially for large-n).
-        local output
-        minus_two = hermite(0, x)
-        minus_one = hermite(1, x)
-        for n′ = 2:n
-            output = 2x*minus_one - 2*(n′-1)*minus_two
-            minus_two = minus_one
-            minus_one = output
-        end
-        return output
-    end
-end
-
 """
     geometric_delays(antennas, source_direction::Direction, phase_center)
 

@@ -13,6 +13,7 @@ include("setup.jl")
 
 srand(123)
 @testset "TTCal Tests" begin
+    include("special.jl")
     include("stokes.jl")
     include("sourcemodel.jl")
     include("beammodel.jl")

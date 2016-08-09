@@ -49,6 +49,7 @@ using CasaCore.Tables
 
 const c = 2.99792e+8
 
+include("special.jl")
 include("rungekutta.jl")
 include("stokes.jl")
 include("sourcemodel.jl")
