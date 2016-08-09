@@ -127,21 +127,21 @@ function corrupt!(visibilities::Visibilities, meta::Metadata, calibration::Calib
     for β = 1:Nfreq(meta), α = 1:Nbase(meta)
         antenna1 = meta.baselines[α].antenna1
         antenna2 = meta.baselines[α].antenna2
-        if calibration.flags[antenna1,β] || calibration.flags[antenna2,β]
-            visibilities.flags[α,β] = true
-        end
         # If the calibration has only one frequency channel, then it is a wideband
         # solution and we should apply it to every frequency channel. Otherwise we
         # should use the calibration from the frequency channel in question.
         if Nfreq(calibration) == 1
             J₁ = calibration.jones[antenna1,1]
             J₂ = calibration.jones[antenna2,1]
+            flag = calibration.flags[antenna1,1] | calibration.flags[antenna2,1]
         else
             J₁ = calibration.jones[antenna1,β]
             J₂ = calibration.jones[antenna2,β]
+            flag = calibration.flags[antenna1,β] | calibration.flags[antenna2,β]
         end
         V  = visibilities.data[α,β]
         visibilities.data[α,β] = J₁*V*J₂'
+        visibilities.flags[α,β] = ifelse(flag, true, visibilities.flags[α,β])
     end
     visibilities
 end

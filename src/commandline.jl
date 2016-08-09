@@ -29,6 +29,9 @@ const beam_dictionary = Dict("constant" => ConstantBeam,
     "peel"
         help = "Peel sources from the dataset."
         action = :command
+    "shave"
+        help = "Shave sources from the dataset (wideband peeling)."
+        action = :command
     "applycal"
         help = "Apply a calibration."
         action = :command
@@ -129,6 +132,41 @@ end
         default  = 0.0
 end
 
+@add_arg_table s["shave"] begin
+    "--input"
+        help = "The measurement set that will have sources shaved."
+        arg_type = ASCIIString
+        required = true
+    "--sources"
+        help = "A JSON file describing the sources to be shaved from the given measurement set."
+        arg_type = ASCIIString
+        required = true
+    "--output"
+        help = "If provided, write the direction dependent calibration solutions to disk as NumPy arrays."
+        arg_type = ASCIIString
+        default = ""
+    "--beam"
+        help = "The name of the beam model to use ($(join(keys(beam_dictionary),",")))."
+        arg_type = ASCIIString
+        default = "sine"
+    "--peeliter"
+        help = "The number of iterations to take while shaving (wideband peeling)."
+        arg_type = Int
+        default = 3
+    "--maxiter"
+        help = "Set the maximum number of (Mitch|Stef)Cal iterations to take on each frequency channel."
+        arg_type = Int
+        default  = 20
+    "--tolerance"
+        help = "Set the relative tolerance used to determine convergence."
+        arg_type = Float64
+        default  = 1e-3
+    "--minuvw"
+        help = "The minimum baseline length (measured in wavelengths) to use while shaving sources. This parameter can be used to mitigate sensitivity to unmodeled diffuse emission."
+        arg_type = Float64
+        default  = 0.0
+end
+
 @add_arg_table s["applycal"] begin
     "--input"
         help = "The measurement set that the calibration will be applied to."
@@ -157,6 +195,8 @@ function main(args)
         run_applycal(parsed_args["applycal"])
     elseif command == "peel"
         run_peel(parsed_args["peel"])
+    elseif command == "shave"
+        run_shave(parsed_args["shave"])
     end
 end
 
@@ -190,8 +230,7 @@ function run_polcal(args)
     nothing
 end
 
-function run_peel(args)
-    println("Running `peel` on $(args["input"])")
+function run_peel_input(args)
     ms = Table(ascii(args["input"]))
     sources = readsources(args["sources"])
     beam = beam_dictionary[args["beam"]]()
@@ -201,14 +240,33 @@ function run_peel(args)
     peeliter = args["peeliter"]
     maxiter = args["maxiter"]
     tolerance = args["tolerance"]
-    calibrations = peel!(data, meta, sources, peeliter=peeliter, maxiter=maxiter, tolerance=tolerance)
+    ms, sources, beam, meta, data, peeliter, maxiter, tolerance
+end
+
+function run_peel_output(output, ms, data, calibrations)
     set_corrected_data!(ms, data)
-    if !isempty(args["output"])
+    if !isempty(output)
         for i = 1:length(calibrations)
-            filename = args["output"]*"-$i.npz"
+            filename = output*"-$i.npz"
             write_for_python(filename, calibrations[i])
         end
     end
+end
+
+function run_peel(args)
+    println("Running `peel` on $(args["input"])")
+    ms, sources, beam, meta, data, peeliter, maxiter, tolerance = run_peel_input(args)
+    calibrations = peel!(data, meta, sources, peeliter=peeliter, maxiter=maxiter, tolerance=tolerance)
+    run_peel_output(args["output"], ms, data, calibrations)
+    nothing
+end
+
+function run_shave(args)
+    println("Running `shave` on $(args["input"])")
+    ms, sources, beam, meta, data, peeliter, maxiter, tolerance = run_peel_input(args)
+    calibrations = shave!(data, meta, sources, peeliter=peeliter, maxiter=maxiter, tolerance=tolerance)
+    run_peel_output(args["output"], ms, data, calibrations)
+    nothing
 end
 
 function run_applycal(args)
@@ -225,9 +283,10 @@ function run_applycal(args)
     nothing
 end
 
-precompile(main,(Vector{UTF8String},))
-precompile(run_gaincal,(Dict{AbstractString,Any},))
-precompile(run_polcal,(Dict{AbstractString,Any},))
-precompile(run_peel,(Dict{AbstractString,Any},))
-precompile(run_applycal,(Dict{AbstractString,Any},))
+precompile(main, (Vector{UTF8String},))
+precompile(run_gaincal, (Dict{AbstractString,Any},))
+precompile(run_polcal, (Dict{AbstractString,Any},))
+precompile(run_peel, (Dict{AbstractString,Any},))
+precompile(run_shave, (Dict{AbstractString,Any},))
+precompile(run_applycal, (Dict{AbstractString,Any},))
 
