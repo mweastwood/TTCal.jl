@@ -113,7 +113,7 @@
     function test_solve(cal,data,model,maxiter,tolerance)
         # Run as `solve!(...)`
         mycal = similar(cal)
-        TTCal.solve!(mycal,data,model,meta,maxiter,tolerance,quiet=true)
+        TTCal.solve!(mycal,data,model,meta,maxiter,tolerance,true)
         TTCal.fixphase!(cal,"1x")
         TTCal.fixphase!(mycal,"1x")
         jones = cal.jones
@@ -225,6 +225,54 @@
         TTCal.fixphase!(mycal,"1x")
         @test !any(mycal.flags)
         @test vecnorm(mycal.jones - ones(JonesMatrix,Nant,Nfreq)) < δ
+    end
+
+    @testset "numpy I/O" begin
+        let Nfreq = 10, Nant = 5
+            calibration = GainCalibration(Nant, Nfreq)
+            for β = 1:Nfreq, ant = 1:Nant
+                calibration.jones[ant,β] = rand(DiagonalJonesMatrix)
+                calibration.flags[ant,β] = rand(Bool)
+            end
+            filename = tempname()*".npz"
+            TTCal.write_for_python(filename, calibration)
+            test = npzread(filename)
+            test_gains = test["gains"]
+            test_flags = test["flags"]
+            expected_gains = zeros(Complex128, 2, Nant, Nfreq)
+            expected_flags = zeros(Bool, Nant, Nfreq)
+            for β = 1:Nfreq, ant = 1:Nant
+                expected_gains[1, ant, β] = calibration.jones[ant,β].xx
+                expected_gains[2, ant, β] = calibration.jones[ant,β].yy
+                expected_flags[ant, β] = calibration.flags[ant,β]
+            end
+            @test test_gains == expected_gains
+            @test test_flags == expected_flags
+        end
+
+        let Nfreq = 10, Nant = 5
+            calibration = PolarizationCalibration(Nant, Nfreq)
+            for β = 1:Nfreq, ant = 1:Nant
+                calibration.jones[ant,β] = rand(JonesMatrix)
+                calibration.flags[ant,β] = rand(Bool)
+            end
+            filename = tempname()*".npz"
+            TTCal.write_for_python(filename, calibration)
+            test = npzread(filename)
+            test_gains = test["gains"]
+            test_flags = test["flags"]
+            expected_gains = zeros(Complex128, 4, Nant, Nfreq)
+            expected_flags = zeros(Bool, Nant, Nfreq)
+            for β = 1:Nfreq, ant = 1:Nant
+                expected_gains[1, ant, β] = calibration.jones[ant,β].xx
+                expected_gains[2, ant, β] = calibration.jones[ant,β].xy
+                expected_gains[3, ant, β] = calibration.jones[ant,β].yx
+                expected_gains[4, ant, β] = calibration.jones[ant,β].yy
+                expected_flags[ant, β] = calibration.flags[ant,β]
+            end
+            @test test_gains == expected_gains
+            @test test_flags == expected_flags
+        end
     end
 end
 

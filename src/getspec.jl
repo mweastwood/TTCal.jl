@@ -50,7 +50,11 @@ function getspec_internal!(spectrum, visibilities, meta, direction, phase_center
             spectrum[β] += HermitianJonesMatrix(xx, xy, yy)
             count += 1
         end
-        spectrum[β] /= count
+        if count > 0
+            spectrum[β] /= count
+        else
+            spectrum[β] = HermitianJonesMatrix(0, 0, 0)
+        end
     end
     spectrum
 end

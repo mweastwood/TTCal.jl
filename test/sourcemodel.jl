@@ -50,5 +50,29 @@
     writesources(filename,multisources1)
     multisources2 = readsources(filename)
     @test multisources1 == multisources2
+
+    @testset "rfi sources" begin
+        # Dear LADWP,
+        #
+        # Please fix.
+        #
+        # Love,
+        # Michael
+        pos = Position(pos"WGS84", 1226.709meters, -118.31478degrees, 37.14540degrees)
+        ν = collect(linspace(30e6, 60e6, 5))
+        stokes = [rand(StokesVector) for idx = 1:length(ν)]
+        pls_fix_this_ladwp = RFISource("Power Lines", pos, RFISpectrum(ν, stokes))
+        filename = tempname()*".json"
+        writesources(filename, [pls_fix_this_ladwp])
+        ladwp_pls = readsources(filename)[1]
+        @test pls_fix_this_ladwp.name == ladwp_pls.name
+        @test pls_fix_this_ladwp.position ≈ ladwp_pls.position
+        @test pls_fix_this_ladwp.spectrum.channels == ladwp_pls.spectrum.channels
+        @test pls_fix_this_ladwp.spectrum.stokes == ladwp_pls.spectrum.stokes
+
+        ν = collect(linspace(30e6, 60e6, 5))
+        stokes = [rand(StokesVector) for idx = 1:length(ν)+1]
+        @test_throws ErrorException RFISource("too many stokes vectors", pos, RFISpectrum(ν, stokes))
+    end
 end
 

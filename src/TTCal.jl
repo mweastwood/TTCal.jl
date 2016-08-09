@@ -24,15 +24,17 @@ export Visibilities, Metadata, Nant, Nfreq, Nbase
 export collect_metadata, flag_short_baselines!
 export get_data, set_corrected_data!
 
-export PointSource, GaussianSource, MultiSource, PowerLaw
+export PointSource, GaussianSource, DiskSource
+export ShapeletSource, MultiSource, RFISource
+export PowerLaw, RFISpectrum
 export readsources, writesources
-export ConstantBeam, SineBeam, Memo178Beam
+export ConstantBeam, SineBeam, Memo178Beam, ZernikeBeam
 
 export genvis, subsrc!, getspec, fitvis
 
 export GainCalibration, gaincal
 export PolarizationCalibration, polcal
-export applycal!, corrupt!, peel!
+export applycal!, corrupt!, peel!, shave!
 
 importall Base.Operators
 import Base: zero, one, rand, conj, det, inv, norm, kron
@@ -47,6 +49,7 @@ using CasaCore.Tables
 
 const c = 2.99792e+8
 
+include("special.jl")
 include("rungekutta.jl")
 include("stokes.jl")
 include("sourcemodel.jl")

@@ -79,6 +79,7 @@ commands:
   gaincal     Solve for a gain calibration.
   polcal      Solve for a polarization calibration.
   peel        Peel sources from the dataset.
+  shave       Shave sources from the dataset (wideband peeling).
   applycal    Apply a calibration.
 
 optional arguments:

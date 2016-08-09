@@ -152,7 +152,33 @@ function P178(ν, az, el)
     sqrt((E178(ν,el)*cos(az))^2 + (H178(ν,el)*sin(az))^2)
 end
 
-const beam_dictionary = Dict("constant" => ConstantBeam,
-                             "sine"     => SineBeam,
-                             "memo178"  => Memo178Beam)
+doc"""
+    ZernikeBeam <: BeamModel
+
+This beam is composed of Zernike polynomials.
+
+**TODO**
+
+* Implement the Stokes Q part to the beam model
+* Implement the Stokes U beam as a 45 degree rotation of the Stokes Q beam
+"""
+immutable ZernikeBeam <: BeamModel
+    coeff :: Vector{Float64}
+end
+
+function call(beam::ZernikeBeam, ν, az, el)
+    ρ = cos(el)
+    θ = az
+    coeff = beam.coeff
+    value = (coeff[1]*zernike(0, 0, ρ, θ)
+            + coeff[2]*zernike(2, 0, ρ, θ)
+            + coeff[3]*zernike(4, 0, ρ, θ)
+            + coeff[4]*zernike(4, 4, ρ, θ)
+            + coeff[5]*zernike(6, 0, ρ, θ)
+            + coeff[6]*zernike(6, 4, ρ, θ)
+            + coeff[7]*zernike(8, 0, ρ, θ)
+            + coeff[8]*zernike(8, 4, ρ, θ)
+            + coeff[9]*zernike(8, 8, ρ, θ))
+    JonesMatrix(sqrt(value), 0, 0, sqrt(value))
+end
 

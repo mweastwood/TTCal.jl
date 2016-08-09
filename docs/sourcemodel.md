@@ -123,8 +123,41 @@ of any number of the other source types. For example:
     ...
 ```
 
-## Near-Field Sources
+## RFI Sources
 
-Experimental support for near-field sources is currently available in the latest version
-of TTCal. Because this is an experimental feature it is not yet very easy to use.
+TTCal allows the possibility that some sources may not originate from the far-field of
+the interferometer. That is, some sources may be so close to the interferometer that
+the curvature of the incoming wavefront cannot be neglected. The exact transition between
+the near-field and far-field depends on the wavelength, the maximum baseline of the
+inteferometer, and the desired dynamic range. In order to correctly account for near-field
+effects TTCal needs the longitude, latitude, and elevation of the source.
+
+!!! note
+    The ITRF coordinate system requires the distance to the center of the Earth in place of
+    the elevation.
+
+Sources that do live in the near-field are likely sources of radio frequency interference (RFI),
+and therefore do not have the smooth power-law spectra expected of astronomical sources.
+Specifying the flux of an RFI source therefore requires you to give a list of frequencies and
+the flux at that frequency. For example:
+
+```
+    ...
+    {
+        "name": "Noisy Power Lines"
+        "sys": "WGS84",
+        "long": -118.31478,
+        "lat": 37.14540,
+        "el": 1226.709,
+        "rfi-frequencies": [3.0e7, 3.75e7, 4.5e7, 5.25e7, 6.0e7],
+        "rfi-I": [1.0, 2.0, 3.0, 4.0, 5.0]
+    }
+    ...
+```
+
+The longitude and latitude must be given in degrees and the elevation (or distance from
+the center of the Earth) must be given in meters. The only valid coordinate systems are
+currently `WGS84` and `ITRF`.
+You may optionally also supply the fields `rfi-Q`, `rfi-U`, and `rfi-V` to specify the
+corresponding Stokes parameters for the RFI emission.
 

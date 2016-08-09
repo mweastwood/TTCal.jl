@@ -7,11 +7,13 @@ else
 end
 using CasaCore.Measures
 using CasaCore.Tables
+using NPZ
 
 include("setup.jl")
 
 srand(123)
 @testset "TTCal Tests" begin
+    include("special.jl")
     include("stokes.jl")
     include("sourcemodel.jl")
     include("beammodel.jl")
