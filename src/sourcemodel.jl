@@ -60,6 +60,12 @@ end
 type RFISpectrum <: Spectrum
     channels :: Vector{Float64}
     stokes   :: Vector{StokesVector}
+    function RFISpectrum(channels, stokes)
+        if length(channels) != length(stokes)
+            error("number of frequency channels must match number of Stokes vectors")
+        end
+        new(channels, stokes)
+    end
 end
 
 function call(spectrum::RFISpectrum, ν::AbstractFloat)
@@ -246,6 +252,11 @@ function construct_source(c)
         # MultiSource
         components = Source[construct_source(dict) for dict in c["components"]]
         source = MultiSource(name, components)
+    elseif haskey(c, "rfi-frequencies") && haskey(c, "rfi-I")
+        # RFISource
+        position = get_source_position(c)
+        spectrum = get_rfi_spectrum(c)
+        source = RFISource(name, position, spectrum)
     else
         dir  = get_source_direction(c)
         spec = get_source_spectrum(c)
@@ -283,6 +294,21 @@ function get_source_direction(c)
     dir
 end
 
+function get_source_position(c)
+    sys  = c["sys"]
+    el   = c["el"]*meters
+    long = c["long"]*degrees
+    lat  = c["lat"]*degrees
+    if sys == "WGS84"
+        pos = Position(pos"WGS84", el, long, lat)
+    elseif sys == "ITRF"
+        pos = Position(pos"ITRF", el, long, lat)
+    else
+        error("unknown coordinate system")
+    end
+    pos
+end
+
 function get_source_spectrum(c)
     I = c["I"]
     Q = get(c, "Q", 0.0)
@@ -291,6 +317,17 @@ function get_source_spectrum(c)
     freq  = c["freq"]
     index = c["index"]
     PowerLaw(I, Q, U, V, freq, index)
+end
+
+function get_rfi_spectrum(c)
+    channels = c["rfi-frequencies"]
+    N = length(channels)
+    I = c["rfi-I"]
+    Q = get(c, "rfi-Q", zeros(N))
+    U = get(c, "rfi-U", zeros(N))
+    V = get(c, "rfi-V", zeros(N))
+    stokes = [StokesVector(I[idx], Q[idx], U[idx], V[idx]) for idx = 1:N]
+    RFISpectrum(channels, stokes)
 end
 
 """
@@ -337,6 +374,14 @@ function deconstruct_source(source::MultiSource)
     c
 end
 
+function deconstruct_source(source::RFISource)
+    c = Dict{UTF8String,Any}()
+    c["name"] = source.name
+    put_source_position(c, source)
+    put_rfi_spectrum(c, source)
+    c
+end
+
 function put_source_direction(c, source)
     if source.name != "Sun" && source.name != "Moon" && source.name != "Jupiter"
         ra  = longitude(source.direction) * radians
@@ -346,6 +391,24 @@ function put_source_direction(c, source)
     end
 end
 
+function put_source_position(c, source)
+    pos = source.position
+    if pos.sys === pos"WGS84"
+        sys = "WGS84"
+    elseif pos.sys === pos"ITRF"
+        sys = "ITRF"
+    else
+        error("unknown coordinate system")
+    end
+    el   =    radius(pos)
+    long = longitude(pos) |> rad2deg
+    lat  =  latitude(pos) |> rad2deg
+    c["sys"]  = sys
+    c["el"]   = el
+    c["long"] = long
+    c["lat"]  = lat
+end
+
 function put_source_spectrum(c, source)
     c["I"]     = source.spectrum.stokes.I
     c["Q"]     = source.spectrum.stokes.Q
@@ -353,5 +416,21 @@ function put_source_spectrum(c, source)
     c["V"]     = source.spectrum.stokes.V
     c["freq"]  = source.spectrum.ν
     c["index"] = source.spectrum.α
+end
+
+function put_rfi_spectrum(c, source)
+    spec = source.spectrum
+    channels = spec.channels
+    stokes = spec.stokes
+    N = length(channels)
+    I = Float64[stokes[idx].I for idx = 1:N]
+    Q = Float64[stokes[idx].Q for idx = 1:N]
+    U = Float64[stokes[idx].U for idx = 1:N]
+    V = Float64[stokes[idx].V for idx = 1:N]
+    c["rfi-frequencies"] = channels
+    c["rfi-I"] = I
+    c["rfi-Q"] = Q
+    c["rfi-U"] = U
+    c["rfi-V"] = V
 end
 

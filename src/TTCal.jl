@@ -25,8 +25,8 @@ export collect_metadata, flag_short_baselines!
 export get_data, set_corrected_data!
 
 export PointSource, GaussianSource, DiskSource
-export ShapeletSource, MultiSource
-export PowerLaw
+export ShapeletSource, MultiSource, RFISource
+export PowerLaw, RFISpectrum
 export readsources, writesources
 export ConstantBeam, SineBeam, Memo178Beam, ZernikeBeam
 
