@@ -148,12 +148,16 @@ the flux at that frequency. For example:
         "sys": "WGS84",
         "long": -118.31478,
         "lat": 37.14540,
+        "el": 1226.709,
         "rfi-frequencies": [3.0e7, 3.75e7, 4.5e7, 5.25e7, 6.0e7],
         "rfi-I": [1.0, 2.0, 3.0, 4.0, 5.0]
     }
     ...
 ```
 
+The longitude and latitude must be given in degrees and the elevation (or distance from
+the center of the Earth) must be given in meters. The only valid coordinate systems are
+currently `WGS84` and `ITRF`.
 You may optionally also supply the fields `rfi-Q`, `rfi-U`, and `rfi-V` to specify the
 corresponding Stokes parameters for the RFI emission.
 
