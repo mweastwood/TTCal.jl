@@ -233,8 +233,8 @@
             </li>
           
             <li class="anchor">
-              <a title="Near-Field Sources" href="#near-field-sources">
-                Near-Field Sources
+              <a title="RFI Sources" href="#rfi-sources">
+                RFI Sources
               </a>
             </li>
           
@@ -421,9 +421,41 @@ of any number of the other source types. For example:</p>
 </pre></div>
 
 
-<h2 id="near-field-sources">Near-Field Sources<a class="headerlink" href="#near-field-sources" title="Permanent link">¶</a></h2>
-<p>Experimental support for near-field sources is currently available in the latest version
-of TTCal. Because this is an experimental feature it is not yet very easy to use.</p>
+<h2 id="rfi-sources">RFI Sources<a class="headerlink" href="#rfi-sources" title="Permanent link">¶</a></h2>
+<p>TTCal allows the possibility that some sources may not originate from the far-field of
+the interferometer. That is, some sources may be so close to the interferometer that
+the curvature of the incoming wavefront cannot be neglected. The exact transition between
+the near-field and far-field depends on the wavelength, the maximum baseline of the
+inteferometer, and the desired dynamic range. In order to correctly account for near-field
+effects TTCal needs the longitude, latitude, and elevation of the source.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The ITRF coordinate system requires the distance to the center of the Earth in place of
+the elevation.</p>
+</div>
+<p>Sources that do live in the near-field are likely sources of radio frequency interference (RFI),
+and therefore do not have the smooth power-law spectra expected of astronomical sources.
+Specifying the flux of an RFI source therefore requires you to give a list of frequencies and
+the flux at that frequency. For example:</p>
+<div class="code"><pre><span></span>    ...
+    {
+        &quot;name&quot;: &quot;Noisy Power Lines&quot;
+        &quot;sys&quot;: &quot;WGS84&quot;,
+        &quot;long&quot;: -118.31478,
+        &quot;lat&quot;: 37.14540,
+        &quot;el&quot;: 1226.709,
+        &quot;rfi-frequencies&quot;: [3.0e7, 3.75e7, 4.5e7, 5.25e7, 6.0e7],
+        &quot;rfi-I&quot;: [1.0, 2.0, 3.0, 4.0, 5.0]
+    }
+    ...
+</pre></div>
+
+
+<p>The longitude and latitude must be given in degrees and the elevation (or distance from
+the center of the Earth) must be given in meters. The only valid coordinate systems are
+currently <code>WGS84</code> and <code>ITRF</code>.
+You may optionally also supply the fields <code>rfi-Q</code>, <code>rfi-U</code>, and <code>rfi-V</code> to specify the
+corresponding Stokes parameters for the RFI emission.</p>
           <aside class="copyright" role="note">
             
             Documentation built with
