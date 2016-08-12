@@ -18,15 +18,11 @@ type Visibilities
     flags :: Matrix{Bool}
 end
 
-Nfreq(vis::Visibilities) = size(vis.data, 2)
 Nbase(vis::Visibilities) = size(vis.data, 1)
+Nfreq(vis::Visibilities) = size(vis.data, 2)
 
-"""
-    read_data_column(ms::Table, column)
-
-Read the visibilities from the measurement set.
-"""
-function read_data_column(ms::Table, column)
+"Read visibilities from the measurement set."
+function read(ms::Table, column)
     raw_data   = ms[column]
     data_flags = ms["FLAG"]
     row_flags  = ms["FLAG_ROW"]
@@ -35,7 +31,8 @@ function read_data_column(ms::Table, column)
     Visibilities(data, flags)
 end
 
-function write_data_column(ms::Table, column, data::Visibilities)
+"Write visibilities to the measurement set."
+function write(ms::Table, column, data::Visibilities)
     reorganized_data = zeros(Complex64, 4, Nfreq(data), Nbase(data))
     for α = 1:Nbase(data), β = 1:Nfreq(data)
         reorganized_data[1,β,α] = data.data[α,β].xx
@@ -44,9 +41,6 @@ function write_data_column(ms::Table, column, data::Visibilities)
         reorganized_data[4,β,α] = data.data[α,β].yy
     end
     ms[column] = reorganized_data
-end
-
-function write_flags(ms::Table, data::Visibilities)
     flags = zeros(Bool, 4, Nfreq(data), Nbase(data))
     for α = 1:Nbase(data), β = 1:Nfreq(data)
         if data.flags[α,β]
@@ -79,47 +73,6 @@ function resolve_flags(data_flags, row_flags)
     end
     flags
 end
-
-function get_data(ms::Table)
-    read_data_column(ms, "DATA")
-end
-
-function set_data!(ms::Table, data)
-    write_data_column(ms, "DATA", data)
-end
-
-function get_model_data(ms::Table)
-    read_data_column(ms, "MODEL_DATA")
-end
-
-function set_model_data!(ms::Table, data, force_imaging_columns = false)
-    if force_imaging_columns || Tables.exists(ms,"MODEL_DATA")
-        write_data_column(ms, "MODEL_DATA", data)
-    end
-end
-
-"""
-    get_corrected_data(ms::MeasurementSet)
-
-Get the CORRECTED_DATA column if it exists. Otherwise settle for the DATA column.
-"""
-function get_corrected_data(ms::Table)
-    if Tables.exists(ms, "CORRECTED_DATA")
-        return read_data_column(ms, "CORRECTED_DATA")
-    else
-        return read_data_column(ms, "DATA")
-    end
-end
-
-function set_corrected_data!(ms::Table, data, force_imaging_columns = false)
-    if force_imaging_columns || Tables.exists(ms, "CORRECTED_DATA")
-        write_data_column(ms, "CORRECTED_DATA", data)
-    else
-        write_data_column(ms, "DATA", data)
-    end
-end
-
-set_flags!(ms::Table, data) = write_flags(ms, data)
 
 function flag_short_baselines!(data, meta, minuvw)
     for β = 1:Nfreq(meta)
