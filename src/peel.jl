@@ -14,7 +14,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 """
-    peel!(visibilities, metadata, sources)
+    peel!(visibilities, metadata, beam, sources)
 
 *Description*
 
@@ -24,6 +24,7 @@ Peel sources from the visibilities.
 
 * `visibilities` - a calibrated set of visibilities
 * `metadata` - the metadata describing the interferometer
+* `beam` - the primary beam model
 * `sources` - the list of sources to peel from the visibilities
 
 *Keyword Arguments*
@@ -37,18 +38,18 @@ Note that peeling iterates through the list of sources in order. A peeling
 iteration is defined as one pass through the full list. Usually 2
 or 3 iterations seems to be sufficient.
 """
-function peel!(visibilities::Visibilities, meta::Metadata, sources;
+function peel!(visibilities::Visibilities, meta::Metadata, beam::BeamModel, sources;
                peeliter = 3, maxiter = 20, tolerance = 1e-3, quiet = false)
     frame = reference_frame(meta)
     sources = abovehorizon(frame, sources)
     calibrations = [GainCalibration(Nant(meta), Nfreq(meta)) for source in sources]
-    coherencies  = [genvis(meta, source) for source in sources]
+    coherencies  = [genvis(meta, beam, source) for source in sources]
     peel!(calibrations, coherencies, visibilities, meta, peeliter, maxiter, tolerance, quiet)
     calibrations
 end
 
 """
-    shave!(visibilities, metadata, sources)
+    shave!(visibilities, metadata, beam, sources)
 
 *Description*
 
@@ -65,6 +66,7 @@ Looks like it worked!
 
 * `visibilities` - a calibrated set of visibilities
 * `metadata` - the metadata describing the interferometer
+* `beam` - the primary beam model
 * `sources` - the list of sources to peel from the visibilities
 
 *Keyword Arguments*
@@ -78,12 +80,12 @@ Note that peeling iterates through the list of sources. A peeling
 iteration is defined as one pass through the full list. Usually 2
 or 3 iterations seems to be sufficient.
 """
-function shave!(visibilities::Visibilities, meta::Metadata, sources;
+function shave!(visibilities::Visibilities, meta::Metadata, beam::BeamModel, sources;
                 peeliter = 3, maxiter = 20, tolerance = 1e-3, quiet = false)
     frame = reference_frame(meta)
     sources = abovehorizon(frame, sources)
     calibrations = [GainCalibration(Nant(meta), 1) for source in sources]
-    coherencies  = [genvis(meta, source) for source in sources]
+    coherencies  = [genvis(meta, beam, source) for source in sources]
     peel!(calibrations, coherencies, visibilities, meta, peeliter, maxiter, tolerance, quiet)
     calibrations
 end
