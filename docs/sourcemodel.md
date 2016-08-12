@@ -42,6 +42,10 @@ using the published spectra for [Baars et al. 1977](http://adsabs.harvard.edu/ab
 ]
 ```
 
+There are many tools available for reading and writing JSON files
+([Julia](https://github.com/JuliaLang/JSON.jl), [Python](https://docs.python.org/2.7/library/json.html)).
+These tools can be used to generate a sky model using your favorite programming language.
+
 **Fields:**
 
 * `ref` is not used by TTCal, but is intended to be a record of the origin
