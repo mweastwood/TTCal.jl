@@ -28,6 +28,13 @@
         end
     end
 
+    J1 = rand(HermitianJonesMatrix)
+    J2 = rand(JonesMatrix)
+    mat1 = Matrix(J1)
+    mat2 = Matrix(J2)
+    @test Matrix(J1*J2) == mat1*mat2
+    @test Matrix(J2*J1) == mat2*mat1
+
     v1 = rand(4)
     v2 = rand(4)
     s1 = StokesVector(v1)
