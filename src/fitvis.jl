@@ -14,6 +14,29 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 """
+    fitvis(visibilities, metadata, beam, source; maxiter = 20, tolerance = 1e-3)
+    fitvis(visibilities, metadata, beam, direction; maxiter = 20, tolerance = 1e-3)
+
+*Description*
+
+Fit for the location of a point source near the given direction.
+
+*Arguments*
+
+*Keyword Arguments*
+
+"""
+function fitvis(visibilities::Visibilities, meta::Metadata, direction::Direction;
+                maxiter::Int = 20, tolerance::Float64 = 1e-3)
+    frame = reference_frame(meta)
+    isabovehorizon(frame, direction) || (return direction)
+    direction = measure(frame, direction, dir"ITRF")
+    variables = FitvisVariables(meta)
+    newdirection = fitvis_internal(visibilities, meta, variables, direction, maxiter, tolerance)
+    measure(frame, newdirection, dir"J2000")
+end
+
+"""
     FitvisVariables
 
 This type is simply a container for variables that need to be calculated
@@ -41,22 +64,6 @@ type FitvisVariables
         end
         new(phase_center, u, v, w)
     end
-end
-
-"""
-    fitvis(visibilities::Visibilities, meta::Metadata, direction::Direction;
-           maxiter = 20, tolerance = 1e-3)
-
-Fit for the location of a point source near the given direction.
-"""
-function fitvis(visibilities::Visibilities, meta::Metadata, direction::Direction;
-                maxiter::Int = 20, tolerance::Float64 = 1e-3)
-    frame = reference_frame(meta)
-    isabovehorizon(frame, direction) || (return direction)
-    direction = measure(frame, direction, dir"ITRF")
-    variables = FitvisVariables(meta)
-    newdirection = fitvis_internal(visibilities, meta, variables, direction, maxiter, tolerance)
-    measure(frame, newdirection, dir"J2000")
 end
 
 function fitvis_internal(visibilities, meta, variables, direction, maxiter, tolerance)

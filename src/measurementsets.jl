@@ -13,65 +13,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-immutable Antenna
-    position :: Position
-end
-
-immutable Baseline
-    antenna1 :: Int
-    antenna2 :: Int
-end
-
-type Metadata
-    antennas  :: Vector{Antenna}
-    baselines :: Vector{Baseline}
-    channels  :: Vector{Float64}
-    phase_center :: Direction
-    time :: Epoch
-    beam :: BeamModel
-end
-
-"""
-    collect_metadata(ms::Table, beam)
-
-Read the interferometer's instrumental parameters from the measurement set.
-"""
-function collect_metadata(ms::Table, beam)
-    antennas  = read_antennas(ms)
-    baselines = read_baselines(ms)
-    channels  = read_channels(ms)
-    phase_center = read_phase_center(ms)
-    time = read_time(ms)
-    Metadata(antennas, baselines, channels, phase_center, time, beam)
-end
-
-Nant(meta::Metadata)  = length(meta.antennas)
-Nfreq(meta::Metadata) = length(meta.channels)
-Nbase(meta::Metadata) = length(meta.baselines)
-
-function position(meta)
-    x = 0.0
-    y = 0.0
-    z = 0.0
-    for i = 1:Nant(meta)
-        pos = meta.antennas[i].position
-        x += pos.x
-        y += pos.y
-        z += pos.z
-    end
-    x /= Nant(meta)
-    y /= Nant(meta)
-    z /= Nant(meta)
-    Position(pos"ITRF", x, y, z)
-end
-
-function reference_frame(meta)
-    frame = ReferenceFrame()
-    set!(frame, meta.time)
-    set!(frame, position(meta))
-    frame
-end
-
 type Visibilities
     data  :: Matrix{JonesMatrix}
     flags :: Matrix{Bool}
@@ -113,51 +54,6 @@ function write_flags(ms::Table, data::Visibilities)
         end
     end
     ms["FLAG"] = flags
-end
-
-"""
-    read_antennas(ms::Table)
-
-Read the antenna positions from the `ANTENNA` subtable.
-"""
-function read_antennas(ms::Table)
-    antenna_table = ms[kw"ANTENNA"] |> Table
-    xyz = antenna_table["POSITION"]
-    antennas = Antenna[]
-    for i = 1:size(xyz, 2)
-        x = xyz[1,i]
-        y = xyz[2,i]
-        z = xyz[3,i]
-        position = Position(pos"ITRF", x, y, z)
-        push!(antennas, Antenna(position))
-    end
-    unlock(antenna_table)
-    antennas
-end
-
-function read_baselines(ms::Table)
-    ant1 = ms["ANTENNA1"]
-    ant2 = ms["ANTENNA2"]
-    [Baseline(ant1[α]+1, ant2[α]+1) for α = 1:length(ant1)]
-end
-
-function read_channels(ms::Table)
-    spw_table = ms[kw"SPECTRAL_WINDOW"] |> Table
-    channels  = spw_table["CHAN_FREQ", 1]
-    unlock(spw_table)
-    channels
-end
-
-function read_phase_center(ms::Table)
-    field_table = ms[kw"FIELD"] |> Table
-    dir = field_table["PHASE_DIR"]
-    unlock(field_table)
-    Direction(dir"J2000", dir[1]*radians, dir[2]*radians)
-end
-
-function read_time(ms::Table)
-    time = ms["TIME", 1]
-    Epoch(epoch"UTC", time*seconds)
 end
 
 function organize_data(raw_data)
