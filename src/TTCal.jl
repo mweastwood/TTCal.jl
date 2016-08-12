@@ -21,8 +21,6 @@ export JonesMatrix, DiagonalJonesMatrix, HermitianJonesMatrix
 export StokesVector, MuellerMatrix
 
 export Visibilities, Metadata, Nant, Nfreq, Nbase
-export collect_metadata, flag_short_baselines!
-export get_data, set_corrected_data!
 
 export PointSource, GaussianSource, DiskSource
 export ShapeletSource, MultiSource, RFISource
@@ -57,7 +55,7 @@ include("beammodel.jl")
 include("utm.jl")
 include("ionosphere.jl")
 include("metadata.jl")
-include("measurementsets.jl")
+include("visibilities.jl")
 include("genvis.jl")
 include("getspec.jl")
 include("subsrc.jl")
