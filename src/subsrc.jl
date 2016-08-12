@@ -14,22 +14,62 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 """
-    subsrc!(visibilities::Visibilities, meta::Metadata, sources::Vector{Source})
+    subsrc!(visibilities, metadata, beam, sources)
+    subsrc!(visibilities, model)
 
-Remove the list of sources from the measurement set.
+*Description*
+
+Subtract sources from the visibilities.
+
+*Arguments*
+
+* `visibilities` - the visibilities from which the sources will be subtracted
+* `metadata` - the metadata describing the interferometer
+* `beam` - the primary beam model
+* `sources` - the list of sources to subtract
 """
-function subsrc!{T<:Source}(visibilities::Visibilities, meta::Metadata, sources::Vector{T})
+function subsrc!{T<:Source}(visibilities::Visibilities, meta::Metadata, beam::BeamModel, sources::Vector{T})
     frame = reference_frame(meta)
     sources = abovehorizon(frame, sources)
     model = genvis(meta, sources)
     subsrc!(visibilities, model)
 end
 
-function subsrc!(visibilities, model)
+function subsrc!(visibilities::Visibilities, meta::Metadata, beam::BeamModel, source::Source)
+    subsrc!(visibilities, meta, beam, [source])
+end
+
+function subsrc!(visibilities::Visibilities, model::Visibilities)
     for i in eachindex(visibilities.data, model.data)
         visibilities.data[i] -= model.data[i]
     end
     visibilities
+end
+
+"""
+    putsrc!(visibilities, metadata, beam, sources)
+    putsrc!(visibilities, model)
+
+*Description*
+
+Add sources to the visibilities.
+
+*Arguments*
+
+* `visibilities` - the visibilities to which the sources will be added
+* `metadata` - the metadata describing the interferometer
+* `beam` - the primary beam model
+* `sources` - the list of sources to add
+"""
+function putsrc!{T<:Source}(visibilities::Visibilities, meta::Metadata, beam::BeamModel, sources::Vector{T})
+    frame = reference_frame(meta)
+    sources = abovehorizon(frame, sources)
+    model = genvis(meta, sources)
+    putsrc!(visibilities, model)
+end
+
+function putsrc!(visibilities::Visibilities, meta::Metadata, beam::BeamModel, source::Source)
+    putsrc!(visibilities, meta, beam, [source])
 end
 
 function putsrc!(visibilities, model)

@@ -23,9 +23,9 @@ srand(123)
     include("visibilities.jl")
     include("genvis.jl")
     include("getspec.jl")
-    #include("subsrc.jl")
+    include("subsrc.jl")
     include("fitvis.jl")
-    #include("calibration.jl")
-    #include("peel.jl")
+    include("calibration.jl")
+    include("peel.jl")
 end
 

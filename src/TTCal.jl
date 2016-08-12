@@ -28,7 +28,7 @@ export PowerLaw, RFISpectrum
 export readsources, writesources
 export ConstantBeam, SineBeam, Memo178Beam, ZernikeBeam
 
-export genvis, subsrc!, getspec, fitvis
+export genvis, subsrc!, putsrc!, getspec, fitvis
 
 export GainCalibration, gaincal
 export PolarizationCalibration, polcal

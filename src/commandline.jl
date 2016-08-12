@@ -200,16 +200,22 @@ function main(args)
     end
 end
 
+macro cal_input()
+    quote
+        ms = Table(ascii(args["input"]))
+        sources = readsources(args["sources"])
+        beam = beam_dictionary[args["beam"]]()
+        meta = Metadata(ms)
+        maxiter = args["maxiter"]
+        tolerance = args["tolerance"]
+    end |> esc
+end
+
 function run_gaincal(args)
     println("Running `gaincal` on $(args["input"])")
-    ms = Table(ascii(args["input"]))
-    sources = readsources(args["sources"])
-    beam = beam_dictionary[args["beam"]]()
-    meta = collect_metadata(ms, beam)
-    data = get_data(ms)
-    maxiter = args["maxiter"]
-    tolerance = args["tolerance"]
-    cal = gaincal(data, meta, sources, maxiter=maxiter, tolerance=tolerance)
+    @cal_input
+    data = read(ms, "DATA")
+    cal = gaincal(data, meta, beam, sources, maxiter=maxiter, tolerance=tolerance)
     write(args["output"], cal)
     unlock(ms)
     nothing
@@ -217,55 +223,53 @@ end
 
 function run_polcal(args)
     println("Running `polcal` on $(args["input"])")
-    ms = Table(ascii(args["input"]))
-    sources = readsources(args["sources"])
-    beam = beam_dictionary[args["beam"]]()
-    meta = collect_metadata(ms, beam)
-    data = get_corrected_data(ms)
-    maxiter = args["maxiter"]
-    tolerance = args["tolerance"]
-    cal = polcal(data, meta, sources, maxiter=maxiter, tolerance=tolerance)
+    @cal_input
+    data = Tables.exists(ms, "CORRECTED_DATA")? read(ms, "CORRECTED_DATA") : read(ms, "DATA")
+    cal = polcal(data, meta, beam, sources, maxiter=maxiter, tolerance=tolerance)
     write(args["output"], cal)
     unlock(ms)
     nothing
 end
 
-function run_peel_input(args)
-    ms = Table(ascii(args["input"]))
-    sources = readsources(args["sources"])
-    beam = beam_dictionary[args["beam"]]()
-    meta = collect_metadata(ms, beam)
-    data = get_corrected_data(ms)
-    flag_short_baselines!(data, meta, args["minuvw"])
-    peeliter = args["peeliter"]
-    maxiter = args["maxiter"]
-    tolerance = args["tolerance"]
-    ms, sources, beam, meta, data, peeliter, maxiter, tolerance
+macro peel_input()
+    quote
+        ms = Table(ascii(args["input"]))
+        sources = readsources(args["sources"])
+        beam = beam_dictionary[args["beam"]]()
+        meta = Metadata(ms)
+        data = Tables.exists(ms, "CORRECTED_DATA")? read(ms, "CORRECTED_DATA") : read(ms, "DATA")
+        flag_short_baselines!(data, meta, args["minuvw"])
+        peeliter = args["peeliter"]
+        maxiter = args["maxiter"]
+        tolerance = args["tolerance"]
+    end |> esc
 end
 
-function run_peel_output(output, ms, data, calibrations)
-    set_corrected_data!(ms, data)
-    if !isempty(output)
-        for i = 1:length(calibrations)
-            filename = output*"-$i.npz"
-            write_for_python(filename, calibrations[i])
+macro peel_output()
+    quote
+        Tables.exists(ms, "CORRECTED_DATA")? write(ms, "CORRECTED_DATA", data) : write(ms, "DATA", data)
+        if !isempty(args["output"])
+            for i = 1:length(calibrations)
+                filename = args["output"]*"-$i.npz"
+                write_for_python(filename, calibrations[i])
+            end
         end
-    end
+    end |> esc
 end
 
 function run_peel(args)
     println("Running `peel` on $(args["input"])")
-    ms, sources, beam, meta, data, peeliter, maxiter, tolerance = run_peel_input(args)
-    calibrations = peel!(data, meta, sources, peeliter=peeliter, maxiter=maxiter, tolerance=tolerance)
-    run_peel_output(args["output"], ms, data, calibrations)
+    @peel_input
+    calibrations = peel!(data, meta, beam, sources, peeliter=peeliter, maxiter=maxiter, tolerance=tolerance)
+    @peel_output
     nothing
 end
 
 function run_shave(args)
     println("Running `shave` on $(args["input"])")
-    ms, sources, beam, meta, data, peeliter, maxiter, tolerance = run_peel_input(args)
-    calibrations = shave!(data, meta, sources, peeliter=peeliter, maxiter=maxiter, tolerance=tolerance)
-    run_peel_output(args["output"], ms, data, calibrations)
+    @peel_input
+    calibrations = shave!(data, meta, beam, sources, peeliter=peeliter, maxiter=maxiter, tolerance=tolerance)
+    @peel_output
     nothing
 end
 
@@ -273,12 +277,12 @@ function run_applycal(args)
     println("Running `applycal` on $(args["input"])")
     ms  = Table(ascii(args["input"]))
     cal = read(args["calibration"])
-    force_imaging_columns = args["force-imaging"]
-    apply_to_corrected    = args["corrected"]
-    meta = collect_metadata(ms, ConstantBeam())
-    data = apply_to_corrected? get_corrected_data(ms) : get_data(ms)
+    write_to_corrected = args["force-imaging"] || Tables.exists(ms, "CORRECTED_DATA")
+    apply_to_corrected = args["corrected"] && Tables.exists(ms, "CORRECTED_DATA")
+    meta = Metadata(ms)
+    data = apply_to_corrected? read(ms, "CORRECTED_DATA") : read(ms, "DATA")
     applycal!(data, meta, cal)
-    set_corrected_data!(ms, data, force_imaging_columns)
+    write_to_corrected? write(ms, "CORRECTED_DATA", data) : write(ms, "DATA", data)
     unlock(ms)
     nothing
 end
