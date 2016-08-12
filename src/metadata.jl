@@ -113,3 +113,25 @@ function read_time(ms::Table)
     Epoch(epoch"UTC", time*seconds)
 end
 
+immutable UVW
+    u :: Vector{Float64}
+    v :: Vector{Float64}
+    w :: Vector{Float64}
+end
+
+function UVW(meta::Metadata)
+    u = zeros(Nbase(meta))
+    v = zeros(Nbase(meta))
+    w = zeros(Nbase(meta))
+    for α = 1:Nbase(meta)
+        antenna1 = meta.baselines[α].antenna1
+        antenna2 = meta.baselines[α].antenna2
+        r1 = meta.antennas[antenna1].position
+        r2 = meta.antennas[antenna2].position
+        u[α] = r1.x - r2.x
+        v[α] = r1.y - r2.y
+        w[α] = r1.z - r2.z
+    end
+    UVW(u, v, w)
+end
+

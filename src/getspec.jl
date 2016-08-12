@@ -59,15 +59,6 @@ function getspec_internal!(output, visibilities, meta, source::Source)
         model = genvis_internal(meta, ConstantBeam(), [source])
         flatten_spectrum!(meta, model, source)
         getspec_internal!(output, visibilities, meta, model)
-        # TEMP
-        for β = 1:Nfreq(meta), α = 1:Nbase(meta)
-            antenna1 = meta.baselines[α].antenna1
-            antenna2 = meta.baselines[α].antenna2
-            antenna1 == antenna2 && continue # don't use autocorrelations
-            visibilities.flags[α,β] && continue
-            V = visibilities.data[α,β]
-            flux = get_total_flux(source, meta.channels[β])
-        end
     end
 end
 
@@ -82,7 +73,6 @@ function getspec_internal!(spectrum, visibilities, meta, model::Matrix{JonesMatr
             visibilities.flags[α,β] && continue
             numerator   += model[α,β]'*visibilities.data[α,β]
             denominator += model[α,β]'*model[α,β]
-
         end
         if abs(det(denominator)) > eps(Float64)
             spectrum[β] = make_hermitian(denominator \ numerator)
