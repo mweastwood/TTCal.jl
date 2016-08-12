@@ -50,51 +50,83 @@ end
 function getspec(visibilities::Visibilities, meta::Metadata, direction::Direction)
     flat = PowerLaw(1, 0, 0, 0, 10e6, [0.0])
     point = PointSource("dummy", direction, flat)
-    getspec(visibilities, meta, source)
+    getspec(visibilities, meta, point)
 end
 
-function getspec_internal!(spectrum, visibilities, meta::Metadata, source::Source)
-    # TODO account for the spectrum of the source
+function getspec_internal!(output, visibilities, meta, source::Source)
+    frame = reference_frame(meta)
     if isabovehorizon(frame, source)
-        model = genvis_internal(meta, ConstantBeam(), source)
-        getspec_internal!(spectrum, visibilities, model)
+        model = genvis_internal(meta, ConstantBeam(), [source])
+        flatten_spectrum!(meta, model, source)
+        getspec_internal!(output, visibilities, meta, model)
+        # TEMP
+        for β = 1:Nfreq(meta), α = 1:Nbase(meta)
+            antenna1 = meta.baselines[α].antenna1
+            antenna2 = meta.baselines[α].antenna2
+            antenna1 == antenna2 && continue # don't use autocorrelations
+            visibilities.flags[α,β] && continue
+            V = visibilities.data[α,β]
+            flux = get_total_flux(source, meta.channels[β])
+        end
     end
 end
 
-function getspec_internal!(spectrum, visibilities, model::Matrix{JonesMatrix})
-    for β = 1:Nfreq(visibilities)
+function getspec_internal!(spectrum, visibilities, meta, model::Matrix{JonesMatrix})
+    for β = 1:Nfreq(meta)
+        numerator   = zero(JonesMatrix)
+        denominator = zero(JonesMatrix)
+        for α = 1:Nbase(meta)
+            antenna1 = meta.baselines[α].antenna1
+            antenna2 = meta.baselines[α].antenna2
+            antenna1 == antenna2 && continue # don't use autocorrelations
+            visibilities.flags[α,β] && continue
+            numerator   += model[α,β]'*visibilities.data[α,β]
+            denominator += model[α,β]'*model[α,β]
+
+        end
+        if abs(det(denominator)) > eps(Float64)
+            spectrum[β] = make_hermitian(denominator \ numerator)
+        end
+    end
+    spectrum
+end
+
+# Design justification
+#
+# Let's say we are trying to measure the flux of a multi-component source.
+# The user has likely gone to great pains to get the relative fluxes of the
+# various components just right. We do not want to discard the spectral
+# information encoded in all these various components.
+#
+# So we generate the model visibilities using the input source model as given.
+# We then scale these visibilities by the total flux of the source (counting
+# all of the components) so that the flux of the model visibilities is unity.
+
+function flatten_spectrum!(meta, model, source::Source)
+    for β = 1:Nfreq(meta)
+        flux = get_total_flux(source, meta.channels[β])
+        for α = 1:Nbase(meta)
+            model[α,β] = model[α,β] / flux
+            # Note that the following form is incorrect
+            #     model[α,β] = flux \ model[α,β]
+            # This decision is determined by the requirement that if the data and
+            # model are exactly equal, we should get `flux` back exactly. The form
+            # of the estimator in `getspec_internal!` (more specifically the order
+            # of the matrix multiplications) then determines the order of the matrix
+            # multiplications here.
+        end
     end
 end
 
-#function getspec_internal!(spectrum, visibilities, meta, direction, phase_center)
-#    delays = geometric_delays(meta.antennas, direction, phase_center)
-#    for β = 1:Nfreq(meta)
-#        count = 0 # the number of baselines used in the calculation
-#        frequency = meta.channels[β]
-#        fringes = delays_to_fringes(delays, frequency)
-#        for α = 1:Nbase(meta)
-#            antenna1 = meta.baselines[α].antenna1
-#            antenna2 = meta.baselines[α].antenna2
-#            antenna1 == antenna2 && continue # don't use autocorrelations
-#            visibilities.flags[α,β] && continue
-#            fringe = conj(fringes[antenna1]) * fringes[antenna2]
-#            xx = real(visibilities.data[α,β].xx*fringe)
-#            xy = complex(real(visibilities.data[α,β].xy*fringe), -imag(visibilities.data[α,β].yx*fringe))
-#            yy = real(visibilities.data[α,β].yy*fringe)
-#            spectrum[β] += HermitianJonesMatrix(xx, xy, yy)
-#            count += 1
-#        end
-#        if count > 0
-#            spectrum[β] /= count
-#        else
-#            spectrum[β] = HermitianJonesMatrix(0, 0, 0)
-#        end
-#    end
-#    spectrum
-#end
+function get_total_flux(source::Source, ν)
+    linear(source.spectrum(ν))
+end
 
-#function with_flat_spectrum(source::Source)
-#    mysource = deepcopy(source) # don't modify the argument!
-#    mysource.spectrum
-#end
+function get_total_flux(source::MultiSource, ν)
+    output = zero(HermitianJonesMatrix)
+    for component in source.components
+        output += get_total_flux(component, ν)
+    end
+    output
+end
 

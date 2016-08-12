@@ -35,7 +35,7 @@ accounted for by this routine.
 """
 function genvis{S<:Source}(meta::Metadata, beam::BeamModel, sources::Vector{S})
     flags = zeros(Bool, Nbase(meta), Nfreq(meta))
-    model = genvis_internal(meta, beam, source)
+    model = genvis_internal(meta, beam, sources)
     Visibilities(model, flags)
 end
 
@@ -47,7 +47,7 @@ end
 genvis(meta::Metadata, source::Source) = genvis(meta, [source])
 genvis(meta::Metadata, beam::BeamModel, source::Source) = genvis(meta, beam, [source])
 
-function genvis_internal(meta, beam, source)
+function genvis_internal(meta, beam, sources)
     model = zeros(JonesMatrix, Nbase(meta), Nfreq(meta))
     for source in sources
         genvis_onesource!(model, meta, beam, source)
@@ -59,7 +59,7 @@ function genvis_onesource!(visibilities, meta, beam, source)
     frame = reference_frame(meta)
     if isabovehorizon(frame, source)
         phase_center = measure(frame, meta.phase_center, dir"ITRF")
-        flux, itrf_direction = refract_and_corrupt(meta, frame, source)
+        flux, itrf_direction = refract_and_corrupt(meta, beam, frame, source)
         variables = additional_precomputation(meta, frame, source)
         for β = 1:Nfreq(meta)
             frequency = meta.channels[β]
@@ -74,7 +74,7 @@ end
 "For multi-component sources iterate over the components."
 function genvis_onesource!(visibilities, meta, beam, source::MultiSource)
     for component in source.components
-        genvis_onesource!(visibilities, meta, component)
+        genvis_onesource!(visibilities, meta, beam, component)
     end
     visibilities
 end
@@ -119,7 +119,7 @@ and corruption by the primary beam.
 
 **TODO** the plasma frequency is currently hard-coded to zero
 """
-function refract_and_corrupt(meta, frame, source)
+function refract_and_corrupt(meta, beam, frame, source)
     pos  = position(meta)
     azel = measure(frame, source.direction, dir"AZEL")
     flux = zeros(HermitianJonesMatrix, Nfreq(meta))
@@ -185,6 +185,70 @@ baseline_coherency(source, frequency, antenna1, antenna2, variables) = 1.0
 #    sinc(delay)
 #end
 
+"""
+    geometric_delays(antennas, source_direction::Direction, phase_center)
+
+Compute the geometric delay to each antenna for a source in the far field
+of the interferometer.
+"""
+function geometric_delays(antennas, source_direction::Direction, phase_center)
+    # far field
+    l = source_direction.x - phase_center.x
+    m = source_direction.y - phase_center.y
+    n = source_direction.z - phase_center.z
+    delays = zeros(length(antennas))
+    for i = 1:length(antennas)
+        antenna_position = antennas[i].position
+        x = antenna_position.x
+        y = antenna_position.y
+        z = antenna_position.z
+        delays[i] = (x*l + y*m + z*n) / c
+    end
+    delays
+end
+
+"""
+    geometric_delays(antennas, source_position::Position, phase_center)
+
+Compute the geometric delay to each antenna for a source in the near field
+of the interferometer.
+"""
+function geometric_delays(antennas, source_position::Position, phase_center)
+    # near field
+    l = -phase_center.x
+    m = -phase_center.y
+    n = -phase_center.z
+    ξ = source_position.x
+    η = source_position.y
+    ζ = source_position.z
+    D = sqrt(ξ^2 + η^2 + ζ^2)
+    delays = zeros(length(antennas))
+    for i = 1:length(antennas)
+        antenna_position = antennas[i].position
+        x = antenna_position.x
+        y = antenna_position.y
+        z = antenna_position.z
+        delays[i] = (D - sqrt((x-ξ)^2 + (y-η)^2 + (z-ζ)^2) + x*l + y*m + z*n) / c
+    end
+    delays
+end
+
+doc"""
+    delays_to_fringes(delays, frequency)
+
+Compute $\exp(2πiντ)$ for each delay $τ$ and the frequency $ν$.
+"""
+function delays_to_fringes(delays, frequency)
+    i2π = 1im * 2π
+    Nant = length(delays)
+    fringes = zeros(Complex128, Nant)
+    for i = 1:Nant
+        ϕ = i2π * frequency * delays[i]
+        fringes[i] = exp(ϕ)
+    end
+    fringes
+end
+
 function local_north_east(frame, source_direction)
     j2000 = measure(frame, source_direction, dir"J2000")
     rhat  = [j2000.x, j2000.y, j2000.z] # the source location
@@ -203,7 +267,8 @@ function get_uvw(frequency, antenna1, antenna2)
     u, v, w
 end
 
-#=
+# TODO move functions below this comment out of this file
+
 function additional_precomputation(meta, frame, source::GaussianSource)
     north, east = local_north_east(frame, source.direction)
     θ = source.position_angle
@@ -271,70 +336,5 @@ function baseline_coherency(source::ShapeletSource, frequency, antenna1, antenna
         idx += 1
     end
     out
-end
-=#
-
-"""
-    geometric_delays(antennas, source_direction::Direction, phase_center)
-
-Compute the geometric delay to each antenna for a source in the far field
-of the interferometer.
-"""
-function geometric_delays(antennas, source_direction::Direction, phase_center)
-    # far field
-    l = source_direction.x - phase_center.x
-    m = source_direction.y - phase_center.y
-    n = source_direction.z - phase_center.z
-    delays = zeros(length(antennas))
-    for i = 1:length(antennas)
-        antenna_position = antennas[i].position
-        x = antenna_position.x
-        y = antenna_position.y
-        z = antenna_position.z
-        delays[i] = (x*l + y*m + z*n) / c
-    end
-    delays
-end
-
-"""
-    geometric_delays(antennas, source_position::Position, phase_center)
-
-Compute the geometric delay to each antenna for a source in the near field
-of the interferometer.
-"""
-function geometric_delays(antennas, source_position::Position, phase_center)
-    # near field
-    l = -phase_center.x
-    m = -phase_center.y
-    n = -phase_center.z
-    ξ = source_position.x
-    η = source_position.y
-    ζ = source_position.z
-    D = sqrt(ξ^2 + η^2 + ζ^2)
-    delays = zeros(length(antennas))
-    for i = 1:length(antennas)
-        antenna_position = antennas[i].position
-        x = antenna_position.x
-        y = antenna_position.y
-        z = antenna_position.z
-        delays[i] = (D - sqrt((x-ξ)^2 + (y-η)^2 + (z-ζ)^2) + x*l + y*m + z*n) / c
-    end
-    delays
-end
-
-doc"""
-    delays_to_fringes(delays, frequency)
-
-Compute $\exp(2πiντ)$ for each delay $τ$ and the frequency $ν$.
-"""
-function delays_to_fringes(delays, frequency)
-    i2π = 1im * 2π
-    Nant = length(delays)
-    fringes = zeros(Complex128, Nant)
-    for i = 1:Nant
-        ϕ = i2π * frequency * delays[i]
-        fringes[i] = exp(ϕ)
-    end
-    fringes
 end
 
