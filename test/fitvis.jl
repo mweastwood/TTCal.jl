@@ -5,6 +5,7 @@
     meta = Metadata(ms)
     beam = ConstantBeam()
     frame = TTCal.reference_frame(meta)
+    tolerance = eps(Float64)/1e5
 
     @testset "point sources" begin
         sources = readsources("sources.json")[1:1]
@@ -15,7 +16,7 @@
         ra  += 0.1 * π/180 * randn()
         dec += 0.1 * π/180 * randn()
         newdirection = Direction(dir"J2000", ra*radians, dec*radians)
-        fitdirection = fitvis(data, meta, newdirection, maxiter = 100, tolerance = sqrt(eps(Float64)))
+        fitdirection = fitvis(data, meta, newdirection, tolerance = tolerance)
         @test fitdirection ≈ direction
     end
 
@@ -31,7 +32,7 @@
         ra  += 0.1 * π/180 * randn()
         dec += 0.1 * π/180 * randn()
         source.direction = Direction(dir"J2000", ra*radians, dec*radians)
-        fitdirection = fitvis(data, meta, source, maxiter = 100, tolerance = sqrt(eps(Float64)))
+        fitdirection = fitvis(data, meta, source, tolerance = tolerance)
         @test fitdirection ≈ direction
     end
 
@@ -51,7 +52,7 @@
         for component in components
             component.direction = Direction(dir"J2000", ra*radians, dec*radians)
         end
-        fitdirection = fitvis(data, meta, source, maxiter = 100, tolerance = sqrt(eps(Float64)))
+        fitdirection = fitvis(data, meta, source, tolerance = tolerance)
         @test fitdirection ≈ direction
     end
 end
