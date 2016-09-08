@@ -38,10 +38,9 @@ importall Base.Operators
 import Base: zero, one, rand, conj, det, inv, norm, kron
 
 using ArgParse
-using JSON
-using FileIO, JLD
-using NPZ
 using ProgressMeter
+using FileIO, JLD, JSON, NPZ
+using NLopt # used in fitvis
 using CasaCore.Measures
 using CasaCore.Tables
 

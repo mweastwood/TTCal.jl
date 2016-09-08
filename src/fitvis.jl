@@ -14,84 +14,82 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 """
-    fitvis(visibilities, metadata, beam, source; maxiter = 20, tolerance = 1e-3)
-    fitvis(visibilities, metadata, beam, direction; maxiter = 20, tolerance = 1e-3)
+    fitvis(visibilities, metadata, beam, source; tolerance = 1e-3)
+    fitvis(visibilities, metadata, beam, direction; tolerance = 1e-3)
 
 *Description*
 
-Fit for the location of a point source near the given direction.
+Fit for the location of a source near the given direction.
 
 *Arguments*
 
+* `visibilities` - the visibilities measured by the interferometer
+* `metadata` - the metadata describing the interferometer
+* `source` - the source model whose direction we want to measure
+* `direction` - alternatively we can specify a direction, in which case
+    we will measure the direction to a flat spectrum point source
+
 *Keyword Arguments*
 
+* `tolerance` - the absolute tolerance used to test for convergence
+    (defaults to `1e-3` where the units are of the direction cosine)
+
+Note that there is currently no way to set the maximum number of iterations.
+Tests with NLopt showed that if the routine exceeded the maximum number of
+function evaluations, NLopt would simply return the starting value instead
+of its current best-guess. This is not the behavior I wanted so I've
+removed the ability to set the maximum number of iterations.
 """
 function fitvis(visibilities::Visibilities, meta::Metadata, source::Source;
-                maxiter::Int = 20, tolerance::Float64 = 1e-3)
-    fitvis_internal(visibilities, meta, source, maxiter, tolerance)
+                tolerance::Float64 = 1e-3)
+    fitvis_internal(visibilities, meta, source, tolerance)
 end
 
 function fitvis(visibilities::Visibilities, meta::Metadata, direction::Direction;
-                maxiter::Int = 20, tolerance::Float64 = 1e-3)
+                tolerance::Float64 = 1e-3)
     flat = PowerLaw(1, 0, 0, 0, 10e6, [0.0])
     point = PointSource("dummy", direction, flat)
-    fitvis(visibilities, meta, point, maxiter=maxiter, tolerance=tolerance)
+    fitvis(visibilities, meta, point, tolerance=tolerance)
 end
 
-# Design justification
-#
-# The visibility measured by a given baseline is influenced by:
-#     1. the flux of the source
-#     2. the primary beam
-#     3. the baseline fringe pattern, and
-#     4. the resolved structure of the source.
-# The first item is constant with respect to the source position. For the LWA
-# the primary beam varies on ten degree scales whereas the refraction
-# through the ionosphere is expected to occur on arcminute scales. Similarly
-# the resolved structure of the source only changes as the projection of the
-# baseline onto the sky changes. This will therefore also vary on ten degree
-# scales.
-#
-# As a result of the above physical arguments we will assume only the derivative
-# of the fringe pattern with respect to direction is nonzero.
-
-function fitvis_internal(visibilities, meta, source::Source, maxiter, tolerance)
+function fitvis_internal(visibilities, meta, source::Source, tolerance)
     frame = reference_frame(meta)
     direction = get_mean_direction(frame, source)
     if isabovehorizon(frame, source)
         data, flags = rotate_visibilities(visibilities, meta, source)
-        direction = fitvis_internal(data, flags, meta, direction, maxiter, tolerance)
+        direction = fitvis_internal(data, flags, meta, direction, tolerance)
     end
     measure(frame, direction, dir"J2000")
 end
 
-function fitvis_internal(data, flags, meta, direction::Direction, maxiter, tolerance)
-    vector = [0.0, 0.0, 0.0, 1.0]
+function fitvis_internal(data, flags, meta, direction::Direction, tolerance)
     uvw = UVW(meta)
-    converged = iterate(fitvisstep, RK4, maxiter, tolerance, false,
-                        vector, data, flags, meta, direction, uvw)
-    Direction(dir"ITRF", direction.x + vector[1], direction.y + vector[2], direction.z + vector[3])
+
+    count = 0
+    start = [0.0, 0.0, 0.0]
+    objective(x, g) = (count += 1; fitvis_nlopt_objective(x, g, data, flags, meta, direction, uvw))
+    constraint(x, g) = fitvis_nlopt_constraint(x, g, direction)
+
+    opt = Opt(:LN_COBYLA, 3)
+    equality_constraint!(opt, constraint)
+    max_objective!(opt, objective)
+    initial_step!(opt, sind(10/60))
+    xtol_abs!(opt, tolerance)
+    flux, offset, _ = optimize(opt, start)
+
+    Direction(dir"ITRF", direction.x + offset[1], direction.y + offset[2], direction.z + offset[3])
 end
 
-function fitvis_step(vector, data, flags, meta, phase_direction, uvw)
-    # We have a custom visibility generation routine because
-    #     1. we want the gradient and hessian as well, and
-    #     2. we only want Stokes I.
-    # Hopefully this functionality will be mostly folded into `genvis` one day.
+function fitvis_nlopt_objective(vector, gradient, data, flags, meta, phase_direction, uvw)
+    # We have a custom visibility generation routine because we only want Stokes I visibilities.
+    # Hopefully this functionality will be mostly folded into `getspec` one day.
     l = phase_direction.x + vector[1]
     m = phase_direction.y + vector[2]
     n = phase_direction.z + vector[3]
-    lagrange = vector[4] # the Lagrange multiplier
     source_direction = Direction(dir"ITRF", l, m, n)
     delays = geometric_delays(meta.antennas, source_direction, phase_direction)
 
-    πi = π*1im
-    gradient = [0.0, 0.0, 0.0, 0.0]
-    hessian  = [0.0  0.0  0.0  0.0
-                0.0  0.0  0.0  0.0
-                0.0  0.0  0.0  0.0
-                0.0  0.0  0.0  0.0]
-
+    flux = 0.0
     count = 1
     for β = 1:Nfreq(meta)
         ν = meta.channels[β]
@@ -107,51 +105,21 @@ function fitvis_step(vector, data, flags, meta, phase_direction, uvw)
             uλ = uvw.u[α]/λ
             vλ = uvw.v[α]/λ
             wλ = uvw.w[α]/λ
-            gradient[1]  += real(V * -2πi * uλ)
-            gradient[2]  += real(V * -2πi * vλ)
-            gradient[3]  += real(V * -2πi * wλ)
-            hessian[1,1] += real(V * (-2πi)^2 * uλ^2)
-            hessian[2,1] += real(V * (-2πi)^2 * uλ*vλ)
-            hessian[3,1] += real(V * (-2πi)^2 * uλ*wλ)
-            hessian[2,2] += real(V * (-2πi)^2 * vλ^2)
-            hessian[3,2] += real(V * (-2πi)^2 * vλ*wλ)
-            hessian[3,3] += real(V * (-2πi)^2 * wλ^2)
+            flux += real(V)
             count += 1
         end
     end
-    gradient /= count
-    hessian  /= count
-
-    # add the contribution of the Lagrange multiplier
-    gradient[1]  += lagrange * 2l
-    gradient[2]  += lagrange * 2m
-    gradient[3]  += lagrange * 2n
-    gradient[4]   = l^2 + m^2 + n^2 - 1
-    hessian[1,1] += lagrange * 2
-    hessian[2,2] += lagrange * 2
-    hessian[3,3] += lagrange * 2
-    hessian[4,1]  = 2l
-    hessian[4,2]  = 2m
-    hessian[4,3]  = 2n
-
-    # the Hessian should be symmetric
-    hessian[1,2] = hessian[2,1]
-    hessian[1,3] = hessian[3,1]
-    hessian[1,4] = hessian[4,1]
-    hessian[2,3] = hessian[3,2]
-    hessian[2,4] = hessian[4,2]
-    hessian[3,4] = hessian[4,3]
-
-    # compute the step
-    δ = -hessian\gradient
+    flux /= count
+    flux
 end
 
-immutable FitvisStep <: StepFunction end
-const fitvisstep = FitvisStep()
-function call(::FitvisStep, vector, data, flags, meta, phase_direction, uvw)
-    fitvis_step(vector, data, flags, meta, phase_direction, uvw)
+function fitvis_nlopt_constraint(vector, gradient, phase_direction)
+    l = phase_direction.x + vector[1]
+    m = phase_direction.y + vector[2]
+    n = phase_direction.z + vector[3]
+    output = l^2 + m^2 + n^2 - 1
+    output
 end
-return_type(::FitvisStep, vector) = Vector{Float64}
 
 function get_mean_direction(frame, source::Source)
     measure(frame, source.direction, dir"ITRF")

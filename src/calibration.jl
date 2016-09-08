@@ -200,8 +200,8 @@ Solve for the interferometer's electronic gains.
 
 * `visibilities` - the visibilities measured by the interferometer
 * `metadata` - the metadata describing the interferometer
-* `sources` - a list of sources comprising the sky model
 * `beam` - the primary beam model
+* `sources` - a list of sources comprising the sky model
 * `model_visibilities` - alternatively the sky model visibilities can be provided
 
 *Keyword Arguments*
