@@ -13,12 +13,51 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+"A wrapper around `Source` that tells peeling which algorithm to use."
+abstract AbstractPeelingSource
+
+macro peelingsource(name, calibration_type_expr)
+    expr = quote
+        Base.@__doc__ immutable $name <: AbstractPeelingSource
+            source :: Source
+        end
+        calibration_type(meta::Metadata, ::$name) = $calibration_type_expr
+    end
+    esc(expr)
+end
+
+@inline unwrap(source::AbstractPeelingSource) = source.source
+
+"One diagonal Jones matrix per antenna per frequency channel."
+@peelingsource PeelingSource GainCalibration(Nant(meta), Nfreq(meta))
+
+"One diagonal Jones matrix per antenna per subband."
+@peelingsource ShavingSource GainCalibration(Nant(meta), 1)
+
+"One full Jones matrix per antenna per frequency channel."
+@peelingsource ZestingSource PolarizationCalibration(Nant(meta), Nfreq(meta))
+
+"One full Jones matrix per antenna per subband."
+@peelingsource PruningSource PolarizationCalibration(Nant(meta), 1)
+
 """
     peel!(visibilities, metadata, beam, sources)
 
 *Description*
 
 Peel sources from the visibilities.
+
+| Name    | Calibration Type      | Bandwidth       |
+|---------|-----------------------|-----------------|
+| Peeling | Diagonal Jones matrix | One per channel |
+| Shaving | Diagonal Jones matrix | One per subband |
+| Zesting | Full Jones matrix     | One per channel |
+| Pruning | Full Jones Matrix     | One per subband |
+
+Note that the names "shaving", "zesting", and "pruning" are non-standard
+puns. I picked these names because they are short synonyms for "peeling"
+and will likely force you to check the documentation when you come across
+them. Looks like it worked!
 
 *Arguments*
 
@@ -38,54 +77,15 @@ Note that peeling iterates through the list of sources in order. A peeling
 iteration is defined as one pass through the full list. Usually 2
 or 3 iterations seems to be sufficient.
 """
-function peel!(visibilities::Visibilities, meta::Metadata, beam::BeamModel, sources;
-               peeliter = 3, maxiter = 20, tolerance = 1e-3, quiet = false)
+function peel!{T<:AbstractPeelingSource}(visibilities::Visibilities, meta::Metadata,
+                                         beam::BeamModel, sources::Vector{T};
+                                         peeliter = 3, maxiter = 20, tolerance = 1e-3, quiet = false)
     frame = reference_frame(meta)
-    sources = abovehorizon(frame, sources)
-    calibrations = [GainCalibration(Nant(meta), Nfreq(meta)) for source in sources]
-    coherencies  = [genvis(meta, beam, source) for source in sources]
-    peel!(calibrations, coherencies, visibilities, meta, peeliter, maxiter, tolerance, quiet)
-    calibrations
-end
-
-"""
-    shave!(visibilities, metadata, beam, sources)
-
-*Description*
-
-Shave sourcces from the visibilities. This is essentially equivalent
-to peeling, but only one calibration is applied across the entire
-frequency channel (instead of one calibration per frequency channel).
-
-Note that the term "shave" is non-standard. I picked the name because
-it's short, a synonym for "peel", and will probably force you to read
-the documentation to figure out how `shave!` differs from `peel!`.
-Looks like it worked!
-
-*Arguments*
-
-* `visibilities` - a calibrated set of visibilities
-* `metadata` - the metadata describing the interferometer
-* `beam` - the primary beam model
-* `sources` - the list of sources to peel from the visibilities
-
-*Keyword Arguments*
-
-* `peeliter` - the number of peeling iterations
-* `maxiter` - the maximum number of iterations to take on each frequency channel (defaults to `20`)
-* `tolerance` - the relative tolerance used to test for convergence (defaults to `1e-3`)
-* `quiet` - suppresses printing if set to `true` (defaults to `false`)
-
-Note that peeling iterates through the list of sources. A peeling
-iteration is defined as one pass through the full list. Usually 2
-or 3 iterations seems to be sufficient.
-"""
-function shave!(visibilities::Visibilities, meta::Metadata, beam::BeamModel, sources;
-                peeliter = 3, maxiter = 20, tolerance = 1e-3, quiet = false)
-    frame = reference_frame(meta)
-    sources = abovehorizon(frame, sources)
-    calibrations = [GainCalibration(Nant(meta), 1) for source in sources]
-    coherencies  = [genvis(meta, beam, source) for source in sources]
+    sources = filter(sources) do source
+        isabovehorizon(frame, unwrap(source))
+    end
+    calibrations = [calibration_type(meta, source) for source in sources]
+    coherencies  = [genvis(meta, beam, unwrap(source)) for source in sources]
     peel!(calibrations, coherencies, visibilities, meta, peeliter, maxiter, tolerance, quiet)
     calibrations
 end
@@ -143,5 +143,21 @@ function do_peeling_solve!(calibration_toward_source, visibilities, coherency, m
         # peeling
         solve!(calibration_toward_source, visibilities, coherency, meta, maxiter, tolerance, true)
     end
+end
+
+# Legacy methods
+
+function peel!{T<:Source}(visibilities::Visibilities, metadata::Metadata, beam::BeamModel, sources::Vector{T};
+                          peeliter = 3, maxiter = 20, tolerance = 1e-3, quiet = false)
+    peelingsources = [PeelingSource(source) for source in sources]
+    peel!(visibilities, metadata, beam, peelingsources,
+          peeliter=peeliter, maxiter=maxiter, tolerance=tolerance, quiet=quiet)
+end
+
+function shave!{T<:Source}(visibilities::Visibilities, metadata::Metadata, beam::BeamModel, sources::Vector{T};
+                           peeliter = 3, maxiter = 20, tolerance = 1e-3, quiet = false)
+    shavingsources = [ShavingSource(source) for source in sources]
+    peel!(visibilities, metadata, beam, shavingsources,
+          peeliter=peeliter, maxiter=maxiter, tolerance=tolerance, quiet=quiet)
 end
 
