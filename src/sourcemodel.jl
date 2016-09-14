@@ -165,32 +165,32 @@ function ==(lhs::MultiSource, rhs::MultiSource)
     lhs.name == rhs.name && lhs.components == rhs.components
 end
 
-function isabovehorizon(frame::ReferenceFrame, direction::Direction)
+function isabovehorizon(frame::ReferenceFrame, direction::Direction, threshold = 0)
     azel = measure(frame, direction, dir"AZEL")
     el = latitude(azel)
-    el > 0
+    el > threshold
 end
 
-function isabovehorizon(frame::ReferenceFrame, source)
-    isabovehorizon(frame, source.direction)
+function isabovehorizon(frame::ReferenceFrame, source, threshold = 0)
+    isabovehorizon(frame, source.direction, threshold)
 end
 
-function isabovehorizon(frame::ReferenceFrame, source::RFISource)
+function isabovehorizon(frame::ReferenceFrame, source::RFISource, threshold = 0)
     true
 end
 
-function isabovehorizon(frame::ReferenceFrame, source::MultiSource)
+function isabovehorizon(frame::ReferenceFrame, source::MultiSource, threshold = 0)
     for component in source.components
-        if !isabovehorizon(frame, component)
+        if !isabovehorizon(frame, component, threshold)
             return false
         end
     end
     true
 end
 
-function abovehorizon{T<:Source}(frame::ReferenceFrame, sources::Vector{T})
+function abovehorizon{T<:Source}(frame::ReferenceFrame, sources::Vector{T}, threshold = 0)
     filter(sources) do source
-        isabovehorizon(frame, source)
+        isabovehorizon(frame, source, threshold)
     end
 end
 
