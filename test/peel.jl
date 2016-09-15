@@ -24,8 +24,9 @@
             δ = sqrt(eps(Float64))*vecnorm(visibilities.data)
             TTCal.write(ms, "DATA", visibilities)
             unlock(ms)
-            TTCal.main(["peel","--input",name,"--sources","sources.json","--minuvw","0",
-                        "--peeliter","3","--maxiter","100","--tolerance","$(eps(Float64))","--beam","constant"])
+            TTCal.main(["peel", name, "sources.json", "--minuvw", "0",
+                        "--peeliter", "3", "--maxiter", "100", "--tolerance","$(eps(Float64))",
+                        "--beam", "constant"])
             lock(ms)
             visibilities = TTCal.read(ms, "DATA")
             @test vecnorm(visibilities.data) < 10δ
@@ -50,8 +51,9 @@
             δ = sqrt(eps(Float64))*vecnorm(visibilities.data)
             TTCal.write(ms, "DATA", visibilities)
             unlock(ms)
-            TTCal.main(["shave","--input",name,"--sources","sources.json","--minuvw","0",
-                        "--peeliter","3","--maxiter","100","--tolerance","$(eps(Float64))","--beam","constant"])
+            TTCal.main(["shave", name, "sources.json", "--minuvw", "0",
+                        "--peeliter", "3", "--maxiter", "100", "--tolerance","$(eps(Float64))",
+                        "--beam", "constant"])
             lock(ms)
             visibilities = TTCal.read(ms, "DATA")
             @test vecnorm(visibilities.data) < 10δ

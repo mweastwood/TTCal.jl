@@ -70,7 +70,7 @@
             TTCal.write(cal_name, constant_cal)
             TTCal.write(ms, "DATA", visibilities)
             unlock(ms)
-            TTCal.main(["applycal", "--input", name, "--calibration", cal_name])
+            TTCal.main(["applycal", name, cal_name])
             lock(ms)
             myvis = TTCal.read(ms, "DATA")
             @test vecnorm(myvis.data - visibilities.data/abs2(g)) < δ32
@@ -198,8 +198,8 @@
 
         # Run from `main(...)`
         output_name = tempname()*".jld"
-        TTCal.main(["gaincal","--input",name,"--output",output_name,"--sources","sources.json",
-                    "--maxiter","100","--tolerance","$(eps(Float64))","--beam","constant"])
+        TTCal.main(["gaincal", name, output_name, "sources.json",
+                    "--maxiter", "100", "--tolerance", "$(eps(Float64))", "--beam","constant"])
         mycal = TTCal.read(output_name)
         TTCal.fixphase!(mycal,"1x")
         @test !any(mycal.flags)
@@ -220,8 +220,8 @@
 
         # Run from `main(...)`
         output_name = tempname()*".jld"
-        TTCal.main(["polcal","--input",name,"--output",output_name,"--sources","sources.json",
-                    "--maxiter","100","--tolerance","$(eps(Float64))","--beam","constant"])
+        TTCal.main(["polcal", name, output_name, "sources.json",
+                    "--maxiter", "100", "--tolerance", "$(eps(Float64))", "--beam","constant"])
         mycal = TTCal.read(output_name)
         TTCal.fixphase!(mycal,"1x")
         @test !any(mycal.flags)
