@@ -228,6 +228,6 @@ precompile(run_gaincal, (Dict{AbstractString,Any},))
 precompile(run_polcal, (Dict{AbstractString,Any},))
 precompile(run_peel, (Dict{AbstractString,Any},))
 precompile(run_shave, (Dict{AbstractString,Any},))
-#precompile(run_zest, (Dict{AbstractString,Any},))
-#precompile(run_prune, (Dict{AbstractString,Any},))
+precompile(run_zest, (Dict{AbstractString,Any},))
+precompile(run_prune, (Dict{AbstractString,Any},))
 
