@@ -300,6 +300,10 @@ end
 Base.convert(::Type{Vector{Float64}},v::StokesVector) = [v.I,v.Q,v.U,v.V]
 Base.convert(::Type{Vector},v::StokesVector) = Base.convert(Vector{Float64},v)
 
+function Base.show(io::IO, v::StokesVector)
+    @printf(io, "(%.3f, %.3f, %.3f, %.3f)", v.I, v.Q, v.U, v.V)
+end
+
 for op in (:+,:-)
     @eval function $op(v1::StokesVector,v2::StokesVector)
         StokesVector($op(v1.I,v2.I),
@@ -317,6 +321,10 @@ function *(a::Number,v::StokesVector)
     StokesVector(a*v.I,a*v.Q,a*v.U,a*v.V)
 end
 *(v::StokesVector,a::Number) = *(a,v)
+
+function /(v::StokesVector,a::Number)
+    StokesVector(v.I/a,v.Q/a,v.U/a,v.V/a)
+end
 
 function norm(v::StokesVector)
     # the Frobenius norm
