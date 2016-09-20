@@ -68,6 +68,14 @@ type RFISpectrum <: Spectrum
     end
 end
 
+function Base.show(io::IO, spectrum::RFISpectrum)
+    N = length(spectrum.channels)
+    ν1 = spectrum.channels[1] / 1e6
+    ν2 = spectrum.channels[2] / 1e6
+    stokes = mean(spectrum.stokes)
+    print(io, @sprintf("RFISpectrum(%d channels between %.3f and %.3f MHz", N, ν1, ν2), ", ", stokes, ")")
+end
+
 function call(spectrum::RFISpectrum, ν::AbstractFloat)
     idx = searchsortedlast(spectrum.channels, ν)
     spectrum.stokes[idx]
@@ -149,6 +157,10 @@ type RFISource <: Source
     name :: ASCIIString
     position :: Position
     spectrum :: RFISpectrum
+end
+
+function Base.show(io::IO, source::RFISource)
+    print(io, "RFISource(\"", source.name, "\", ", source.position, "\", ", source.spectrum, ")")
 end
 
 function ==(lhs::PointSource, rhs::PointSource)
