@@ -1,10 +1,10 @@
 function test_getspec_direction(meta, source)
     data = genvis(meta, source)
     dir = source.direction
-    stokes_flux = source.spectrum(meta.channels)
+    stokes_flux = source.spectrum.(meta.channels)
     measured_flux = getspec(data, meta, dir)
     for β = 1:Nfreq(meta)
-        linear_flux = TTCal.linear(stokes_flux[β])
+        linear_flux = HermitianJonesMatrix(stokes_flux[β])
         @test linear_flux.xx ≈ measured_flux[β].xx
         @test linear_flux.xy ≈ measured_flux[β].xy
         @test linear_flux.yy ≈ measured_flux[β].yy
@@ -13,10 +13,10 @@ end
 
 function test_getspec_source(meta, source)
     data = genvis(meta, source)
-    stokes_flux = source.spectrum(meta.channels)
+    stokes_flux = source.spectrum.(meta.channels)
     measured_flux = getspec(data, meta, source)
     for β = 1:Nfreq(meta)
-        linear_flux = TTCal.linear(stokes_flux[β])
+        linear_flux = HermitianJonesMatrix(stokes_flux[β])
         @test linear_flux.xx ≈ measured_flux[β].xx
         @test linear_flux.xy ≈ measured_flux[β].xy
         @test linear_flux.yy ≈ measured_flux[β].yy

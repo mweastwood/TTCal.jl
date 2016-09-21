@@ -13,9 +13,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-abstract StepFunction
-abstract RKStepFunction
-
 """
 The Butcher tableau for the 2nd-order Runge-Kutta method.
 """
@@ -38,16 +35,18 @@ const RK4_tableau = [1/2 0.0 0.0 0.0;
                      1/6 1/3 1/3 1/6]
 
 macro generate_step(name, tableau)
-    funcname = symbol(name, "_func")
-    typename = symbol(name, "_type")
     quote
-        function $funcname(step::StepFunction, x, args...)
+        Base.@__doc__ immutable $name
+            func :: Function
+        end
+        
+        function (rkstep::$name)(x, args...)
             N = length(x)
             order = size($tableau, 1)
 
             # Calculate the intermediate steps
-            k = Array(return_type(step, x), order)
-            k[1] = step(x, args...)
+            k = Array(Vector{eltype(x)}, order)
+            k[1] = rkstep.func(x, args...)
             for row = 1:order-1
                 x′ = copy(x)
                 for col = 1:row
@@ -57,7 +56,7 @@ macro generate_step(name, tableau)
                         @inbounds x′[i] += k′[i] * $tableau[row,col]
                     end
                 end
-                k[row+1] = step(x′, args...)
+                k[row+1] = rkstep.func(x′, args...)
             end
 
             # Calculate the final step
@@ -70,17 +69,17 @@ macro generate_step(name, tableau)
             end
             δ
         end
-
-        immutable $typename <: RKStepFunction end
-        call(::$typename, x, args...) = $funcname(x, args...)
-        Base.@__doc__ const $name = $typename()
     end |> esc
 end
 
 """
-    RK2(step, x, args...)
+    RK2(step)
 
-Take a 2nd-order Runge-Kutta step.
+Wrap a step function with the 2nd-order Runge-Kutta method. For example
+
+    # Compute an approximation of exp(1)
+    rk = RK2(x -> x)
+    rk(1) + 1
 
 **Arguments:**
 
@@ -91,9 +90,13 @@ Take a 2nd-order Runge-Kutta step.
 @generate_step RK2 RK2_tableau
 
 """
-    RK3(step, x, args...)
+    RK3(step)
 
-Take a 3rd-order Runge-Kutta step.
+Wrap a step function with the 3rd-order Runge-Kutta method. For example
+
+    # Compute an approximation of exp(1)
+    rk = RK3(x -> x)
+    rk(1) + 1
 
 **Arguments:**
 
@@ -104,9 +107,13 @@ Take a 3rd-order Runge-Kutta step.
 @generate_step RK3 RK3_tableau
 
 """
-    RK4(step, x, args...)
+    RK4(step)
 
-Take a 4th-order Runge-Kutta step.
+Wrap a step function with the 4th-order Runge-Kutta method. For example
+
+    # Compute an approximation of exp(1)
+    rk = RK4(x -> x)
+    rk(1) + 1
 
 **Arguments:**
 
@@ -117,32 +124,24 @@ Take a 4th-order Runge-Kutta step.
 @generate_step RK4 RK4_tableau
 
 """
-    iterate(step, rkstep, maxiter, tolerance, switch, x, args...)
+    iterate(step, maxiter, tolerance, x, args...)
 
-Repeatedly call `rkstep(step, x, args...)` while updating the value of `x`
-until either the step size is sufficiently small or the maximum number
-of iterations is reached.
-
-If `switch` is set to `true`, every iteration will also run `check!(step, x, args...)`.
-This function can then be used to constrain or help the iteration converge.
-For example `check!` can be used to update flags on bad antennas.
+Repeatedly call `step(x, args...)` while updating the value of `x` until either the step size is
+sufficiently small or the maximum number of iterations is reached.
 """
-function iterate(step::StepFunction, rkstep, maxiter, tolerance, switch, x, args...)
+function iterate(step, maxiter, tolerance, x, args...)
     iter = 0
     converged = false
     while !converged && iter < maxiter
-        δ = rkstep(step, x, args...)
+        δ = step(x, args...)
         if vecnorm(δ) < tolerance * vecnorm(x)
             converged = true
         end
         for i in eachindex(x, δ)
             x[i] += δ[i]
         end
-        switch && check!(step, x, args...) # hook that allows flags to be updated while iterating
         iter += 1
     end
     converged
 end
-
-check!(::StepFunction, x, args...) = nothing
 

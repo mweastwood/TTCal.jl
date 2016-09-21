@@ -36,10 +36,9 @@ export applycal!, corrupt!, peel!, shave!
 export PeelingSource, ShavingSource, ZestingSource, PruningSource
 
 importall Base.Operators
-import Base: zero, one, rand, conj, det, inv, norm, kron
 
 using ProgressMeter
-using FileIO, JLD, JSON, NPZ
+using FileIO, JLD, JSON
 using NLopt # used in fitvis
 using CasaCore.Measures
 using CasaCore.Tables
@@ -48,9 +47,11 @@ const c = 2.99792e+8
 
 include("special.jl")
 include("rungekutta.jl")
+include("jones.jl")
 include("stokes.jl")
-include("sourcemodel.jl")
-include("beammodel.jl")
+include("spectra.jl")
+include("skymodels.jl")
+include("beammodels.jl")
 include("utm.jl")
 include("ionosphere.jl")
 include("metadata.jl")

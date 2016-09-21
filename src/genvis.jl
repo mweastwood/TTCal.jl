@@ -63,7 +63,7 @@ function genvis_onesource!(visibilities, meta, beam, source)
         variables = additional_precomputation(meta, frame, source)
         for β = 1:Nfreq(meta)
             frequency = meta.channels[β]
-            visibilities_onechannel = slice(visibilities, :, β)
+            visibilities_onechannel = view(visibilities, :, β)
             genvis_onesource_onechannel!(visibilities_onechannel, meta, source, frequency,
                                          flux[β], itrf_direction[β], phase_center, variables)
         end
@@ -86,8 +86,8 @@ function genvis_onesource!(visibilities, meta, beam, source::RFISource)
     itrf_position = measure(frame, source.position, pos"ITRF")
     for β = 1:Nfreq(meta)
         frequency = meta.channels[β]
-        flux = source.spectrum(frequency) |> linear
-        visibilities_onechannel = slice(visibilities, :, β)
+        flux = source.spectrum(frequency) |> HermitianJonesMatrix
+        visibilities_onechannel = view(visibilities, :, β)
         genvis_onesource_onechannel!(visibilities_onechannel, meta, source, frequency,
                                      flux, itrf_position, phase_center, ())
     end
@@ -129,7 +129,7 @@ function refract_and_corrupt(meta, beam, frame, source)
         # refraction through the ionosphere
         refracted_direction = refract(azel, frequency, 0.0)
         # corruption by the primary beam
-        my_flux = (source.spectrum(frequency) |> linear) :: HermitianJonesMatrix
+        my_flux = source.spectrum(frequency) |> HermitianJonesMatrix
         jones   = beam(frequency, refracted_direction) :: JonesMatrix
         flux[β] = congruence_transform(jones, my_flux)
         # convert the source direction into the correct coordinate system

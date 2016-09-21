@@ -5,5 +5,4 @@ FileIO
 JSON
 JLD
 NLopt
-NPZ
 ProgressMeter
