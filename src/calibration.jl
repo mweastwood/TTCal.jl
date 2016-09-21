@@ -21,7 +21,7 @@ macro generate_calibration(name, jones)
             jones :: Matrix{$jones}
             flags :: Matrix{Bool}
         end
-        function $name(Nant, Nfreq)
+        function $name(Nant::Int, Nfreq::Int)
             $name(ones($jones, Nant, Nfreq), zeros(Bool, Nant, Nfreq))
         end
         Base.similar(cal::$name) = $name(Nant(cal), Nfreq(cal))
@@ -80,29 +80,36 @@ Nfreq(cal::Calibration) = size(cal.jones, 2)
 write(filename, calibration::Calibration) = JLD.save(File(format"JLD", filename), "cal", calibration)
 read(filename) = JLD.load(filename, "cal")
 
-function write_for_python(filename, calibration::GainCalibration)
-    gains = zeros(Complex128, 2, Nant(calibration), Nfreq(calibration))
-    flags = zeros(      Bool,    Nant(calibration), Nfreq(calibration))
-    for β = 1:Nfreq(calibration), ant = 1:Nant(calibration)
-        gains[1,ant,β] = calibration.jones[ant,β].xx
-        gains[2,ant,β] = calibration.jones[ant,β].yy
-        flags[  ant,β] = calibration.flags[ant,β]
-    end
-    npzwrite(filename, Dict("gains" => gains, "flags" => flags))
-end
-
-function write_for_python(filename, calibration::PolarizationCalibration)
-    gains = zeros(Complex128, 4, Nant(calibration), Nfreq(calibration))
-    flags = zeros(      Bool,    Nant(calibration), Nfreq(calibration))
-    for β = 1:Nfreq(calibration), ant = 1:Nant(calibration)
-        gains[1,ant,β] = calibration.jones[ant,β].xx
-        gains[2,ant,β] = calibration.jones[ant,β].xy
-        gains[3,ant,β] = calibration.jones[ant,β].yx
-        gains[4,ant,β] = calibration.jones[ant,β].yy
-        flags[  ant,β] = calibration.flags[ant,β]
-    end
-    npzwrite(filename, Dict("gains" => gains, "flags" => flags))
-end
+# The following functions are disabled until NPZ.jl is fixed on Julia v0.5. To re-enable:
+# * uncomment these lines
+# * add `using NPZ` to `src/TTCal.jl`
+# * add `NPZ` to `REQUIRE`
+# * uncomment `using NPZ` in `test/runtests.jl`
+# * uncomment the corresponding tests in `test/calibration.jl`
+#
+#function write_for_python(filename, calibration::GainCalibration)
+#    gains = zeros(Complex128, 2, Nant(calibration), Nfreq(calibration))
+#    flags = zeros(      Bool,    Nant(calibration), Nfreq(calibration))
+#    for β = 1:Nfreq(calibration), ant = 1:Nant(calibration)
+#        gains[1,ant,β] = calibration.jones[ant,β].xx
+#        gains[2,ant,β] = calibration.jones[ant,β].yy
+#        flags[  ant,β] = calibration.flags[ant,β]
+#    end
+#    npzwrite(filename, Dict("gains" => gains, "flags" => flags))
+#end
+#
+#function write_for_python(filename, calibration::PolarizationCalibration)
+#    gains = zeros(Complex128, 4, Nant(calibration), Nfreq(calibration))
+#    flags = zeros(      Bool,    Nant(calibration), Nfreq(calibration))
+#    for β = 1:Nfreq(calibration), ant = 1:Nant(calibration)
+#        gains[1,ant,β] = calibration.jones[ant,β].xx
+#        gains[2,ant,β] = calibration.jones[ant,β].xy
+#        gains[3,ant,β] = calibration.jones[ant,β].yx
+#        gains[4,ant,β] = calibration.jones[ant,β].yy
+#        flags[  ant,β] = calibration.flags[ant,β]
+#    end
+#    npzwrite(filename, Dict("gains" => gains, "flags" => flags))
+#end
 
 # corrupt / applycal
 
@@ -266,10 +273,10 @@ function solve!(calibration, measured_visibilities, model_visibilities, metadata
     square_measured, square_model = makesquare(measured_visibilities, model_visibilities, metadata)
     quiet || (p = Progress(Nfreq(metadata), "Calibrating: "))
     for β = 1:Nfreq(metadata)
-        solve_onechannel!(slice(calibration.jones, :, β),
-                          slice(calibration.flags, :, β),
-                          slice(square_measured, :, :, β),
-                          slice(square_model,    :, :, β),
+        solve_onechannel!(view(calibration.jones, :, β),
+                          view(calibration.flags, :, β),
+                          view(square_measured, :, :, β),
+                          view(square_model,    :, :, β),
                           maxiter, tolerance)
         quiet || next!(p)
     end
@@ -285,17 +292,17 @@ end
 
 "Solve one channel at a time."
 function solve_onechannel!(jones, flags, measured, model, maxiter, tolerance)
-    converged = iterate(stefcalstep, RK4, maxiter, tolerance, false, jones, measured, model)
+    converged = iterate(RK4(stefcal_step), maxiter, tolerance, jones, measured, model)
     flag_solution!(jones, flags, measured, model, converged)
     jones
 end
 
 "Solve with one solution for all channels."
 function solve_allchannels!(calibration, measured, model, metadata, maxiter, tolerance)
-    G = slice(calibration.jones, :, 1)
-    F = slice(calibration.flags, :, 1)
+    G = view(calibration.jones, :, 1)
+    F = view(calibration.flags, :, 1)
     V, M = makesquare(measured, model, metadata)
-    converged = iterate(stefcalstep, RK4, maxiter, tolerance, false, G, V, M)
+    converged = iterate(RK4(stefcal_step), maxiter, tolerance, G, V, M)
     flag_solution!(G, F, V, M, converged)
     calibration
 end
@@ -457,9 +464,4 @@ end
 end
 
 @inline inner_multiply(::Type{JonesMatrix}, X, Y) = X'*Y
-
-immutable StefcalStep <: StepFunction end
-const stefcalstep = StefcalStep()
-call(::StefcalStep, input, measured, model) = step = stefcal_step(input, measured, model)
-return_type(::StefcalStep, input) = Vector{eltype(input)}
 

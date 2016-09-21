@@ -109,7 +109,7 @@ function flatten_spectrum!(meta, model, source::Source)
 end
 
 function get_total_flux(source::Source, ν)
-    linear(source.spectrum(ν))
+    source.spectrum(ν) |> HermitianJonesMatrix
 end
 
 function get_total_flux(source::MultiSource, ν)

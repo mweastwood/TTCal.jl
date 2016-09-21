@@ -1,22 +1,20 @@
 using TTCal
-if VERSION >= v"0.5-"
-    using Base.Test
-else
-    using BaseTestNext
-    const Test = BaseTestNext
-end
+using Base.Test
 using CasaCore.Measures
 using CasaCore.Tables
-using NPZ
+#using NPZ
 
 include("setup.jl")
 
 srand(123)
 @testset "TTCal Tests" begin
     include("special.jl")
+    include("rungekutta.jl")
+    include("jones.jl")
     include("stokes.jl")
-    include("sourcemodel.jl")
-    include("beammodel.jl")
+    include("spectra.jl")
+    include("skymodels.jl")
+    include("beammodels.jl")
     include("utm.jl")
     include("ionosphere.jl")
     include("metadata.jl")
