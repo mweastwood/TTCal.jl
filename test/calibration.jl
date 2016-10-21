@@ -69,9 +69,9 @@
             cal_name = tempname()*".jld"
             TTCal.write(cal_name, constant_cal)
             TTCal.write(ms, "DATA", visibilities)
-            unlock(ms)
+            Tables.unlock(ms)
             TTCal.main(["applycal", name, cal_name])
-            lock(ms)
+            Tables.lock(ms)
             myvis = TTCal.read(ms, "DATA")
             @test vecnorm(myvis.data - visibilities.data/abs2(g)) < δ32
             @test myvis.flags == visibilities.flags
@@ -194,7 +194,7 @@
         @test vecnorm(mycal.jones - ones(DiagonalJonesMatrix,Nant,Nfreq)) < δ
 
         TTCal.write(ms, "DATA", visibilities)
-        unlock(ms)
+        Tables.unlock(ms)
 
         # Run from `main(...)`
         output_name = tempname()*".jld"
@@ -216,7 +216,7 @@
         @test vecnorm(mycal.jones - ones(JonesMatrix,Nant,Nfreq)) < δ
 
         TTCal.write(ms, "DATA", visibilities)
-        unlock(ms)
+        Tables.unlock(ms)
 
         # Run from `main(...)`
         output_name = tempname()*".jld"
