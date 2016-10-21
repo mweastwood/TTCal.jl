@@ -22,6 +22,7 @@ export StokesVector, MuellerMatrix
 
 export Visibilities, Metadata, Nant, Nfreq, Nbase
 
+export Source
 export PointSource, GaussianSource, DiskSource
 export ShapeletSource, MultiSource, RFISource
 export PowerLaw, RFISpectrum
