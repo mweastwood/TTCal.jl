@@ -26,6 +26,7 @@
 
     @testset "applycal" begin
         for T in (GainCalibration,PolarizationCalibration)
+            @show "applycal", T
             g = rand(Complex128)
             δ32 = sqrt(eps(Float32))*vecnorm(visibilities.data)
             δ64 = sqrt(eps(Float64))*vecnorm(visibilities.data)
@@ -79,6 +80,7 @@
     end
 
     @testset "stefcal" begin
+        @show "stefcal"
         N = 100
         data  = [rand(JonesMatrix) for i = 1:N, j = 1:N]
         model = copy(data)
@@ -91,6 +93,7 @@
     end
 
     @testset "fixphase" begin
+        @show "fixphase"
         cal = GainCalibration(Nant,Nfreq)
         for i in eachindex(cal.jones)
             cal.jones[i] = rand(eltype(cal.jones))
@@ -126,16 +129,20 @@
     end
 
     @testset "unity gains" begin
+        @show "unity gains"
         measured = deepcopy(visibilities)
         model = deepcopy(visibilities)
         for T in (GainCalibration,PolarizationCalibration)
+            @show T
             cal = T(Nant,Nfreq)
             test_solve(cal,measured,model,100,eps(Float64))
         end
     end
 
     @testset "random gains" begin
+        @show "random gains"
         for T in (GainCalibration,PolarizationCalibration)
+            @show T
             cal = T(Nant,Nfreq)
             for i in eachindex(cal.jones)
                 cal.jones[i] = rand(eltype(cal.jones))
@@ -149,7 +156,9 @@
     end
 
     @testset "corrupted autos" begin
+        @show "corrupted autos"
         for T in (GainCalibration,PolarizationCalibration)
+            @show T
             cal = T(Nant,Nfreq)
             for i in eachindex(cal.jones)
                 cal.jones[i] = rand(eltype(cal.jones))
@@ -170,7 +179,9 @@
     end
 
     @testset "flagged antenna" begin
+        @show "flagged antennas"
         for T in (GainCalibration,PolarizationCalibration)
+            @show T
             cal = T(Nant,Nfreq)
             for i in eachindex(cal.jones)
                 cal.jones[i] = rand(eltype(cal.jones))
@@ -185,6 +196,7 @@
     end
 
     @testset "gaincal" begin
+        @show "gaincal"
         δ = sqrt(eps(Float64))*vecnorm(ones(DiagonalJonesMatrix,Nant,Nfreq))
 
         # Run as `gaincal(...)`
