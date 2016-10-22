@@ -270,9 +270,12 @@ function polcal(visibilities::Visibilities, meta::Metadata, model::Visibilities;
 end
 
 function solve!(calibration, measured_visibilities, model_visibilities, metadata, maxiter, tolerance, quiet)
+    println(2)
     square_measured, square_model = makesquare(measured_visibilities, model_visibilities, metadata)
+    println(2)
     quiet || (p = Progress(Nfreq(metadata), "Calibrating: "))
     for β = 1:Nfreq(metadata)
+        @show β
         solve_onechannel!(view(calibration.jones, :, β),
                           view(calibration.flags, :, β),
                           view(square_measured, :, :, β),
