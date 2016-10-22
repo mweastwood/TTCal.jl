@@ -116,15 +116,25 @@
 
     function test_solve(cal,data,model,maxiter,tolerance)
         # Run as `solve!(...)`
+        println(1)
         mycal = similar(cal)
+        println(1)
         TTCal.solve!(mycal,data,model,meta,maxiter,tolerance,true)
+        println(1)
         TTCal.fixphase!(cal,"1x")
+        println(1)
         TTCal.fixphase!(mycal,"1x")
+        println(1)
         jones = cal.jones
+        println(1)
         myjones = mycal.jones
+        println(1)
         jones[cal.flags] = zero(eltype(jones))
+        println(1)
         myjones[mycal.flags] = zero(eltype(myjones))
+        println(1)
         @test cal.flags == mycal.flags
+        println(1)
         @test vecnorm(myjones-jones) < eps(Float32)*vecnorm(jones)
     end
 
