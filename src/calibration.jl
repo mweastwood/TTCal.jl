@@ -445,10 +445,9 @@ function stefcal_step{T}(input::AbstractVector{T}, measured, model)
     # frequency channels to solve for the calibration.
     Nant = length(input)     # number of antennas
     Nint = size(measured, 3) # number of integrations
+    @show "stefcal", Nant, Nint
     step = similar(input)
-    @show Nant Nint
     @inbounds for j = 1:Nant
-        @show j
         numerator   = zero(T)
         denominator = zero(T)
         for t = 1:Nint, i = 1:Nant
