@@ -1,5 +1,5 @@
 julia 0.4
-CasaCore 0.1.0
+CasaCore
 DocOpt
 FileIO
 JSON
