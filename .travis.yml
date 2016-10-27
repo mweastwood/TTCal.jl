@@ -2,7 +2,6 @@ language: julia
 os:
     - linux
 julia:
-    - 0.4
     - 0.5
 notifications:
     email: false
@@ -11,10 +10,6 @@ before_install:
     - sudo apt-get update -qq -y
     - sudo apt-get install libcasacore2-dev -y
     - sudo apt-get install casacore-data -y
-script:
-    - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-    - julia -e 'Pkg.add("BaseTestNext")'
-    - julia -e 'Pkg.clone(pwd())'
-    - julia -e 'cd(Pkg.dir("CasaCore")); run(`git checkout a895d936f9d39b2906a9c4bde9995d0dd13315ae`); cd("deps/src"); run(`make clean`); run(`make`); run(`make install`)'
-    - julia --check-bounds=yes -e 'cd(Pkg.dir("TTCal")); cd("test"); include("runtests.jl")'
+#after_success:
+#    - julia -e 'cd(Pkg.dir("TTCal")); Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder())'
 
