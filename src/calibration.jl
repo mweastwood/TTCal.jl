@@ -189,7 +189,7 @@ end
 # gaincal / polcal
 
 """
-    gaincal(visibilities, metadata, sources)
+    gaincal(visibilities, metadata, beam, sources)
     gaincal(visibilities, metadata, model_visibilities)
 
 *Description*
@@ -200,6 +200,7 @@ Solve for the interferometer's electronic gains.
 
 * `visibilities` - the visibilities measured by the interferometer
 * `metadata` - the metadata describing the interferometer
+* `beam` - the primary beam model
 * `sources` - a list of sources comprising the sky model
 * `model_visibilities` - alternatively the sky model visibilities can be provided
 
@@ -209,11 +210,11 @@ Solve for the interferometer's electronic gains.
 * `tolerance` - the relative tolerance used to test for convergence (defaults to `1e-3`)
 * `quiet` - suppresses printing if set to `true` (defaults to `false`)
 """
-function gaincal{S<:Source}(visibilities::Visibilities, meta::Metadata, sources::Vector{S};
+function gaincal{S<:Source}(visibilities::Visibilities, meta::Metadata, beam::BeamModel, sources::Vector{S};
                             maxiter = 20, tolerance = 1e-3, quiet = false)
     frame = reference_frame(meta)
     sources = abovehorizon(frame, sources)
-    model = genvis(meta, sources)
+    model = genvis(meta, beam, sources)
     gaincal(visibilities, meta, model, maxiter=maxiter, tolerance=tolerance, quiet=quiet)
 end
 
@@ -225,7 +226,7 @@ function gaincal(visibilities::Visibilities, meta::Metadata, model::Visibilities
 end
 
 """
-    polcal(visibilities, metadata, sources)
+    polcal(visibilities, metadata, beam, sources)
     polcal(visibilities, metadata, model_visibilities)
 
 *Description*
@@ -237,6 +238,7 @@ Solve for the polarization properties of the interferometer.
 * `visibilities` - the visibilities measured by the interferometer
 * `metadata` - the metadata describing the interferometer
 * `sources` - a list of sources comprising the sky model
+* `beam` - the primary beam model
 * `model_visibilities` - alternatively the sky model visibilities can be provided
 
 *Keyword Arguments*
@@ -245,11 +247,11 @@ Solve for the polarization properties of the interferometer.
 * `tolerance` - the relative tolerance used to test for convergence (defaults to `1e-3`)
 * `quiet` - suppresses printing if set to `true` (defaults to `false`)
 """
-function polcal{S<:Source}(visibilities::Visibilities, meta::Metadata, sources::Vector{S};
+function polcal{S<:Source}(visibilities::Visibilities, meta::Metadata, beam::BeamModel, sources::Vector{S};
                            maxiter::Int = 20, tolerance::Float64 = 1e-3, quiet = false)
     frame = reference_frame(meta)
     sources = abovehorizon(frame, sources)
-    model = genvis(meta, sources)
+    model = genvis(meta, beam, sources)
     polcal(visibilities, meta, model, maxiter=maxiter, tolerance=tolerance, quiet=quiet)
 end
 

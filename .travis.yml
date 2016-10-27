@@ -10,11 +10,10 @@ before_install:
     - sudo apt-get update -qq -y
     - sudo apt-get install libcasacore2-dev -y
     - sudo apt-get install casacore-data -y
-    - julia -e 'Pkg.clone("CasaCore")'
-    - julia -e 'Pkg.build("CasaCore")'
 script:
     - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-    - julia --check-bounds=yes -e 'Pkg.clone(pwd()); Pkg.test("TTCal"; coverage=true)'
-after_success:
-    - julia -e 'cd(Pkg.dir("TTCal")); Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder())'
+    - julia -e 'Pkg.add("BaseTestNext")'
+    - julia -e 'Pkg.clone(pwd())'
+    - julia -e 'cd(Pkg.dir("CasaCore")); run(`git checkout a895d936f9d39b2906a9c4bde9995d0dd13315ae`); cd("deps/src"); run(`make clean`); run(`make`); run(`make install`)'
+    - julia --check-bounds=yes -e 'cd(Pkg.dir("TTCal")); cd("test"); include("runtests.jl")'
 

@@ -2,7 +2,8 @@
     Nant  = 256
     Nfreq = 2
     name, ms = createms(Nant, Nfreq)
-    meta = collect_metadata(ms, ConstantBeam())
+    meta = Metadata(ms)
+    beam = ConstantBeam()
     sources = readsources("sources.json")
     visibilities = genvis(meta, sources)
 
@@ -66,12 +67,12 @@
 
             # Test the command line interface
             cal_name = tempname()*".jld"
-            TTCal.write(cal_name,constant_cal)
-            TTCal.set_data!(ms, visibilities)
+            TTCal.write(cal_name, constant_cal)
+            TTCal.write(ms, "DATA", visibilities)
             unlock(ms)
-            TTCal.main(["applycal","--input",name,"--calibration",cal_name])
+            TTCal.main(["applycal", name, cal_name])
             lock(ms)
-            myvis = TTCal.get_data(ms)
+            myvis = TTCal.read(ms, "DATA")
             @test vecnorm(myvis.data - visibilities.data/abs2(g)) < δ32
             @test myvis.flags == visibilities.flags
         end
@@ -187,18 +188,18 @@
         δ = sqrt(eps(Float64))*vecnorm(ones(DiagonalJonesMatrix,Nant,Nfreq))
 
         # Run as `gaincal(...)`
-        mycal = gaincal(visibilities, meta, sources ,maxiter=100, tolerance=eps(Float64))
+        mycal = gaincal(visibilities, meta, beam, sources ,maxiter=100, tolerance=eps(Float64))
         TTCal.fixphase!(mycal,"1x")
         @test !any(mycal.flags)
         @test vecnorm(mycal.jones - ones(DiagonalJonesMatrix,Nant,Nfreq)) < δ
 
-        TTCal.set_data!(ms, visibilities)
+        TTCal.write(ms, "DATA", visibilities)
         unlock(ms)
 
         # Run from `main(...)`
         output_name = tempname()*".jld"
-        TTCal.main(["gaincal","--input",name,"--output",output_name,"--sources","sources.json",
-                    "--maxiter","100","--tolerance","$(eps(Float64))","--beam","constant"])
+        TTCal.main(["gaincal", name, output_name, "sources.json",
+                    "--maxiter", "100", "--tolerance", "$(eps(Float64))", "--beam","constant"])
         mycal = TTCal.read(output_name)
         TTCal.fixphase!(mycal,"1x")
         @test !any(mycal.flags)
@@ -209,18 +210,18 @@
         δ = sqrt(eps(Float64))*vecnorm(ones(JonesMatrix,Nant,Nfreq))
 
         # Run as `polcal(...)`
-        mycal = polcal(visibilities, meta, sources ,maxiter=100, tolerance=eps(Float64))
+        mycal = polcal(visibilities, meta, beam, sources ,maxiter=100, tolerance=eps(Float64))
         TTCal.fixphase!(mycal,"1x")
         @test !any(mycal.flags)
         @test vecnorm(mycal.jones - ones(JonesMatrix,Nant,Nfreq)) < δ
 
-        TTCal.set_data!(ms, visibilities)
+        TTCal.write(ms, "DATA", visibilities)
         unlock(ms)
 
         # Run from `main(...)`
         output_name = tempname()*".jld"
-        TTCal.main(["polcal","--input",name,"--output",output_name,"--sources","sources.json",
-                    "--maxiter","100","--tolerance","$(eps(Float64))","--beam","constant"])
+        TTCal.main(["polcal", name, output_name, "sources.json",
+                    "--maxiter", "100", "--tolerance", "$(eps(Float64))", "--beam","constant"])
         mycal = TTCal.read(output_name)
         TTCal.fixphase!(mycal,"1x")
         @test !any(mycal.flags)

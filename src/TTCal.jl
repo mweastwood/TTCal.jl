@@ -21,8 +21,6 @@ export JonesMatrix, DiagonalJonesMatrix, HermitianJonesMatrix
 export StokesVector, MuellerMatrix
 
 export Visibilities, Metadata, Nant, Nfreq, Nbase
-export collect_metadata, flag_short_baselines!
-export get_data, set_corrected_data!
 
 export PointSource, GaussianSource, DiskSource
 export ShapeletSource, MultiSource, RFISource
@@ -30,20 +28,19 @@ export PowerLaw, RFISpectrum
 export readsources, writesources
 export ConstantBeam, SineBeam, Memo178Beam, ZernikeBeam
 
-export genvis, subsrc!, getspec, fitvis
+export genvis, subsrc!, putsrc!, getspec, fitvis
 
 export GainCalibration, gaincal
 export PolarizationCalibration, polcal
 export applycal!, corrupt!, peel!, shave!
+export PeelingSource, ShavingSource, ZestingSource, PruningSource
 
 importall Base.Operators
 import Base: zero, one, rand, conj, det, inv, norm, kron
 
-using ArgParse
-using JSON
-using FileIO, JLD
-using NPZ
 using ProgressMeter
+using FileIO, JLD, JSON, NPZ
+using NLopt # used in fitvis
 using CasaCore.Measures
 using CasaCore.Tables
 
@@ -56,7 +53,8 @@ include("sourcemodel.jl")
 include("beammodel.jl")
 include("utm.jl")
 include("ionosphere.jl")
-include("measurementsets.jl")
+include("metadata.jl")
+include("visibilities.jl")
 include("genvis.jl")
 include("getspec.jl")
 include("subsrc.jl")

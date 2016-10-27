@@ -14,35 +14,112 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 """
-    genvis(meta::Metadata, sources)
+    genvis(metadata, sources)
+    genvis(metadata, beam, sources)
+
+*Description*
 
 Generate model visibilities for the given list of sources.
+
+If a beam model is provided, the model visibilities will be given as if
+they were observed with antennas that have the given primary beam.
+
+Note that bandwidth smearing and time smearing are currently not
+accounted for by this routine.
+
+*Arguments*
+
+* `metadata` - the metadata describing the interferometer
+* `beam` - the antenna primary beam (assumed to be constant if not given)
+* `sources` - the list of sources to include in the sky model
 """
-function genvis(meta::Metadata, sources)
-    model = zeros(JonesMatrix, Nbase(meta), Nfreq(meta))
-    flags = zeros(       Bool, Nbase(meta), Nfreq(meta))
-    for source in sources
-        genvis_onesource!(model, meta, source)
-    end
+function genvis{S<:Source}(meta::Metadata, beam::BeamModel, sources::Vector{S})
+    flags = zeros(Bool, Nbase(meta), Nfreq(meta))
+    model = genvis_internal(meta, beam, sources)
     Visibilities(model, flags)
 end
 
-genvis(meta::Metadata, source::Source) = genvis(meta, [source])
+function genvis{S<:Source}(meta::Metadata, sources::Vector{S})
+    beam = ConstantBeam()
+    genvis(meta, beam, sources)
+end
 
-function frame_and_phase_center(meta::Metadata)
+genvis(meta::Metadata, source::Source) = genvis(meta, [source])
+genvis(meta::Metadata, beam::BeamModel, source::Source) = genvis(meta, beam, [source])
+
+function genvis_internal(meta, beam, sources)
+    model = zeros(JonesMatrix, Nbase(meta), Nfreq(meta))
+    for source in sources
+        genvis_onesource!(model, meta, beam, source)
+    end
+    model
+end
+
+function genvis_onesource!(visibilities, meta, beam, source)
+    frame = reference_frame(meta)
+    if isabovehorizon(frame, source)
+        phase_center = measure(frame, meta.phase_center, dir"ITRF")
+        flux, itrf_direction = refract_and_corrupt(meta, beam, frame, source)
+        variables = additional_precomputation(meta, frame, source)
+        for β = 1:Nfreq(meta)
+            frequency = meta.channels[β]
+            visibilities_onechannel = slice(visibilities, :, β)
+            genvis_onesource_onechannel!(visibilities_onechannel, meta, source, frequency,
+                                         flux[β], itrf_direction[β], phase_center, variables)
+        end
+    end
+    visibilities
+end
+
+"For multi-component sources iterate over the components."
+function genvis_onesource!(visibilities, meta, beam, source::MultiSource)
+    for component in source.components
+        genvis_onesource!(visibilities, meta, beam, component)
+    end
+    visibilities
+end
+
+"RFI sources need some special treatment."
+function genvis_onesource!(visibilities, meta, beam, source::RFISource)
     frame = reference_frame(meta)
     phase_center = measure(frame, meta.phase_center, dir"ITRF")
-    frame, phase_center
+    itrf_position = measure(frame, source.position, pos"ITRF")
+    for β = 1:Nfreq(meta)
+        frequency = meta.channels[β]
+        flux = source.spectrum(frequency) |> linear
+        visibilities_onechannel = slice(visibilities, :, β)
+        genvis_onesource_onechannel!(visibilities_onechannel, meta, source, frequency,
+                                     flux, itrf_position, phase_center, ())
+    end
+    visibilities
+end
+
+function genvis_onesource_onechannel!(visibilities, meta, source, frequency,
+                                      flux, itrf, phase_center, variables)
+    delays  = geometric_delays(meta.antennas, itrf, phase_center)
+    fringes = delays_to_fringes(delays, frequency)
+    for α = 1:Nbase(meta)
+        idx1 = meta.baselines[α].antenna1
+        idx2 = meta.baselines[α].antenna2
+        antenna1 = meta.antennas[idx1]
+        antenna2 = meta.antennas[idx2]
+        fringe = fringes[idx1] * conj(fringes[idx2])
+        coherency = baseline_coherency(source, frequency, antenna1, antenna2, variables)
+        visibilities[α] += flux * fringe * coherency
+    end
+    visibilities
 end
 
 """
-    refract_and_corrupt(meta, frame, source)
+    refract_and_corrupt(meta, beam, frame, source)
 
 This function returns the flux and ITRF direction to the source
 at each frequency channel after refraction through the ionosphere
 and corruption by the primary beam.
+
+**TODO** the plasma frequency is currently hard-coded to zero
 """
-function refract_and_corrupt(meta, frame, source)
+function refract_and_corrupt(meta, beam, frame, source)
     pos  = position(meta)
     azel = measure(frame, source.direction, dir"AZEL")
     flux = zeros(HermitianJonesMatrix, Nfreq(meta))
@@ -50,11 +127,10 @@ function refract_and_corrupt(meta, frame, source)
     for β = 1:Nfreq(meta)
         frequency = meta.channels[β]
         # refraction through the ionosphere
-        # TODO: allow the plasma frequency to be set to something nonzero
         refracted_direction = refract(azel, frequency, 0.0)
         # corruption by the primary beam
         my_flux = (source.spectrum(frequency) |> linear) :: HermitianJonesMatrix
-        jones   = meta.beam(frequency, refracted_direction) :: JonesMatrix
+        jones   = beam(frequency, refracted_direction) :: JonesMatrix
         flux[β] = congruence_transform(jones, my_flux)
         # convert the source direction into the correct coordinate system
         itrf[β] = azel_to_itrf(refracted_direction, pos)
@@ -84,7 +160,7 @@ Note that the `variables` argument is the output of the
 """
 baseline_coherency(source, frequency, antenna1, antenna2, variables) = 1.0
 
-function time_smearing(itrf, frequency, antenna1, antenna2)
+#function time_smearing(itrf, frequency, antenna1, antenna2)
 #    ω = 2π / 86164.09054 # angular rotation speed of the Earth
 #    cosδ = cos(latitude(itrf)) # cosine declination
 #    τ = 13 # hard coded to LWA integration time
@@ -98,71 +174,79 @@ function time_smearing(itrf, frequency, antenna1, antenna2)
 #    baseline_east = abs(u*east[1] + v*east[2] + w*east[3])
 #
 #    sinc(ω * cosδ * baseline_east * τ)
-    1.0
-end
+#end
 
-time_smearing(itrf::Position, frequency, antenna1, antenna2) = 1.0
-
-function bandwidth_smearing(itrf, antenna1, antenna2)
+#function bandwidth_smearing(itrf, antenna1, antenna2)
 #    λ = c / 24e3 # hard coded to LWA channel width
 #    u = (antenna1.position.x - antenna2.position.x) / λ
 #    v = (antenna1.position.y - antenna2.position.y) / λ
 #    w = (antenna1.position.z - antenna2.position.z) / λ
 #    delay = u*itrf.x + v*itrf.y + w*itrf.z
 #    sinc(delay)
-    1.0
+#end
+
+"""
+    geometric_delays(antennas, source_direction::Direction, phase_center)
+
+Compute the geometric delay to each antenna for a source in the far field
+of the interferometer.
+"""
+function geometric_delays(antennas, source_direction::Direction, phase_center)
+    # far field
+    l = source_direction.x - phase_center.x
+    m = source_direction.y - phase_center.y
+    n = source_direction.z - phase_center.z
+    delays = zeros(length(antennas))
+    for i = 1:length(antennas)
+        antenna_position = antennas[i].position
+        x = antenna_position.x
+        y = antenna_position.y
+        z = antenna_position.z
+        delays[i] = (x*l + y*m + z*n) / c
+    end
+    delays
 end
 
-function genvis_onesource!(visibilities, meta, source)
-    frame, phase_center = frame_and_phase_center(meta)
-    isabovehorizon(frame, source) || (return visibilities)
-    flux, itrf_direction = refract_and_corrupt(meta, frame, source)
-    variables = additional_precomputation(meta, frame, source)
-    for β = 1:Nfreq(meta)
-        frequency = meta.channels[β]
-        visibilities_onechannel = slice(visibilities, :, β)
-        genvis_onesource_onechannel!(visibilities_onechannel, meta, source, frequency,
-                                     flux[β], itrf_direction[β], phase_center, variables)
+"""
+    geometric_delays(antennas, source_position::Position, phase_center)
+
+Compute the geometric delay to each antenna for a source in the near field
+of the interferometer.
+"""
+function geometric_delays(antennas, source_position::Position, phase_center)
+    # near field
+    l = -phase_center.x
+    m = -phase_center.y
+    n = -phase_center.z
+    ξ = source_position.x
+    η = source_position.y
+    ζ = source_position.z
+    D = sqrt(ξ^2 + η^2 + ζ^2)
+    delays = zeros(length(antennas))
+    for i = 1:length(antennas)
+        antenna_position = antennas[i].position
+        x = antenna_position.x
+        y = antenna_position.y
+        z = antenna_position.z
+        delays[i] = (D - sqrt((x-ξ)^2 + (y-η)^2 + (z-ζ)^2) + x*l + y*m + z*n) / c
     end
-    visibilities
+    delays
 end
 
-function genvis_onesource!(visibilities, meta, source::MultiSource)
-    for component in source.components
-        genvis_onesource!(visibilities, meta, component)
-    end
-    visibilities
-end
+doc"""
+    delays_to_fringes(delays, frequency)
 
-function genvis_onesource!(visibilities, meta, source::RFISource)
-    frame, phase_center = frame_and_phase_center(meta)
-    itrf_position = measure(frame, source.position, pos"ITRF")
-    for β = 1:Nfreq(meta)
-        frequency = meta.channels[β]
-        flux = source.spectrum(frequency) |> linear
-        visibilities_onechannel = slice(visibilities, :, β)
-        genvis_onesource_onechannel!(visibilities_onechannel, meta, source, frequency,
-                                     flux, itrf_position, phase_center, ())
+Compute $\exp(2πiντ)$ for each delay $τ$ and the frequency $ν$.
+"""
+function delays_to_fringes(delays, frequency)
+    i2π = 1im * 2π
+    Nant = length(delays)
+    fringes = zeros(Complex128, Nant)
+    for i = 1:Nant
+        ϕ = i2π * frequency * delays[i]
+        fringes[i] = exp(ϕ)
     end
-end
-
-function genvis_onesource_onechannel!(visibilities, meta, source, frequency,
-                                      flux, itrf, phase_center, variables)
-    delays  = geometric_delays(meta.antennas, itrf, phase_center)
-    fringes = delays_to_fringes(delays, frequency)
-    for α = 1:Nbase(meta)
-        idx1 = meta.baselines[α].antenna1
-        idx2 = meta.baselines[α].antenna2
-        antenna1 = meta.antennas[idx1]
-        antenna2 = meta.antennas[idx2]
-        fringe = fringes[idx1] * conj(fringes[idx2])
-        coherency = baseline_coherency(source, frequency, antenna1, antenna2, variables)
-        smearing1 = bandwidth_smearing(itrf, antenna1, antenna2)
-        smearing2 = time_smearing(itrf, frequency, antenna1, antenna2)
-        smearing = smearing1 * smearing2
-        visibilities[α] += flux * fringe * coherency * smearing
-    end
-    visibilities
+    fringes
 end
 
 function local_north_east(frame, source_direction)
@@ -182,6 +266,8 @@ function get_uvw(frequency, antenna1, antenna2)
     w = (antenna1.position.z - antenna2.position.z) / λ
     u, v, w
 end
+
+# TODO move functions below this comment out of this file
 
 function additional_precomputation(meta, frame, source::GaussianSource)
     north, east = local_north_east(frame, source.direction)
@@ -250,73 +336,5 @@ function baseline_coherency(source::ShapeletSource, frequency, antenna1, antenna
         idx += 1
     end
     out
-end
-
-"""
-    geometric_delays(antennas, source_direction::Direction, phase_center)
-
-Compute the geometric delay to each antenna for a source in the far field
-of the interferometer.
-"""
-function geometric_delays(antennas, source_direction::Direction, phase_center)
-    # far field
-    l = source_direction.x - phase_center.x
-    m = source_direction.y - phase_center.y
-    n = source_direction.z - phase_center.z
-    delays = zeros(length(antennas))
-    for i = 1:length(antennas)
-        antenna_position = antennas[i].position
-        x = antenna_position.x
-        y = antenna_position.y
-        z = antenna_position.z
-        delays[i] = (x*l + y*m + z*n) / c
-    end
-    delays
-end
-
-"""
-    geometric_delays(antennas, source_position::Position, phase_center)
-
-Compute the geometric delay to each antenna for a source in the near field
-of the interferometer.
-"""
-function geometric_delays(antennas, source_position::Position, phase_center)
-    # near field
-    l = -phase_center.x
-    m = -phase_center.y
-    n = -phase_center.z
-    ξ = source_position.x
-    η = source_position.y
-    ζ = source_position.z
-    D = sqrt(ξ^2 + η^2 + ζ^2)
-    delays = zeros(length(antennas))
-    for i = 1:length(antennas)
-        antenna_position = antennas[i].position
-        x = antenna_position.x
-        y = antenna_position.y
-        z = antenna_position.z
-        delays[i] = (D - sqrt((x-ξ)^2 + (y-η)^2 + (z-ζ)^2) + x*l + y*m + z*n) / c
-    end
-    delays
-end
-
-doc"""
-    delays_to_fringes(delays, frequency)
-
-Compute
-\[
-    \exp\left(2\pi i \nu \tau\right)
-\]
-for each delay $\tau$ and the frequency $\nu$.
-"""
-function delays_to_fringes(delays, frequency)
-    i2π = 1im * 2π
-    Nant = length(delays)
-    fringes = zeros(Complex128, Nant)
-    for i = 1:Nant
-        ϕ = i2π * frequency * delays[i]
-        fringes[i] = exp(ϕ)
-    end
-    fringes
 end
 

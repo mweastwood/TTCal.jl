@@ -153,6 +153,20 @@ function *(J1::HermitianJonesMatrix,J2::HermitianJonesMatrix)
                 J1.xy'*J2.xy + J1.yy*J2.yy)
 end
 
+function *(J1::HermitianJonesMatrix, J2::JonesMatrix)
+    JonesMatrix(J1.xx *J2.xx + J1.xy*J2.yx,
+                J1.xx *J2.xy + J1.xy*J2.yy,
+                J1.xy'*J2.xx + J1.yy*J2.yx,
+                J1.xy'*J2.xy + J1.yy*J2.yy)
+end
+
+function *(J1::JonesMatrix, J2::HermitianJonesMatrix)
+    JonesMatrix(J1.xx*J2.xx + J1.xy*J2.xy',
+                J1.xx*J2.xy + J1.xy*J2.yy,
+                J1.yx*J2.xx + J1.yy*J2.xy',
+                J1.yx*J2.xy + J1.yy*J2.yy)
+end
+
 \(J1::AnyJonesMatrix,J2::AnyJonesMatrix) = inv(J1)*J2
 /(J1::AnyJonesMatrix,J2::AnyJonesMatrix) = J1*inv(J2)
 
@@ -208,6 +222,10 @@ function congruence_transform(J::JonesMatrix,K::HermitianJonesMatrix)
                          J.xx*J.yx'*K.xx + J.xx*J.yy'*K.xy
                             + J.xy*J.yx'*K.xy' + J.xy*J.yy'*K.yy,
                          abs2(J.yx)*K.xx + 2real(J.yx*J.yy'*K.xy) + abs2(J.yy)*K.yy)
+end
+
+function make_hermitian(J::JonesMatrix)
+    HermitianJonesMatrix(real(J.xx), 0.5*(J.xy+conj(J.yx)), real(J.yy))
 end
 
 """
@@ -282,6 +300,10 @@ end
 Base.convert(::Type{Vector{Float64}},v::StokesVector) = [v.I,v.Q,v.U,v.V]
 Base.convert(::Type{Vector},v::StokesVector) = Base.convert(Vector{Float64},v)
 
+function Base.show(io::IO, v::StokesVector)
+    @printf(io, "(%.3f, %.3f, %.3f, %.3f)", v.I, v.Q, v.U, v.V)
+end
+
 for op in (:+,:-)
     @eval function $op(v1::StokesVector,v2::StokesVector)
         StokesVector($op(v1.I,v2.I),
@@ -299,6 +321,10 @@ function *(a::Number,v::StokesVector)
     StokesVector(a*v.I,a*v.Q,a*v.U,a*v.V)
 end
 *(v::StokesVector,a::Number) = *(a,v)
+
+function /(v::StokesVector,a::Number)
+    StokesVector(v.I/a,v.Q/a,v.U/a,v.V/a)
+end
 
 function norm(v::StokesVector)
     # the Frobenius norm

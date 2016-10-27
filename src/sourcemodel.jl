@@ -68,6 +68,14 @@ type RFISpectrum <: Spectrum
     end
 end
 
+function Base.show(io::IO, spectrum::RFISpectrum)
+    N = length(spectrum.channels)
+    ν1 = spectrum.channels[1] / 1e6
+    ν2 = spectrum.channels[2] / 1e6
+    stokes = mean(spectrum.stokes)
+    print(io, @sprintf("RFISpectrum(%d channels between %.3f and %.3f MHz", N, ν1, ν2), ", ", stokes, ")")
+end
+
 function call(spectrum::RFISpectrum, ν::AbstractFloat)
     idx = searchsortedlast(spectrum.channels, ν)
     spectrum.stokes[idx]
@@ -151,6 +159,10 @@ type RFISource <: Source
     spectrum :: RFISpectrum
 end
 
+function Base.show(io::IO, source::RFISource)
+    print(io, "RFISource(\"", source.name, "\", ", source.position, "\", ", source.spectrum, ")")
+end
+
 function ==(lhs::PointSource, rhs::PointSource)
     lhs.name == rhs.name && lhs.direction == rhs.direction && lhs.spectrum == rhs.spectrum
 end
@@ -165,32 +177,32 @@ function ==(lhs::MultiSource, rhs::MultiSource)
     lhs.name == rhs.name && lhs.components == rhs.components
 end
 
-function isabovehorizon(frame::ReferenceFrame, direction::Direction)
+function isabovehorizon(frame::ReferenceFrame, direction::Direction, threshold = 0)
     azel = measure(frame, direction, dir"AZEL")
     el = latitude(azel)
-    el > 0
+    el > threshold
 end
 
-function isabovehorizon(frame::ReferenceFrame, source)
-    isabovehorizon(frame, source.direction)
+function isabovehorizon(frame::ReferenceFrame, source, threshold = 0)
+    isabovehorizon(frame, source.direction, threshold)
 end
 
-function isabovehorizon(frame::ReferenceFrame, source::RFISource)
+function isabovehorizon(frame::ReferenceFrame, source::RFISource, threshold = 0)
     true
 end
 
-function isabovehorizon(frame::ReferenceFrame, source::MultiSource)
+function isabovehorizon(frame::ReferenceFrame, source::MultiSource, threshold = 0)
     for component in source.components
-        if !isabovehorizon(frame, component)
+        if !isabovehorizon(frame, component, threshold)
             return false
         end
     end
     true
 end
 
-function abovehorizon{T<:Source}(frame::ReferenceFrame, sources::Vector{T})
+function abovehorizon{T<:Source}(frame::ReferenceFrame, sources::Vector{T}, threshold = 0)
     filter(sources) do source
-        isabovehorizon(frame, source)
+        isabovehorizon(frame, source, threshold)
     end
 end
 

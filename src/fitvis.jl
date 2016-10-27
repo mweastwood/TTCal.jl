@@ -14,73 +14,82 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 """
-    FitvisVariables
+    fitvis(visibilities, metadata, beam, source; tolerance = 1e-3)
+    fitvis(visibilities, metadata, beam, direction; tolerance = 1e-3)
 
-This type is simply a container for variables that need to be calculated
-once and shared between functions while fitting source positions.
+*Description*
+
+Fit for the location of a source near the given direction.
+
+*Arguments*
+
+* `visibilities` - the visibilities measured by the interferometer
+* `metadata` - the metadata describing the interferometer
+* `source` - the source model whose direction we want to measure
+* `direction` - alternatively we can specify a direction, in which case
+    we will measure the direction to a flat spectrum point source
+
+*Keyword Arguments*
+
+* `tolerance` - the absolute tolerance used to test for convergence
+    (defaults to `1e-3` where the units are of the direction cosine)
+
+Note that there is currently no way to set the maximum number of iterations.
+Tests with NLopt showed that if the routine exceeded the maximum number of
+function evaluations, NLopt would simply return the starting value instead
+of its current best-guess. This is not the behavior I wanted so I've
+removed the ability to set the maximum number of iterations.
 """
-type FitvisVariables
-    phase_center :: Direction # should always be ITRF
-    u :: Vector{Float64}
-    v :: Vector{Float64}
-    w :: Vector{Float64}
-    function FitvisVariables(meta::Metadata)
-        frame = reference_frame(meta)
-        phase_center = measure(frame, meta.phase_center, dir"ITRF")
-        u = zeros(Nbase(meta))
-        v = zeros(Nbase(meta))
-        w = zeros(Nbase(meta))
-        for α = 1:Nbase(meta)
-            antenna1 = meta.baselines[α].antenna1
-            antenna2 = meta.baselines[α].antenna2
-            r1 = meta.antennas[antenna1].position
-            r2 = meta.antennas[antenna2].position
-            u[α] = r1.x - r2.x
-            v[α] = r1.y - r2.y
-            w[α] = r1.z - r2.z
-        end
-        new(phase_center, u, v, w)
-    end
+function fitvis(visibilities::Visibilities, meta::Metadata, source::Source;
+                tolerance::Float64 = 1e-3)
+    fitvis_internal(visibilities, meta, source, tolerance)
 end
 
-"""
-    fitvis(visibilities::Visibilities, meta::Metadata, direction::Direction;
-           maxiter = 20, tolerance = 1e-3)
-
-Fit for the location of a point source near the given direction.
-"""
 function fitvis(visibilities::Visibilities, meta::Metadata, direction::Direction;
-                maxiter::Int = 20, tolerance::Float64 = 1e-3)
+                tolerance::Float64 = 1e-3)
+    flat = PowerLaw(1, 0, 0, 0, 10e6, [0.0])
+    point = PointSource("dummy", direction, flat)
+    fitvis(visibilities, meta, point, tolerance=tolerance)
+end
+
+function fitvis_internal(visibilities, meta, source::Source, tolerance)
     frame = reference_frame(meta)
-    isabovehorizon(frame, direction) || (return direction)
-    direction = measure(frame, direction, dir"ITRF")
-    variables = FitvisVariables(meta)
-    newdirection = fitvis_internal(visibilities, meta, variables, direction, maxiter, tolerance)
-    measure(frame, newdirection, dir"J2000")
+    direction = get_mean_direction(frame, source)
+    if isabovehorizon(frame, source)
+        data, flags = rotate_visibilities(visibilities, meta, source)
+        direction = fitvis_internal(data, flags, meta, direction, tolerance)
+    end
+    measure(frame, direction, dir"J2000")
 end
 
-function fitvis_internal(visibilities, meta, variables, direction, maxiter, tolerance)
-    vector = [direction.x, direction.y, direction.z, 1.0]
-    converged = iterate(fitvisstep, RK4, maxiter, tolerance, false,
-                        vector, visibilities, meta, variables)
-    Direction(dir"ITRF", vector[1], vector[2], vector[3])
+function fitvis_internal(data, flags, meta, direction::Direction, tolerance)
+    uvw = UVW(meta)
+
+    count = 0
+    start = [0.0, 0.0, 0.0]
+    objective(x, g) = (count += 1; fitvis_nlopt_objective(x, g, data, flags, meta, direction, uvw))
+    constraint(x, g) = fitvis_nlopt_constraint(x, g, direction)
+
+    opt = Opt(:LN_COBYLA, 3)
+    equality_constraint!(opt, constraint)
+    max_objective!(opt, objective)
+    initial_step!(opt, sind(10/60))
+    xtol_abs!(opt, tolerance)
+    flux, offset, _ = optimize(opt, start)
+
+    Direction(dir"ITRF", direction.x + offset[1], direction.y + offset[2], direction.z + offset[3])
 end
 
-function fitvis_step(vector, visibilities, meta, variables)
-    x = vector[1]
-    y = vector[2]
-    z = vector[3]
-    lagrange = vector[4] # the Lagrange multiplier
-    direction = Direction(dir"ITRF", x, y, z)
-    delays = geometric_delays(meta.antennas, direction, variables.phase_center)
+function fitvis_nlopt_objective(vector, gradient, data, flags, meta, phase_direction, uvw)
+    # We have a custom visibility generation routine because we only want Stokes I visibilities.
+    # Hopefully this functionality will be mostly folded into `getspec` one day.
+    l = phase_direction.x + vector[1]
+    m = phase_direction.y + vector[2]
+    n = phase_direction.z + vector[3]
+    source_direction = Direction(dir"ITRF", l, m, n)
+    delays = geometric_delays(meta.antennas, source_direction, phase_direction)
 
-    πi = π*1im
-    gradient = [0.0, 0.0, 0.0, 0.0]
-    hessian  = [0.0  0.0  0.0  0.0
-                0.0  0.0  0.0  0.0
-                0.0  0.0  0.0  0.0
-                0.0  0.0  0.0  0.0]
-
+    flux = 0.0
     count = 1
     for β = 1:Nfreq(meta)
         ν = meta.channels[β]
@@ -90,54 +99,65 @@ function fitvis_step(vector, visibilities, meta, variables)
             antenna1 = meta.baselines[α].antenna1
             antenna2 = meta.baselines[α].antenna2
             antenna1 == antenna2 && continue # don't use auto-correlations
-            visibilities.flags[α,β] && continue
+            flags[α,β] && continue
             fringe = conj(fringes[antenna1]) * fringes[antenna2]
-            # use the Stokes I flux only
-            V = 0.5*(visibilities.data[α,β].xx+visibilities.data[α,β].yy) * fringe
-            uλ = variables.u[α]/λ
-            vλ = variables.v[α]/λ
-            wλ = variables.w[α]/λ
-            gradient[1]  += real(V * -2πi * uλ)
-            gradient[2]  += real(V * -2πi * vλ)
-            gradient[3]  += real(V * -2πi * wλ)
-            hessian[1,1] += real(V * (-2πi)^2 * uλ^2)
-            hessian[2,1] += real(V * (-2πi)^2 * uλ*vλ)
-            hessian[3,1] += real(V * (-2πi)^2 * uλ*wλ)
-            hessian[2,2] += real(V * (-2πi)^2 * vλ^2)
-            hessian[3,2] += real(V * (-2πi)^2 * vλ*wλ)
-            hessian[3,3] += real(V * (-2πi)^2 * wλ^2)
+            V = data[α,β]*fringe
+            uλ = uvw.u[α]/λ
+            vλ = uvw.v[α]/λ
+            wλ = uvw.w[α]/λ
+            flux += real(V)
             count += 1
         end
     end
-    gradient /= count
-    hessian  /= count
-
-    # Add the contribution of the Lagrange multiplier
-    gradient[1]  += lagrange * 2x
-    gradient[2]  += lagrange * 2y
-    gradient[3]  += lagrange * 2z
-    gradient[4]   = x^2 + y^2 + z^2 - 1
-    hessian[1,1] += lagrange * 2
-    hessian[2,2] += lagrange * 2
-    hessian[3,3] += lagrange * 2
-    hessian[4,1]  = 2x
-    hessian[4,2]  = 2y
-    hessian[4,3]  = 2z
-
-    # The Hessian should be symmetric
-    hessian[1,2] = hessian[2,1]
-    hessian[1,3] = hessian[3,1]
-    hessian[1,4] = hessian[4,1]
-    hessian[2,3] = hessian[3,2]
-    hessian[2,4] = hessian[4,2]
-    hessian[3,4] = hessian[4,3]
-
-    # Compute the step
-    δ = -hessian\gradient
+    flux /= count
+    flux
 end
 
-immutable FitvisStep <: StepFunction end
-const fitvisstep = FitvisStep()
-call(::FitvisStep, vector, visibilities, meta, variables) = fitvis_step(vector, visibilities, meta, variables)
-return_type(::FitvisStep, vector) = Vector{Float64}
+function fitvis_nlopt_constraint(vector, gradient, phase_direction)
+    l = phase_direction.x + vector[1]
+    m = phase_direction.y + vector[2]
+    n = phase_direction.z + vector[3]
+    output = l^2 + m^2 + n^2 - 1
+    output
+end
+
+function get_mean_direction(frame, source::Source)
+    measure(frame, source.direction, dir"ITRF")
+end
+
+function get_mean_direction(frame, source::MultiSource)
+    x, y, z = 0.0, 0.0, 0.0
+    for component in source.components
+        direction = get_mean_direction(frame, component)
+        x += direction.x
+        y += direction.y
+        z += direction.z
+    end
+    norm = sqrt(x^2 + y^2 + z^2)
+    Direction(dir"ITRF", x/norm, y/norm, z/norm)
+end
+
+function stokes_I_only(input)
+    output = zeros(Complex128, size(input))
+    for idx in eachindex(input, output)
+        J = input[idx]
+        output[idx] = 0.5*(J.xx + J.yy)
+    end
+    output
+end
+
+function rotate_phase_center!(data, model)
+    for idx in eachindex(data, model)
+        data[idx] = data[idx] / model[idx]
+    end
+end
+
+function rotate_visibilities(visibilities, meta, source)
+    model = genvis_internal(meta, ConstantBeam(), [source])
+    flatten_spectrum!(meta, model, source)
+    stokes_I_data  = stokes_I_only(visibilities.data)
+    stokes_I_model = stokes_I_only(model)
+    rotate_phase_center!(stokes_I_data, stokes_I_model)
+    stokes_I_data, visibilities.flags
+end
 
