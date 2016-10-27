@@ -2,7 +2,6 @@ language: julia
 os:
     - linux
 julia:
-    - 0.4
     - 0.5
 notifications:
     email: false
@@ -13,7 +12,7 @@ before_install:
     - sudo apt-get install casacore-data -y
 script:
     - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-    - julia --check-bounds=yes -e 'Pkg.clone(pwd()); Pkg.test("TTCal"; coverage=true)'
+    - julia -e 'Pkg.clone(pwd()); Pkg.test("TTCal"; coverage=true)'
 after_success:
     - julia -e 'cd(Pkg.dir("TTCal")); Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder())'
 
