@@ -83,7 +83,7 @@ Base.rand(::Type{JonesMatrix}) = JonesMatrix(rand(Complex128), rand(Complex128),
 
 Base.zero(::Type{DiagonalJonesMatrix}) = DiagonalJonesMatrix(0, 0)
 Base.one(::Type{DiagonalJonesMatrix}) = DiagonalJonesMatrix(1, 1) # the identity matrix
-Base.rand(::Type{DiagonalJonesMatrix}) = DiagonalJonesMatrix(rand(Float64), rand(Float64))
+Base.rand(::Type{DiagonalJonesMatrix}) = DiagonalJonesMatrix(rand(Complex128), rand(Complex128))
 
 Base.zero(::Type{HermitianJonesMatrix}) = HermitianJonesMatrix(0, 0, 0)
 Base.one(::Type{HermitianJonesMatrix}) = HermitianJonesMatrix(1, 0, 1) # the identity matrix

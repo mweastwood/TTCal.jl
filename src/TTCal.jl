@@ -33,7 +33,7 @@ export genvis, subsrc!, putsrc!, getspec, fitvis
 
 export GainCalibration, gaincal
 export PolarizationCalibration, polcal
-export applycal!, corrupt!, peel!, shave!
+export applycal!, corrupt!, peel!, shave!, multipeel!
 export PeelingSource, ShavingSource, ZestingSource, PruningSource
 
 importall Base.Operators
@@ -64,6 +64,7 @@ include("subsrc.jl")
 include("fitvis.jl")
 include("calibration.jl")
 include("peel.jl")
+include("multipeel.jl")
 include("commandline.jl")
 
 end
