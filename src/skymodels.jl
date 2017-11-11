@@ -211,6 +211,11 @@ function construct_source(c)
             # DiskSource
             radius = deg2rad(c["radius"]/3600)
             source = DiskSource(name, dir, spec, radius)
+        elseif haskey(c, "coefficients")
+            # ShapeletSource
+            scale = c["scale-parameter"]
+            coeff = c["coefficients"]
+            source = ShapeletSource(name, dir, spec, scale, coeff)
         else
             # PointSource
             source = PointSource(name, dir, spec)
@@ -305,6 +310,16 @@ function deconstruct_source(source::GaussianSource)
     c["major-fwhm"] = 3600*rad2deg(source.major_fwhm)
     c["minor-fwhm"] = 3600*rad2deg(source.minor_fwhm)
     c["position-angle"] = rad2deg(source.position_angle)
+    c
+end
+
+function deconstruct_source(source::ShapeletSource)
+    c = Dict{String,Any}()
+    c["name"] = source.name
+    put_source_direction(c, source)
+    put_source_spectrum(c, source)
+    c["scale-parameter"] = source.scale
+    c["coefficients"] = source.coeff
     c
 end
 

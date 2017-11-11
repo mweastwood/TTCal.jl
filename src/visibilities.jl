@@ -18,6 +18,16 @@ type Visibilities
     flags :: Matrix{Bool}
 end
 
+function Visibilities(Nbase::Int, Nfreq::Int)
+    data = zeros(JonesMatrix, Nbase, Nfreq)
+    flags = fill(false, Nbase, Nfreq)
+    Visibilities(data, flags)
+end
+
+function Visibilities(meta::Metadata)
+    Visibilities(Nbase(meta), Nfreq(meta))
+end
+
 Nbase(vis::Visibilities) = size(vis.data, 1)
 Nfreq(vis::Visibilities) = size(vis.data, 2)
 
@@ -32,7 +42,7 @@ function read(ms::Table, column)
 end
 
 "Write visibilities to the measurement set."
-function write(ms::Table, column, data::Visibilities)
+function write(ms::Table, column, data::Visibilities; apply_flags::Bool=true)
     reorganized_data = zeros(Complex64, 4, Nfreq(data), Nbase(data))
     for α = 1:Nbase(data), β = 1:Nfreq(data)
         reorganized_data[1,β,α] = data.data[α,β].xx
@@ -41,13 +51,15 @@ function write(ms::Table, column, data::Visibilities)
         reorganized_data[4,β,α] = data.data[α,β].yy
     end
     ms[column] = reorganized_data
-    flags = zeros(Bool, 4, Nfreq(data), Nbase(data))
-    for α = 1:Nbase(data), β = 1:Nfreq(data)
-        if data.flags[α,β]
-            flags[:,β,α] = true
+    if apply_flags
+        flags = zeros(Bool, 4, Nfreq(data), Nbase(data))
+        for α = 1:Nbase(data), β = 1:Nfreq(data)
+            if data.flags[α,β]
+                flags[:,β,α] = true
+            end
         end
+        ms["FLAG"] = flags
     end
-    ms["FLAG"] = flags
 end
 
 function organize_data(raw_data)

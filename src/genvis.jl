@@ -48,7 +48,7 @@ genvis(meta::Metadata, source::Source) = genvis(meta, [source])
 genvis(meta::Metadata, beam::BeamModel, source::Source) = genvis(meta, beam, [source])
 
 function genvis_internal(meta, beam, sources)
-    model = zeros(JonesMatrix, Nbase(meta), Nfreq(meta))
+    model = zeros(JonesMatrix, Nbase(meta), Nfreq(meta)) :: Matrix{JonesMatrix}
     for source in sources
         genvis_onesource!(model, meta, beam, source)
     end
@@ -68,6 +68,7 @@ function genvis_onesource!(visibilities, meta, beam, source)
                                          flux[β], itrf_direction[β], phase_center, variables)
         end
     end
+    finalize(frame) # the Julia gc doesn't know how much memory this is taking up so it prefers just leave it
     visibilities
 end
 
@@ -322,9 +323,10 @@ function baseline_coherency(source::ShapeletSource, frequency, antenna1, antenna
     # project the baseline onto the sky
     x = u*east.x  + v*east.y  + w*east.z
     y = u*north.x + v*north.y + w*north.z
-    exponential = exp(-2π^2*β^2*(x^2+y^2))
+    π2 = π*π
+    exponential = exp(-2π2*β^2*(x^2+y^2))
     # compute the contribution from each shapelet component
-    out = 0.0
+    out = zero(Complex128)
     idx = 1
     nmax = round(Int, sqrt(length(source.coeff))) - 1
     for n2 = 0:nmax, n1 = 0:nmax

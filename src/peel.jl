@@ -27,6 +27,7 @@ macro peelingsource(name, calibration_type_expr)
 end
 
 @inline unwrap(source::AbstractPeelingSource) = source.source
+@inline unwrap(source) = source
 
 "One diagonal Jones matrix per antenna per frequency channel."
 @peelingsource PeelingSource GainCalibration(Nant(meta), Nfreq(meta))
@@ -95,8 +96,14 @@ function peel!(calibrations, coherencies, visibilities, meta, peeliter, maxiter,
 
     # Subtract all of the sources
     # (assuming the beam is unity towards each source)
-    for coherency in coherencies
-        subsrc!(visibilities, coherency)
+    for s = 1:Nsource
+        # Make sure to apply the initial gains here because we're going to be restoring the source
+        # with those same initial gains
+        coherency = coherencies[s]
+        calibration_toward_source = calibrations[s]
+        corrupted = deepcopy(coherency)
+        corrupt!(corrupted, meta, calibration_toward_source)
+        subsrc!(visibilities, corrupted)
     end
 
     # Derive a calibration towards each source
@@ -126,9 +133,9 @@ function peel!(calibrations, coherencies, visibilities, meta, peeliter, maxiter,
         end
     end
     if !quiet
-        for calibration in calibrations
+        for (idx, calibration) in enumerate(calibrations)
             if sum(calibration.flags) > 0.5length(calibration.flags)
-                warn("Frequently failed to converge. There will likely be large residuals.")
+                warn("Calibration number $idx frequently failed to converge.")
             end
         end
     end

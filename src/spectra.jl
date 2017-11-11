@@ -37,6 +37,7 @@ PowerLaw(I, Q, U, V, ν, index) = PowerLaw(StokesVector(I, Q, U, V), ν, index)
 PowerLaw(I::Real, ν, index) = PowerLaw(StokesVector(I, 0, 0, 0), ν, index)
 
 function (spectrum::PowerLaw)(ν::AbstractFloat)
+    spectrum.stokes.I == 0 && return StokesVector(0, 0, 0, 0)
     s = sign(spectrum.stokes.I)
     log_I = log10(abs(spectrum.stokes.I))
     log_ν = log10(ν/spectrum.ν)
@@ -73,7 +74,7 @@ end
 function Base.show(io::IO, spectrum::RFISpectrum)
     N = length(spectrum.channels)
     ν1 = spectrum.channels[1] / 1e6
-    ν2 = spectrum.channels[2] / 1e6
+    ν2 = spectrum.channels[end] / 1e6
     stokes = mean(spectrum.stokes)
     print(io, @sprintf("RFISpectrum(%d channels between %.3f and %.3f MHz", N, ν1, ν2), ", ", stokes, ")")
 end

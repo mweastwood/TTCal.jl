@@ -171,20 +171,6 @@ function run_polcal(args)
     @cli_cleanup
 end
 
-macro peel_input()
-    quote
-        ms = Table(ascii(args["input"]))
-        sources = readsources(args["sources"])
-        beam = beam_dictionary[args["beam"]]()
-        meta = Metadata(ms)
-        data = Tables.column_exists(ms, "CORRECTED_DATA")? read(ms, "CORRECTED_DATA") : read(ms, "DATA")
-        flag_short_baselines!(data, meta, args["minuvw"])
-        peeliter = args["peeliter"]
-        maxiter = args["maxiter"]
-        tolerance = args["tolerance"]
-    end |> esc
-end
-
 for (routine, T) in ((:peel, PeelingSource), (:shave, ShavingSource),
                      (:zest, ZestingSource), (:prune, PruningSource))
     func = Symbol("run_", routine)
@@ -199,7 +185,8 @@ for (routine, T) in ((:peel, PeelingSource), (:shave, ShavingSource),
         peelingsources = $T[$T(source) for source in sources]
         calibrations = peel!(data, meta, beam, peelingsources,
                              peeliter=peeliter, maxiter=maxiter, tolerance=tolerance)
-        Tables.column_exists(ms, "CORRECTED_DATA")? write(ms, "CORRECTED_DATA", data) : write(ms, "DATA", data)
+        (Tables.column_exists(ms, "CORRECTED_DATA")? write(ms, "CORRECTED_DATA", data, apply_flags=false)
+                                                   : write(ms, "DATA", data, apply_flags=false))
         @cli_cleanup
     end
 end

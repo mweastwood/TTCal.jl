@@ -185,6 +185,9 @@ function (beam::ZernikeBeam)(ν, az, el)::JonesMatrix
             + coeff[7]*zernike(8, 0, ρ, θ)
             + coeff[8]*zernike(8, 4, ρ, θ)
             + coeff[9]*zernike(8, 8, ρ, θ))
+    if value < 0
+        value = 0.0
+    end
     JonesMatrix(sqrt(value), 0, 0, sqrt(value))
 end
 @define_for_direction_too ZernikeBeam
