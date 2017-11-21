@@ -1,4 +1,4 @@
-# Copyright (c) 2015 Michael Eastwood
+# Copyright (c) 2015, 2016 Michael Eastwood
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -109,7 +109,7 @@ function flatten_spectrum!(meta, model, source::Source)
 end
 
 function get_total_flux(source::Source, ν)
-    linear(source.spectrum(ν))
+    source.spectrum(ν) |> HermitianJonesMatrix
 end
 
 function get_total_flux(source::MultiSource, ν)

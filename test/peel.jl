@@ -23,11 +23,11 @@
             visibilities = genvis(meta, sources)
             δ = sqrt(eps(Float64))*vecnorm(visibilities.data)
             TTCal.write(ms, "DATA", visibilities)
-            unlock(ms)
+            Tables.unlock(ms)
             TTCal.main(["peel", name, "sources.json", "--minuvw", "0",
                         "--peeliter", "3", "--maxiter", "100", "--tolerance","$(eps(Float64))",
                         "--beam", "constant"])
-            lock(ms)
+            Tables.lock(ms)
             visibilities = TTCal.read(ms, "DATA")
             @test vecnorm(visibilities.data) < 10δ
             @test !any(visibilities.flags)
@@ -50,11 +50,11 @@
             visibilities = genvis(meta, sources)
             δ = sqrt(eps(Float64))*vecnorm(visibilities.data)
             TTCal.write(ms, "DATA", visibilities)
-            unlock(ms)
+            Tables.unlock(ms)
             TTCal.main(["shave", name, "sources.json", "--minuvw", "0",
                         "--peeliter", "3", "--maxiter", "100", "--tolerance","$(eps(Float64))",
                         "--beam", "constant"])
-            lock(ms)
+            Tables.lock(ms)
             visibilities = TTCal.read(ms, "DATA")
             @test vecnorm(visibilities.data) < 10δ
             @test !any(visibilities.flags)

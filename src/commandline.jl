@@ -1,4 +1,4 @@
-# Copyright (c) 2015 Michael Eastwood
+# Copyright (c) 2015, 2016 Michael Eastwood
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -12,8 +12,6 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-using DocOpt
 
 doc = """
 TTCal is a calibration routine developed by Michael Eastwood for the Long Wavelength Array at the
@@ -139,8 +137,8 @@ function run_applycal(args)
     @cli_intro applycal
     @cli_load_ms
     cal = read(args["<cal>"])
-    write_to_corrected = args["--force-imaging"] || Tables.exists(ms, "CORRECTED_DATA")
-    apply_to_corrected = args["--corrected"] && Tables.exists(ms, "CORRECTED_DATA")
+    write_to_corrected = args["--force-imaging"] || Tables.column_exists(ms, "CORRECTED_DATA")
+    apply_to_corrected = args["--corrected"] && Tables.column_exists(ms, "CORRECTED_DATA")
     data = apply_to_corrected? read(ms, "CORRECTED_DATA") : read(ms, "DATA")
     applycal!(data, meta, cal)
     write_to_corrected? write(ms, "CORRECTED_DATA", data) : write(ms, "DATA", data)
@@ -166,25 +164,11 @@ function run_polcal(args)
     @cli_load_sources
     @cli_load_beam
     @cli_convergence_criteria
-    data = Tables.exists(ms, "CORRECTED_DATA")? read(ms, "CORRECTED_DATA") : read(ms, "DATA")
+    data = Tables.column_exists(ms, "CORRECTED_DATA")? read(ms, "CORRECTED_DATA") : read(ms, "DATA")
     flag_short_baselines!(data, meta, minuvw)
     cal = polcal(data, meta, beam, sources, maxiter=maxiter, tolerance=tolerance)
     write(args["<cal>"], cal)
     @cli_cleanup
-end
-
-macro peel_input()
-    quote
-        ms = Table(ascii(args["input"]))
-        sources = readsources(args["sources"])
-        beam = beam_dictionary[args["beam"]]()
-        meta = Metadata(ms)
-        data = Tables.exists(ms, "CORRECTED_DATA")? read(ms, "CORRECTED_DATA") : read(ms, "DATA")
-        flag_short_baselines!(data, meta, args["minuvw"])
-        peeliter = args["peeliter"]
-        maxiter = args["maxiter"]
-        tolerance = args["tolerance"]
-    end |> esc
 end
 
 for (routine, T) in ((:peel, PeelingSource), (:shave, ShavingSource),
@@ -196,12 +180,13 @@ for (routine, T) in ((:peel, PeelingSource), (:shave, ShavingSource),
         @cli_load_sources
         @cli_load_beam
         @cli_convergence_criteria
-        data = Tables.exists(ms, "CORRECTED_DATA")? read(ms, "CORRECTED_DATA") : read(ms, "DATA")
+        data = Tables.column_exists(ms, "CORRECTED_DATA")? read(ms, "CORRECTED_DATA") : read(ms, "DATA")
         flag_short_baselines!(data, meta, minuvw)
         peelingsources = $T[$T(source) for source in sources]
         calibrations = peel!(data, meta, beam, peelingsources,
                              peeliter=peeliter, maxiter=maxiter, tolerance=tolerance)
-        Tables.exists(ms, "CORRECTED_DATA")? write(ms, "CORRECTED_DATA", data) : write(ms, "DATA", data)
+        (Tables.column_exists(ms, "CORRECTED_DATA")? write(ms, "CORRECTED_DATA", data, apply_flags=false)
+                                                   : write(ms, "DATA", data, apply_flags=false))
         @cli_cleanup
     end
 end

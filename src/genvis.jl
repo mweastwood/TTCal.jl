@@ -1,4 +1,4 @@
-# Copyright (c) 2015 Michael Eastwood
+# Copyright (c) 2015, 2016 Michael Eastwood
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -48,7 +48,7 @@ genvis(meta::Metadata, source::Source) = genvis(meta, [source])
 genvis(meta::Metadata, beam::BeamModel, source::Source) = genvis(meta, beam, [source])
 
 function genvis_internal(meta, beam, sources)
-    model = zeros(JonesMatrix, Nbase(meta), Nfreq(meta))
+    model = zeros(JonesMatrix, Nbase(meta), Nfreq(meta)) :: Matrix{JonesMatrix}
     for source in sources
         genvis_onesource!(model, meta, beam, source)
     end
@@ -63,11 +63,12 @@ function genvis_onesource!(visibilities, meta, beam, source)
         variables = additional_precomputation(meta, frame, source)
         for β = 1:Nfreq(meta)
             frequency = meta.channels[β]
-            visibilities_onechannel = slice(visibilities, :, β)
+            visibilities_onechannel = view(visibilities, :, β)
             genvis_onesource_onechannel!(visibilities_onechannel, meta, source, frequency,
                                          flux[β], itrf_direction[β], phase_center, variables)
         end
     end
+    finalize(frame) # the Julia gc doesn't know how much memory this is taking up so it prefers just leave it
     visibilities
 end
 
@@ -86,8 +87,8 @@ function genvis_onesource!(visibilities, meta, beam, source::RFISource)
     itrf_position = measure(frame, source.position, pos"ITRF")
     for β = 1:Nfreq(meta)
         frequency = meta.channels[β]
-        flux = source.spectrum(frequency) |> linear
-        visibilities_onechannel = slice(visibilities, :, β)
+        flux = source.spectrum(frequency) |> HermitianJonesMatrix
+        visibilities_onechannel = view(visibilities, :, β)
         genvis_onesource_onechannel!(visibilities_onechannel, meta, source, frequency,
                                      flux, itrf_position, phase_center, ())
     end
@@ -129,7 +130,7 @@ function refract_and_corrupt(meta, beam, frame, source)
         # refraction through the ionosphere
         refracted_direction = refract(azel, frequency, 0.0)
         # corruption by the primary beam
-        my_flux = (source.spectrum(frequency) |> linear) :: HermitianJonesMatrix
+        my_flux = source.spectrum(frequency) |> HermitianJonesMatrix
         jones   = beam(frequency, refracted_direction) :: JonesMatrix
         flux[β] = congruence_transform(jones, my_flux)
         # convert the source direction into the correct coordinate system
@@ -322,9 +323,10 @@ function baseline_coherency(source::ShapeletSource, frequency, antenna1, antenna
     # project the baseline onto the sky
     x = u*east.x  + v*east.y  + w*east.z
     y = u*north.x + v*north.y + w*north.z
-    exponential = exp(-2π^2*β^2*(x^2+y^2))
+    π2 = π*π
+    exponential = exp(-2π2*β^2*(x^2+y^2))
     # compute the contribution from each shapelet component
-    out = 0.0
+    out = zero(Complex128)
     idx = 1
     nmax = round(Int, sqrt(length(source.coeff))) - 1
     for n2 = 0:nmax, n1 = 0:nmax

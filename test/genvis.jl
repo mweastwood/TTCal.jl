@@ -13,7 +13,7 @@ function old_genvis_equivalent(meta, beam, sources)
         for β = 1:TTCal.Nfreq(meta)
             ν = meta.channels[β]
             λ = TTCal.c / ν
-            flux = source.spectrum(ν) |> TTCal.linear
+            flux = source.spectrum(ν) |> HermitianJonesMatrix
             jones = beam(ν, az, el)
             flux  = TTCal.congruence_transform(jones, flux)
             for α = 1:TTCal.Nbase(meta)

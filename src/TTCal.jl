@@ -1,4 +1,4 @@
-# Copyright (c) 2015 Michael Eastwood
+# Copyright (c) 2015, 2016 Michael Eastwood
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,6 +22,7 @@ export StokesVector, MuellerMatrix
 
 export Visibilities, Metadata, Nant, Nfreq, Nbase
 
+export Source
 export PointSource, GaussianSource, DiskSource
 export ShapeletSource, MultiSource, RFISource
 export PowerLaw, RFISpectrum
@@ -36,11 +37,12 @@ export applycal!, corrupt!, peel!, shave!
 export PeelingSource, ShavingSource, ZestingSource, PruningSource
 
 importall Base.Operators
-import Base: zero, one, rand, conj, det, inv, norm, kron
 
+using DocOpt
 using ProgressMeter
-using FileIO, JLD, JSON, NPZ
+using FileIO, JLD, JSON
 using NLopt # used in fitvis
+using Unitful, UnitfulAstro
 using CasaCore.Measures
 using CasaCore.Tables
 
@@ -48,9 +50,11 @@ const c = 2.99792e+8
 
 include("special.jl")
 include("rungekutta.jl")
+include("jones.jl")
 include("stokes.jl")
-include("sourcemodel.jl")
-include("beammodel.jl")
+include("spectra.jl")
+include("skymodels.jl")
+include("beammodels.jl")
 include("utm.jl")
 include("ionosphere.jl")
 include("metadata.jl")

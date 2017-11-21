@@ -1,4 +1,4 @@
-# Copyright (c) 2015 Michael Eastwood
+# Copyright (c) 2015, 2016 Michael Eastwood
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -13,74 +13,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-abstract Spectrum
-
-function call(spectrum::Spectrum, ν::AbstractVector)
-    StokesVector[spectrum(ν′) for ν′ in ν]
-end
-
-doc"""
-    PowerLaw <: Spectrum
-
-A multi-component power-law spectrum.
-
-\\[
-    \log_{10} S = \log_{10} S_0 + \sum_{n=1}^N \alpha_n \log_{10}\left(\frac{\nu}{\nu_0}\right)^n
-\\]
-
-where $S$ is a Stokes parameter, and $\alpha_n$ is the list of
-spectral indices. At least one spectral index needs to be provided.
-"""
-type PowerLaw <: Spectrum
-    stokes :: StokesVector
-    ν :: Float64 # Hz
-    α :: Vector{Float64}
-end
-
-PowerLaw(I,Q,U,V,ν,index) = PowerLaw(StokesVector(I,Q,U,V),ν,index)
-
-function call(spectrum::PowerLaw, ν::AbstractFloat)
-    s = sign(spectrum.stokes.I)
-    log_I = log10(abs(spectrum.stokes.I))
-    log_ν = log10(ν/spectrum.ν)
-    for (i,α) in enumerate(spectrum.α)
-        log_I += α*log_ν^i
-    end
-    I = s*10^log_I
-    Q = spectrum.stokes.Q / spectrum.stokes.I * I
-    U = spectrum.stokes.U / spectrum.stokes.I * I
-    V = spectrum.stokes.V / spectrum.stokes.I * I
-    StokesVector(I,Q,U,V)
-end
-
-function ==(lhs::PowerLaw, rhs::PowerLaw)
-    lhs.stokes == rhs.stokes && lhs.ν == rhs.ν && lhs.α == rhs.α
-end
-
-type RFISpectrum <: Spectrum
-    channels :: Vector{Float64}
-    stokes   :: Vector{StokesVector}
-    function RFISpectrum(channels, stokes)
-        if length(channels) != length(stokes)
-            error("number of frequency channels must match number of Stokes vectors")
-        end
-        new(channels, stokes)
-    end
-end
-
-function Base.show(io::IO, spectrum::RFISpectrum)
-    N = length(spectrum.channels)
-    ν1 = spectrum.channels[1] / 1e6
-    ν2 = spectrum.channels[2] / 1e6
-    stokes = mean(spectrum.stokes)
-    print(io, @sprintf("RFISpectrum(%d channels between %.3f and %.3f MHz", N, ν1, ν2), ", ", stokes, ")")
-end
-
-function call(spectrum::RFISpectrum, ν::AbstractFloat)
-    idx = searchsortedlast(spectrum.channels, ν)
-    spectrum.stokes[idx]
-end
-
 abstract Source
 
 """
@@ -89,7 +21,7 @@ abstract Source
 An astronomical point source.
 """
 type PointSource <: Source
-    name :: ASCIIString
+    name :: String
     direction :: Direction
     spectrum  :: PowerLaw
 end
@@ -100,7 +32,7 @@ end
 An astronomical source in the shape of a Gaussian.
 """
 type GaussianSource <: Source
-    name :: ASCIIString
+    name :: String
     direction :: Direction
     spectrum  :: PowerLaw
     major_fwhm :: Float64 # FWHM along the major axis (radians)
@@ -114,7 +46,7 @@ end
 An astronomical source in the shape of a circular disk.
 """
 type DiskSource <: Source
-    name :: ASCIIString
+    name :: String
     direction :: Direction
     spectrum :: PowerLaw
     radius :: Float64 # radius of the disk (radians)
@@ -125,12 +57,11 @@ doc"""
 
 An astronomical source composed of shapelets.
 
-Shapelets are eigenfunctions of the fourier transform operator.
-They form an orthonormal basis for real functions mapping
-$\mathbb R^2 \mapsto \mathbb R$.
+Shapelets are eigenfunctions of the fourier transform operator.  They form an orthonormal basis for
+real functions mapping $\mathbb R^2 \mapsto \mathbb R$.
 """
 type ShapeletSource <: Source
-    name :: ASCIIString
+    name :: String
     direction :: Direction
     spectrum :: PowerLaw
     scale :: Float64 # scale factor of the shapelets (radians)
@@ -143,18 +74,18 @@ end
 An astronomical source that has multiple components.
 """
 type MultiSource <: Source
-    name :: ASCIIString
+    name :: String
     components :: Vector{Source}
 end
 
 """
     RFISource <: Source
 
-A terrestrial source of RFI. These sources are assumed to be
-spectrally unsmooth and in the near field of the interferometer.
+A terrestrial source of RFI. These sources are assumed to be spectrally unsmooth and in the near
+field of the interferometer.
 """
 type RFISource <: Source
-    name :: ASCIIString
+    name :: String
     position :: Position
     spectrum :: RFISpectrum
 end
@@ -209,8 +140,7 @@ end
 """
     readsources(filename)
 
-Read the list of point sources from the given JSON file.
-The format must be as follows:
+Read the list of point sources from the given JSON file.  The format must be as follows:
 
     [
         {
@@ -244,9 +174,8 @@ Additional Stokes parameters may also be specified.
         ...
     }
 
-A right ascension and declination does not need to be specified if
-the name of the source is "Sun", "Moon", or "Jupiter". These sources
-will have their location automatically determined by CasaCore.
+A right ascension and declination does not need to be specified if the name of the source is "Sun",
+"Moon", or "Jupiter". These sources will have their location automatically determined by CasaCore.
 """
 function readsources(filename)
     sources = Source[]
@@ -282,6 +211,11 @@ function construct_source(c)
             # DiskSource
             radius = deg2rad(c["radius"]/3600)
             source = DiskSource(name, dir, spec, radius)
+        elseif haskey(c, "coefficients")
+            # ShapeletSource
+            scale = c["scale-parameter"]
+            coeff = c["coefficients"]
+            source = ShapeletSource(name, dir, spec, scale, coeff)
         else
             # PointSource
             source = PointSource(name, dir, spec)
@@ -345,11 +279,11 @@ end
 """
     writesources(filename, sources)
 
-Write the list of sources to the given location as a JSON file.
-These sources can be read back in again using the `readsources` function.
+Write the list of sources to the given location as a JSON file.  These sources can be read back in
+again using the `readsources` function.
 """
 function writesources{T<:Source}(filename, sources::Vector{T})
-    dicts = Dict{UTF8String,Any}[]
+    dicts = Dict{String,Any}[]
     for source in sources
         source_dict = deconstruct_source(source)
         push!(dicts, source_dict)
@@ -361,7 +295,7 @@ function writesources{T<:Source}(filename, sources::Vector{T})
 end
 
 function deconstruct_source(source::PointSource)
-    c = Dict{UTF8String,Any}()
+    c = Dict{String,Any}()
     c["name"] = source.name
     put_source_direction(c, source)
     put_source_spectrum(c, source)
@@ -369,7 +303,7 @@ function deconstruct_source(source::PointSource)
 end
 
 function deconstruct_source(source::GaussianSource)
-    c = Dict{UTF8String,Any}()
+    c = Dict{String,Any}()
     c["name"] = source.name
     put_source_direction(c, source)
     put_source_spectrum(c, source)
@@ -379,15 +313,25 @@ function deconstruct_source(source::GaussianSource)
     c
 end
 
+function deconstruct_source(source::ShapeletSource)
+    c = Dict{String,Any}()
+    c["name"] = source.name
+    put_source_direction(c, source)
+    put_source_spectrum(c, source)
+    c["scale-parameter"] = source.scale
+    c["coefficients"] = source.coeff
+    c
+end
+
 function deconstruct_source(source::MultiSource)
-    c = Dict{UTF8String,Any}()
+    c = Dict{String,Any}()
     c["name"] = source.name
     c["components"] = [deconstruct_source(s) for s in source.components]
     c
 end
 
 function deconstruct_source(source::RFISource)
-    c = Dict{UTF8String,Any}()
+    c = Dict{String,Any}()
     c["name"] = source.name
     put_source_position(c, source)
     put_rfi_spectrum(c, source)

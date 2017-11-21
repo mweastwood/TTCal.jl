@@ -1,12 +1,4 @@
-@testset "sourcemodel.jl" begin
-    I0 = 100; Q0 = -50; U0 = 40; V0 = -10; ν0 = 123; index = [1.0]
-    spec = PowerLaw(I0,Q0,U0,V0,ν0,index)
-
-    frequency = 123.0
-    @test norm(spec(frequency) - StokesVector(I0,Q0,U0,V0)) < eps(Float64)
-    frequency = 1230.0
-    @test norm(spec(frequency) - 10*StokesVector(I0,Q0,U0,V0)) < eps(Float64)
-
+@testset "skymodels.jl" begin
     frame   = ReferenceFrame()
     sources = [PointSource("S1",Direction(dir"AZEL","0.0deg","+45.0deg"),
                                 PowerLaw(1.0,2.0,3.0,4.0,10e6,[0.0])),
