@@ -42,6 +42,7 @@ using DocOpt
 using ProgressMeter
 using FileIO, JLD, JSON
 using NLopt # used in fitvis
+using Unitful, UnitfulAstro
 using CasaCore.Measures
 using CasaCore.Tables
 

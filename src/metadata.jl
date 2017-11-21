@@ -70,7 +70,7 @@ end
 
 "Read antenna positions from the `ANTENNA` subtable."
 function read_antennas(ms::Table)
-    antenna_table = ms[kw"ANTENNA"] |> Table
+    antenna_table = ms[kw"ANTENNA"]
     xyz = antenna_table["POSITION"]
     antennas = Antenna[]
     for i = 1:size(xyz, 2)
@@ -80,7 +80,7 @@ function read_antennas(ms::Table)
         position = Position(pos"ITRF", x, y, z)
         push!(antennas, Antenna(position))
     end
-    unlock(antenna_table)
+    Tables.close(antenna_table)
     antennas
 end
 
@@ -93,24 +93,24 @@ end
 
 "Read frequency channels from the `SPECTRAL_WINDOW` subtable."
 function read_channels(ms::Table)
-    spw_table = ms[kw"SPECTRAL_WINDOW"] |> Table
+    spw_table = ms[kw"SPECTRAL_WINDOW"]
     channels  = spw_table["CHAN_FREQ", 1]
-    unlock(spw_table)
+    Tables.close(spw_table)
     channels
 end
 
 "Read the phase direction from the `PHASE_DIR` subtable."
 function read_phase_center(ms::Table)
-    field_table = ms[kw"FIELD"] |> Table
+    field_table = ms[kw"FIELD"]
     dir = field_table["PHASE_DIR"]
-    unlock(field_table)
-    Direction(dir"J2000", dir[1]*radians, dir[2]*radians)
+    Tables.close(field_table)
+    Direction(dir"J2000", dir[1]*u"rad", dir[2]*u"rad")
 end
 
 "Read the time from the main table."
 function read_time(ms::Table)
     time = ms["TIME", 1]
-    Epoch(epoch"UTC", time*seconds)
+    Epoch(epoch"UTC", time*u"s")
 end
 
 immutable UVW
