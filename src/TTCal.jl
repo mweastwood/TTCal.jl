@@ -1,4 +1,4 @@
-# Copyright (c) 2015, 2016 Michael Eastwood
+# Copyright (c) 2015-2017 Michael Eastwood
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -13,59 +13,68 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-__precompile__()
+#__precompile__()
 
 module TTCal
 
-export JonesMatrix, DiagonalJonesMatrix, HermitianJonesMatrix
-export StokesVector, MuellerMatrix
+#export JonesMatrix, DiagonalJonesMatrix, HermitianJonesMatrix
+#export StokesVector, MuellerMatrix
+#
+#export Visibilities, Metadata, Nant, Nfreq, Nbase
+#
+#export Source
+#export PointSource, GaussianSource, DiskSource
+#export ShapeletSource, MultiSource, RFISource
+#export PowerLaw, RFISpectrum
+#export readsources, writesources
+#export ConstantBeam, SineBeam, Memo178Beam, ZernikeBeam
+#
+#export genvis, subsrc!, putsrc!, getspec, fitvis
+#
+#export GainCalibration, gaincal
+#export PolarizationCalibration, polcal
+#export applycal!, corrupt!, peel!, shave!
+#export PeelingSource, ShavingSource, ZestingSource, PruningSource
+#
+#importall Base.Operators
 
-export Visibilities, Metadata, Nant, Nfreq, Nbase
-
-export Source
-export PointSource, GaussianSource, DiskSource
-export ShapeletSource, MultiSource, RFISource
-export PowerLaw, RFISpectrum
-export readsources, writesources
-export ConstantBeam, SineBeam, Memo178Beam, ZernikeBeam
-
-export genvis, subsrc!, putsrc!, getspec, fitvis
-
-export GainCalibration, gaincal
-export PolarizationCalibration, polcal
-export applycal!, corrupt!, peel!, shave!
-export PeelingSource, ShavingSource, ZestingSource, PruningSource
-
-importall Base.Operators
-
-using DocOpt
+#using DocOpt
 using ProgressMeter
-using FileIO, JLD, JSON
+using FileIO, JLD2, JSON
 using NLopt # used in fitvis
 using Unitful, UnitfulAstro
 using CasaCore.Measures
 using CasaCore.Tables
+using StaticArrays
 
-const c = 2.99792e+8
+struct TTCalException <: Exception
+    message :: String
+end
+@noinline err(message) = throw(TTCalException(message))
+function Base.show(io::IO, exception::TTCalException)
+    print(io, "TTCalException: ", exception.message)
+end
 
 include("special.jl")
 include("rungekutta.jl")
 include("jones.jl")
 include("stokes.jl")
-include("spectra.jl")
-include("skymodels.jl")
-include("beammodels.jl")
-include("utm.jl")
-include("ionosphere.jl")
+
+#include("spectra.jl")
+#include("skymodels.jl")
+#include("beammodels.jl")
+
+#include("utm.jl")
+#include("ionosphere.jl")
 include("metadata.jl")
 include("visibilities.jl")
-include("genvis.jl")
-include("getspec.jl")
-include("subsrc.jl")
-include("fitvis.jl")
+#include("genvis.jl")
+#include("getspec.jl")
+#include("subsrc.jl")
+#include("fitvis.jl")
 include("calibration.jl")
-include("peel.jl")
-include("commandline.jl")
+#include("peel.jl")
+#include("commandline.jl")
 
 end
 

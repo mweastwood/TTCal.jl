@@ -1,8 +1,8 @@
-julia 0.4
+julia 0.6
 CasaCore
-DocOpt
 FileIO
 JSON
-JLD
+JLD2
 NLopt
 ProgressMeter
+StaticArrays

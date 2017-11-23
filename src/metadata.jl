@@ -1,4 +1,4 @@
-# Copyright (c) 2015, 2016 Michael Eastwood
+# Copyright (c) 2015-2017 Michael Eastwood
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -13,125 +13,117 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-immutable Antenna
-    position :: Position
+struct Metadata
+    frequencies   :: Vector{typeof{1.0*u"Hz"}}
+    times         :: Vector{Epoch}
+    positions     :: Vector{Metadata}  # ITRF
+    phase_centers :: Vector{Direction} # ITRF (one per time)
 end
 
-immutable Baseline
-    antenna1 :: Int
-    antenna2 :: Int
+Nfreq(metadata::Metadata) = length(metadata.frequencies)
+Ntime(metadata::Metadata) = length(metadata.times)
+Nant(metadata::Metadata)  = length(metadata.positions)
+
+"Number of baselines (counting auto-correlations)"
+function Nbase(metadata::Metadata)
+    N = Nant(metadata)
+    (N*(N+1)) ÷ 2
 end
 
-type Metadata
-    antennas  :: Vector{Antenna}
-    baselines :: Vector{Baseline}
-    channels  :: Vector{Float64}
-    phase_center :: Direction
-    time :: Epoch
+function merge!(lhs::Metadata, rhs::Metadata; axis=:frequency)
+    if axis == :frequency
+        append!(lhs.frequencies, rhs.frequencies)
+    elseif axis == :time
+        append!(lhs.times, rhs.times)
+        append!(lhs.phase_centers, rhs.phase_centers)
+    end
+    lhs
 end
 
+"Read metadata from the given measurement set."
 function Metadata(ms::Table)
-    antennas  = read_antennas(ms)
-    baselines = read_baselines(ms)
-    channels  = read_channels(ms)
-    phase_center = read_phase_center(ms)
-    time = read_time(ms)
-    Metadata(antennas, baselines, channels, phase_center, time)
+    frequencies   = read_frequencies(ms)
+    times         = read_times(ms)
+    positions     = read_positions(ms)
+    phase_centers = read_phase_centers(ms)
+    Metadata(frequencies, times, positions, phase_centers)
 end
 
-Nant(meta::Metadata)  = length(meta.antennas)
-Nfreq(meta::Metadata) = length(meta.channels)
-Nbase(meta::Metadata) = length(meta.baselines)
+"Read frequency channels from the `SPECTRAL_WINDOW` subtable."
+function read_frequencies(ms::Table)
+    spw_table   = ms[kw"SPECTRAL_WINDOW"]
+    frequencies = spw_table["CHAN_FREQ", 1] .* u"Hz"
+    Tables.close(spw_table)
+    frequencies
+end
+
+"Read the times from the main table."
+function read_times(ms::Table)
+    time = ms["TIME", 1]
+    [Epoch(epoch"UTC", time*u"s")]
+end
+
+"Read antenna positions from the `ANTENNA` subtable."
+function read_positions(ms::Table)
+    antenna_table = ms[kw"ANTENNA"]
+    xyz = antenna_table["POSITION"]
+    positions = Position[]
+    for i = 1:size(xyz, 2)
+        x = xyz[1, i]
+        y = xyz[2, i]
+        z = xyz[3, i]
+        position = Position(pos"ITRF", x, y, z)
+        push!(positions, position)
+    end
+    Tables.close(antenna_table)
+    positions
+end
+
+"Read the phase directions from the `PHASE_DIR` subtable."
+function read_phase_centers(ms::Table)
+    field_table = ms[kw"FIELD"]
+    dir = field_table["PHASE_DIR"]
+    Tables.close(field_table)
+    [Direction(dir"J2000", dir[1]*u"rad", dir[2]*u"rad")]
+end
 
 "Construct the reference frame of the interferometer."
-function reference_frame(meta)
+function Tables.ReferenceFrame(metadata)
     frame = ReferenceFrame()
-    set!(frame, meta.time)
-    set!(frame, position(meta))
+    set!(frame, metadata.times[1])
+    set!(frame, position(metadata))
     frame
 end
 
 "Get the interferometer location by averaging the antenna positions."
-function position(meta)
-    x = 0.0
-    y = 0.0
-    z = 0.0
-    for i = 1:Nant(meta)
-        pos = meta.antennas[i].position
-        x += pos.x
-        y += pos.y
-        z += pos.z
-    end
-    x /= Nant(meta)
-    y /= Nant(meta)
-    z /= Nant(meta)
-    Position(pos"ITRF", x, y, z)
-end
+position(metadata::Metadata) = mean(metadata.positions)
 
-"Read antenna positions from the `ANTENNA` subtable."
-function read_antennas(ms::Table)
-    antenna_table = ms[kw"ANTENNA"]
-    xyz = antenna_table["POSITION"]
-    antennas = Antenna[]
-    for i = 1:size(xyz, 2)
-        x = xyz[1,i]
-        y = xyz[2,i]
-        z = xyz[3,i]
-        position = Position(pos"ITRF", x, y, z)
-        push!(antennas, Antenna(position))
-    end
-    Tables.close(antenna_table)
-    antennas
-end
-
-"Read baselines from the main table."
-function read_baselines(ms::Table)
-    ant1 = ms["ANTENNA1"]
-    ant2 = ms["ANTENNA2"]
-    [Baseline(ant1[α]+1, ant2[α]+1) for α = 1:length(ant1)]
-end
-
-"Read frequency channels from the `SPECTRAL_WINDOW` subtable."
-function read_channels(ms::Table)
-    spw_table = ms[kw"SPECTRAL_WINDOW"]
-    channels  = spw_table["CHAN_FREQ", 1]
-    Tables.close(spw_table)
-    channels
-end
-
-"Read the phase direction from the `PHASE_DIR` subtable."
-function read_phase_center(ms::Table)
-    field_table = ms[kw"FIELD"]
-    dir = field_table["PHASE_DIR"]
-    Tables.close(field_table)
-    Direction(dir"J2000", dir[1]*u"rad", dir[2]*u"rad")
-end
-
-"Read the time from the main table."
-function read_time(ms::Table)
-    time = ms["TIME", 1]
-    Epoch(epoch"UTC", time*u"s")
-end
-
-immutable UVW
-    u :: Vector{Float64}
-    v :: Vector{Float64}
-    w :: Vector{Float64}
-end
-
-function UVW(meta::Metadata)
-    u = zeros(Nbase(meta))
-    v = zeros(Nbase(meta))
-    w = zeros(Nbase(meta))
-    for α = 1:Nbase(meta)
-        antenna1 = meta.baselines[α].antenna1
-        antenna2 = meta.baselines[α].antenna2
-        r1 = meta.antennas[antenna1].position
-        r2 = meta.antennas[antenna2].position
-        u[α] = r1.x - r2.x
-        v[α] = r1.y - r2.y
-        w[α] = r1.z - r2.z
-    end
-    UVW(u, v, w)
-end
+#"Read baselines from the main table."
+#function read_baselines(ms::Table)
+#    ant1 = ms["ANTENNA1"]
+#    ant2 = ms["ANTENNA2"]
+#    [Baseline(ant1[α]+1, ant2[α]+1) for α = 1:length(ant1)]
+#end
+#
+#immutable UVW
+#    u :: Vector{Float64}
+#    v :: Vector{Float64}
+#    w :: Vector{Float64}
+#end
+#
+#function UVW(meta::Metadata)
+#    u = zeros(Nbase(meta))
+#    v = zeros(Nbase(meta))
+#    w = zeros(Nbase(meta))
+#    for α = 1:Nbase(meta)
+#        antenna1 = meta.baselines[α].antenna1
+#        antenna2 = meta.baselines[α].antenna2
+#        r1 = meta.antennas[antenna1].position
+#        r2 = meta.antennas[antenna2].position
+#        u[α] = r1.x - r2.x
+#        v[α] = r1.y - r2.y
+#        w[α] = r1.z - r2.z
+#    end
+#    UVW(u, v, w)
+#end
 

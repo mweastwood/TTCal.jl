@@ -8,9 +8,9 @@ include("setup.jl")
 
 srand(123)
 @testset "TTCal Tests" begin
-    #include("special.jl")
+    include("special.jl")
     #include("rungekutta.jl")
-    #include("jones.jl")
+    include("jones.jl")
     #include("stokes.jl")
     #include("spectra.jl")
     #include("skymodels.jl")
@@ -23,7 +23,7 @@ srand(123)
     #include("getspec.jl")
     #include("subsrc.jl")
     #include("fitvis.jl")
-    include("calibration.jl")
+    #include("calibration.jl")
     #include("peel.jl")
 end
 
