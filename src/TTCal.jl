@@ -17,6 +17,8 @@
 
 module TTCal
 
+export Nant, Nfreq, Nbase
+
 #export JonesMatrix, DiagonalJonesMatrix, HermitianJonesMatrix
 #export StokesVector, MuellerMatrix
 #
@@ -59,6 +61,7 @@ include("special.jl")
 include("rungekutta.jl")
 include("jones.jl")
 include("stokes.jl")
+include("struct-of-arrays.jl")
 
 #include("spectra.jl")
 #include("skymodels.jl")
@@ -72,7 +75,7 @@ include("visibilities.jl")
 #include("getspec.jl")
 #include("subsrc.jl")
 #include("fitvis.jl")
-include("calibration.jl")
+#include("calibration.jl")
 #include("peel.jl")
 #include("commandline.jl")
 

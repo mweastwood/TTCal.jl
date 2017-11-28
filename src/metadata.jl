@@ -14,10 +14,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 struct Metadata
-    frequencies   :: Vector{typeof{1.0*u"Hz"}}
+    frequencies   :: Vector{typeof(1.0*u"Hz")}
     times         :: Vector{Epoch}
-    positions     :: Vector{Metadata}  # ITRF
-    phase_centers :: Vector{Direction} # ITRF (one per time)
+    positions     :: Vector{Position}  # ITRF
+    phase_centers :: Vector{Direction} # not necessarily ITRF (one per time)
 end
 
 Nfreq(metadata::Metadata) = length(metadata.frequencies)
@@ -36,8 +36,24 @@ function merge!(lhs::Metadata, rhs::Metadata; axis=:frequency)
     elseif axis == :time
         append!(lhs.times, rhs.times)
         append!(lhs.phase_centers, rhs.phase_centers)
+    else
+        err("unknown merge axis $axis")
     end
     lhs
+end
+
+function slice!(metadata::Metadata, indices; axis=:frequency)
+    if axis == :frequency
+        new_frequencies = metadata.frequencies[indices]
+        resize!(metadata.frequencies, length(new_frequencies))
+        metadata.frequencies[:] = new_frequencies
+    elseif axis == :time
+        new_times = metadata.times[indices]
+        resize!(metadata.times, length(new_times))
+        metadata.times[:] = new_times
+    else
+        err("unknown slice axis $axis")
+    end
 end
 
 "Read metadata from the given measurement set."
@@ -88,7 +104,7 @@ function read_phase_centers(ms::Table)
 end
 
 "Construct the reference frame of the interferometer."
-function Tables.ReferenceFrame(metadata)
+function Measures.ReferenceFrame(metadata::Metadata)
     frame = ReferenceFrame()
     set!(frame, metadata.times[1])
     set!(frame, position(metadata))

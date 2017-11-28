@@ -398,25 +398,6 @@
 
 # step functions
 
-"Implement the \"struct of arrays\" optimization to facilitiate SIMD vectorization."
-struct ComplexVector{T} <: AbstractVector{Complex{T}}
-    real :: Vector{T}
-    imag :: Vector{T}
-end
-
-ComplexVector(N) = ComplexVector(Complex128, N)
-ComplexVector(T, N) = ComplexVector(zeros(real(T), N), zeros(real(T), N))
-Base.length(v::ComplexVector) = length(v.real)
-Base.eltype(v::ComplexVector{T}) where {T} = complex(T)
-Base.@propagate_inbounds function Base.getindex(v::ComplexVector, i)
-    complex(v.real[i], v.imag[i])
-end
-Base.@propagate_inbounds function Base.setindex!(v::ComplexVector, value, i)
-    v.real[i] = real(value)
-    v.imag[i] = imag(value)
-    value
-end
-
 function unpolarized_stefcal_step!(steps,
                                    gains,
                                    measured_visibilities,

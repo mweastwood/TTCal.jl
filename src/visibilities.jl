@@ -40,7 +40,9 @@ end
 
 function Base.setindex!(visibilities::Visibilities, value, antenna1, antenna2)
     visibilities.data[antenna2][antenna1]  = value
+    visibilities.data[antenna1][antenna2]  = value'
     visibilities.flags[antenna2][antenna1] = false
+    visibilities.flags[antenna1][antenna2] = false
     value
 end
 
@@ -55,13 +57,18 @@ mutable struct Dataset{T <: Visibilities}
     data     :: Matrix{T} # (number of frequency channels) × (number of time integrations)
 end
 
-function getindex(dataset::Dataset, channel, time)
+function Dataset(T::Type{<:Visibilities}, metadata)
+    data = [T(Nant(metadata)) for freq = 1:Nfreq(metadata), time = 1:Ntime(metadata)]
+    Dataset(metadata, data)
+end
+
+function Base.getindex(dataset::Dataset, channel, time)
     dataset.data[channel, time]
 end
 
 Nfreq(dataset::Dataset) = Nfreq(dataset.metadata)
 Ntime(dataset::Dataset) = Ntime(dataset.metadata)
-Nant(dataset::Dataset)  = Nant(dataset.metadata)
+Nant(dataset::Dataset)  =  Nant(dataset.metadata)
 Nbase(dataset::Dataset) = Nbase(dataset.metadata)
 
 function merge!(lhs::Dataset{T}, rhs::Dataset{T}; axis=:frequency) where {T}
@@ -84,29 +91,91 @@ function merge!(lhs::Dataset{T}, rhs::Dataset{T}; axis=:frequency) where {T}
     lhs
 end
 
-#function Visibilities(Nbase::Int, Nfreq::Int)
-#    data = zeros(JonesMatrix, Nbase, Nfreq)
-#    flags = fill(false, Nbase, Nfreq)
-#    Visibilities(data, flags)
-#end
-#
-#function Visibilities(meta::Metadata)
-#    Visibilities(Nbase(meta), Nfreq(meta))
-#end
-#
-#Nbase(vis::Visibilities) = size(vis.data, 1)
-#Nfreq(vis::Visibilities) = size(vis.data, 2)
-#
-#"Read visibilities from the measurement set."
-#function read(ms::Table, column)
-#    raw_data   = ms[column]
-#    data_flags = ms["FLAG"]
-#    row_flags  = ms["FLAG_ROW"]
-#    data  = organize_data(raw_data)
-#    flags = resolve_flags(data_flags, row_flags)
-#    Visibilities(data, flags)
-#end
-#
+function slice!(dataset::Dataset{T}, indices; axis=:frequency) where {T}
+    slice!(dataset.metadata, indices, axis=axis)
+    if axis == :frequency
+        dataset.data = dataset.data[indices, :]
+    elseif axis == :time
+        dataset.data = dataset.data[:, indices]
+    else
+        err("unknown slice axis $axis")
+    end
+end
+
+
+
+
+
+
+"Read dataset from the given measurement set."
+function Dataset(ms::Table; column="DATA", polarization=:full)
+    metadata = Metadata(ms::Table)
+    if polarization == :aa
+        return read_single_polarization_visibilities(ms, metadata, column, 1)
+    elseif polarization == :bb
+        return read_single_polarization_visibilities(ms, metadata, column, 4)
+    else
+        err("unknown polarization $polarization")
+    end
+end
+
+function read_single_polarization_visibilities(ms, metadata, column, polarization)
+    dataset = Dataset(SinglePolarizationVisibilities, metadata)
+    data  = ms[column]
+    flags = read_flags(ms)
+    antenna1, antenna2 = read_antenna1_antenna2(ms)
+    for frequency = 1:Nfreq(metadata)
+        visibilities = dataset[frequency, 1]
+        for baseline = 1:Nbase(metadata)
+            flags[baseline, frequency] && continue
+            ant1 = antenna1[baseline]
+            ant2 = antenna2[baseline]
+            visibilities[ant1, ant2] = data[polarization, frequency, baseline]
+        end
+    end
+    dataset
+end
+
+"Read flags from the given measurement set."
+function read_flags(ms::Table)
+    data_flags = ms["FLAG"]
+    row_flags  = ms["FLAG_ROW"]
+    resolve_flags(data_flags, row_flags)
+end
+
+function resolve_flags(data_flags, row_flags)
+    # Merge the row flags with the rest of the flags.
+    # Note that here we flag all polarizations if one polarization is flagged.
+    # (we may want to change this behavior in the future)
+    flags = zeros(Bool, size(data_flags,3), size(data_flags,2))
+    for β = 1:size(data_flags,2), α = 1:size(data_flags,3)
+        if data_flags[1,β,α] || data_flags[2,β,α] || data_flags[3,β,α] || data_flags[4,β,α]
+            flags[α,β] = true
+        end
+    end
+    for α = 1:length(row_flags)
+        if row_flags[α]
+            flags[α,:] = true
+        end
+    end
+    flags
+end
+
+"Read the ANTENNA1 and ANTENNA2 columns from the given measurement set."
+function read_antenna1_antenna2(ms::Table)
+    # Note that we add 1 so that these antenna numbers start at 1
+    antenna1 = ms["ANTENNA1"] .+ 1
+    antenna2 = ms["ANTENNA2"] .+ 1
+    antenna1, antenna2
+end
+
+
+
+
+
+
+
+
 #"Write visibilities to the measurement set."
 #function write(ms::Table, column, data::Visibilities; apply_flags::Bool=true)
 #    reorganized_data = zeros(Complex64, 4, Nfreq(data), Nbase(data))
@@ -137,21 +206,7 @@ end
 #    data
 #end
 #
-#function resolve_flags(data_flags, row_flags)
-#    flags = zeros(Bool, size(data_flags,3), size(data_flags,2))
-#    for β = 1:size(data_flags,2), α = 1:size(data_flags,3)
-#        if data_flags[1,β,α] || data_flags[2,β,α] || data_flags[3,β,α] || data_flags[4,β,α]
-#            flags[α,β] = true
-#        end
-#    end
-#    for α = 1:length(row_flags)
-#        if row_flags[α]
-#            flags[α,:] = true
-#        end
-#    end
-#    flags
-#end
-#
+
 #function flag_short_baselines!(data, meta, minuvw)
 #    for β = 1:Nfreq(meta)
 #        ν = meta.channels[β]
