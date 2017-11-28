@@ -57,11 +57,11 @@ function Base.show(io::IO, exception::TTCalException)
     print(io, "TTCalException: ", exception.message)
 end
 
-include("special.jl")
-include("rungekutta.jl")
-include("jones.jl")
-include("stokes.jl")
-include("struct-of-arrays.jl")
+include("math/special.jl")
+include("math/rungekutta.jl")
+include("math/jones.jl")
+include("math/stokes.jl")
+include("math/struct-of-arrays.jl")
 
 #include("spectra.jl")
 #include("skymodels.jl")
