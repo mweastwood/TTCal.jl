@@ -145,102 +145,109 @@ Base.rand(::Type{HermitianJonesMatrix}) = HermitianJonesMatrix(rand(Float64), ra
 #end
 
 for op in (:+, :-)
-    @eval function $op(J1::JonesMatrix, J2::JonesMatrix)
+    @eval function Base.$op(J1::JonesMatrix, J2::JonesMatrix)
         JonesMatrix($op(J1.xx, J2.xx),
                     $op(J1.xy, J2.xy),
                     $op(J1.yx, J2.yx),
                     $op(J1.yy, J2.yy))
     end
-    @eval function $op(J1::DiagonalJonesMatrix, J2::DiagonalJonesMatrix)
+    @eval function Base.$op(J1::DiagonalJonesMatrix, J2::DiagonalJonesMatrix)
         DiagonalJonesMatrix($op(J1.xx, J2.xx),
                             $op(J1.yy, J2.yy))
     end
-    @eval function $op(J1::HermitianJonesMatrix, J2::HermitianJonesMatrix)
+    @eval function Base.$op(J1::HermitianJonesMatrix, J2::HermitianJonesMatrix)
         HermitianJonesMatrix($op(J1.xx, J2.xx),
                              $op(J1.xy, J2.xy),
                              $op(J1.yy, J2.yy))
     end
 end
 
-# Custom broadcasting
-Base.Broadcast._containertype(::Type{T}) where {T<:AbstractJonesMatrix} = T
-Base.Broadcast.promote_containertype(::Type{Any}, ::Type{T}) where {T<:AbstractJonesMatrix} = T
-Base.Broadcast.promote_containertype(::Type{T}, ::Type{Any}) where {T<:AbstractJonesMatrix} = T
+for op in (:*, :/)
+    @eval function Base.$op(J::JonesMatrix, a::Number)
+        JonesMatrix($op(J.xx, a), $op(J.xy, a), $op(J.yx, a), $op(J.yy, a))
+    end
+    @eval function Base.$op(J::DiagonalJonesMatrix, a::Number)
+        DiagonalJonesMatrix($op(J.xx, a), $op(J.yy, a))
+    end
+    @eval function Base.$op(J::HermitianJonesMatrix, a::Real)
+        HermitianJonesMatrix($op(J.xx, a), $op(J.xy, a), $op(J.yy, a))
+    end
+    @eval function Base.$op(J::HermitianJonesMatrix, a::Number)
+        JonesMatrix($op(J.xx, a), $op(J.xy, a), $op(conj(J.xy), a), $op(J.yy, a))
+    end
+end
 
+Base.:*(a::Number, J::AbstractJonesMatrix) = J*a
+Base.:/(a::Number, J::AbstractJonesMatrix) = a*inv(J)
 
-#*(a::Number, J::JonesMatrix) = JonesMatrix(a*J.xx, a*J.xy, a*J.yx, a*J.yy)
-#*(a::Number, J::DiagonalJonesMatrix) = DiagonalJonesMatrix(a*J.xx, a*J.yy)
-#*(a::Real, J::HermitianJonesMatrix) = HermitianJonesMatrix(a*J.xx, a*J.xy, a*J.yy)
-#*(a::Complex, J::HermitianJonesMatrix) = JonesMatrix(a*J.xx, a*J.xy, a*J.xy', a*J.yy)
-#*(J::AnyJonesMatrix, a::Number) = a*J
-#
-#/(J::AnyJonesMatrix, a::Number) = (1/a)*J
-#./(J::AnyJonesMatrix, a::Number) = J/a
-#
-#function *(J1::JonesMatrix, J2::JonesMatrix)
-#    JonesMatrix(J1.xx*J2.xx + J1.xy*J2.yx, J1.xx*J2.xy + J1.xy*J2.yy,
-#                J1.yx*J2.xx + J1.yy*J2.yx, J1.yx*J2.xy + J1.yy*J2.yy)
-#end
-#
-#function *(J1::JonesMatrix, J2::DiagonalJonesMatrix)
-#    JonesMatrix(J1.xx*J2.xx,J1.xy*J2.yy, J1.yx*J2.xx,J1.yy*J2.yy)
-#end
-#
-#function *(J1::DiagonalJonesMatrix, J2::JonesMatrix)
-#    JonesMatrix(J1.xx*J2.xx,J1.xx*J2.xy, J1.yy*J2.yx,J1.yy*J2.yy)
-#end
-#
-#function *(J1::DiagonalJonesMatrix, J2::DiagonalJonesMatrix)
-#    DiagonalJonesMatrix(J1.xx*J2.xx, J1.yy*J2.yy)
-#end
-#
-#function *(J1::HermitianJonesMatrix, J2::HermitianJonesMatrix)
-#    JonesMatrix(J1.xx *J2.xx + J1.xy*J2.xy', J1.xx *J2.xy + J1.xy*J2.yy,
-#                J1.xy'*J2.xx + J1.yy*J2.xy', J1.xy'*J2.xy + J1.yy*J2.yy)
-#end
-#
-#function *(J1::HermitianJonesMatrix, J2::JonesMatrix)
-#    JonesMatrix(J1.xx *J2.xx + J1.xy*J2.yx, J1.xx *J2.xy + J1.xy*J2.yy,
-#                J1.xy'*J2.xx + J1.yy*J2.yx, J1.xy'*J2.xy + J1.yy*J2.yy)
-#end
-#
-#function *(J1::JonesMatrix, J2::HermitianJonesMatrix)
-#    JonesMatrix(J1.xx*J2.xx + J1.xy*J2.xy', J1.xx*J2.xy + J1.xy*J2.yy,
-#                J1.yx*J2.xx + J1.yy*J2.xy', J1.yx*J2.xy + J1.yy*J2.yy)
-#end
-#
-#\(J1::AnyJonesMatrix, J2::AnyJonesMatrix) = inv(J1)*J2
-#/(J1::AnyJonesMatrix, J2::AnyJonesMatrix) = J1*inv(J2)
-#
-#Base.conj(J::JonesMatrix) = JonesMatrix(conj(J.xx), conj(J.xy), conj(J.yx), conj(J.yy))
-#Base.conj(J::DiagonalJonesMatrix) = DiagonalJonesMatrix(conj(J.xx), conj(J.yy))
-#Base.conj(J::HermitianJonesMatrix) = HermitianJonesMatrix(J.xx, conj(J.xy), J.yy)
-#
-#Base.ctranspose(J::JonesMatrix) = JonesMatrix(conj(J.xx), conj(J.yx), conj(J.xy), conj(J.yy))
-#Base.ctranspose(J::DiagonalJonesMatrix) = conj(J)
-#Base.ctranspose(J::HermitianJonesMatrix) = J
-#
-#Base.det(J::JonesMatrix) = J.xx*J.yy - J.xy*J.yx
-#Base.det(J::DiagonalJonesMatrix) = J.xx*J.yy
-#Base.det(J::HermitianJonesMatrix) = J.xx*J.yy - J.xy*J.xy'
-#
-#function Base.inv(J::JonesMatrix)
-#    1/det(J) * JonesMatrix(J.yy, -J.xy, -J.yx, J.xx)
-#end
-#
-#function Base.inv(J::DiagonalJonesMatrix)
-#    DiagonalJonesMatrix(1/J.xx, 1/J.yy)
-#end
-#
-#function Base.inv(J::HermitianJonesMatrix)
-#    1/det(J) * HermitianJonesMatrix(J.yy, -J.xy, J.xx)
-#end
-#
-## use the Frobenius norm
-#Base.norm(J::JonesMatrix) = sqrt(abs2(J.xx)+abs2(J.xy)+abs2(J.yx)+abs2(J.yy))
-#Base.norm(J::DiagonalJonesMatrix) = sqrt(abs2(J.xx)+abs2(J.yy))
-#Base.norm(J::HermitianJonesMatrix) = sqrt(abs2(J.xx)+2abs2(J.xy)+abs2(J.yy))
-#
+function Base.:*(J1::JonesMatrix, J2::JonesMatrix)
+    JonesMatrix(J1.xx*J2.xx + J1.xy*J2.yx, J1.xx*J2.xy + J1.xy*J2.yy,
+                J1.yx*J2.xx + J1.yy*J2.yx, J1.yx*J2.xy + J1.yy*J2.yy)
+end
+
+function Base.:*(J1::JonesMatrix, J2::DiagonalJonesMatrix)
+    JonesMatrix(J1.xx*J2.xx,J1.xy*J2.yy, J1.yx*J2.xx,J1.yy*J2.yy)
+end
+
+function Base.:*(J1::DiagonalJonesMatrix, J2::JonesMatrix)
+    JonesMatrix(J1.xx*J2.xx,J1.xx*J2.xy, J1.yy*J2.yx,J1.yy*J2.yy)
+end
+
+function Base.:*(J1::DiagonalJonesMatrix, J2::DiagonalJonesMatrix)
+    DiagonalJonesMatrix(J1.xx*J2.xx, J1.yy*J2.yy)
+end
+
+function Base.:*(J1::HermitianJonesMatrix, J2::HermitianJonesMatrix)
+    JonesMatrix(J1.xx *J2.xx + J1.xy*J2.xy', J1.xx *J2.xy + J1.xy*J2.yy,
+                J1.xy'*J2.xx + J1.yy*J2.xy', J1.xy'*J2.xy + J1.yy*J2.yy)
+end
+
+function Base.:*(J1::HermitianJonesMatrix, J2::JonesMatrix)
+    JonesMatrix(J1.xx *J2.xx + J1.xy*J2.yx, J1.xx *J2.xy + J1.xy*J2.yy,
+                J1.xy'*J2.xx + J1.yy*J2.yx, J1.xy'*J2.xy + J1.yy*J2.yy)
+end
+
+function Base.:*(J1::JonesMatrix, J2::HermitianJonesMatrix)
+    JonesMatrix(J1.xx*J2.xx + J1.xy*J2.xy', J1.xx*J2.xy + J1.xy*J2.yy,
+                J1.yx*J2.xx + J1.yy*J2.xy', J1.yx*J2.xy + J1.yy*J2.yy)
+end
+
+Base.:\(J1::AbstractJonesMatrix, J2::AbstractJonesMatrix) = inv(J1)*J2
+Base.:/(J1::AbstractJonesMatrix, J2::AbstractJonesMatrix) = J1*inv(J2)
+
+Base.conj(J::JonesMatrix) = JonesMatrix(conj(J.xx), conj(J.xy), conj(J.yx), conj(J.yy))
+Base.conj(J::DiagonalJonesMatrix) = DiagonalJonesMatrix(conj(J.xx), conj(J.yy))
+Base.conj(J::HermitianJonesMatrix) = HermitianJonesMatrix(J.xx, conj(J.xy), J.yy)
+
+Base.transpose(J::JonesMatrix) = JonesMatrix(J.xx, J.yx, J.xy, J.yy)
+Base.transpose(J::DiagonalJonesMatrix) = J
+Base.transpose(J::HermitianJonesMatrix) = conj(J)
+
+Base.ctranspose(J::JonesMatrix) = JonesMatrix(conj(J.xx), conj(J.yx), conj(J.xy), conj(J.yy))
+Base.ctranspose(J::DiagonalJonesMatrix) = conj(J)
+Base.ctranspose(J::HermitianJonesMatrix) = J
+
+Base.det(J::JonesMatrix) = J.xx*J.yy - J.xy*J.yx
+Base.det(J::DiagonalJonesMatrix) = J.xx*J.yy
+Base.det(J::HermitianJonesMatrix) = J.xx*J.yy - J.xy*conj(J.xy)
+
+function Base.inv(J::JonesMatrix)
+    1/det(J) * JonesMatrix(J.yy, -J.xy, -J.yx, J.xx)
+end
+
+function Base.inv(J::DiagonalJonesMatrix)
+    DiagonalJonesMatrix(1/J.xx, 1/J.yy)
+end
+
+function Base.inv(J::HermitianJonesMatrix)
+    1/det(J) * HermitianJonesMatrix(J.yy, -J.xy, J.xx)
+end
+
+# use the Frobenius norm
+Base.norm(J::JonesMatrix) = hypot(J.xx, J.xy, J.yx, J.yy)
+Base.norm(J::DiagonalJonesMatrix) = hypot(J.xx, J.yy)
+Base.norm(J::HermitianJonesMatrix) = hypot(J.xx, J.xy, J.xy, J.yy)
+
 #function Base.kron(J1::JonesMatrix, J2::JonesMatrix)
 #    [J1.xx*J2.xx J1.xx*J2.xy J1.xy*J2.xx J1.xy*J2.xy;
 #     J1.xx*J2.yx J1.xx*J2.yy J1.xy*J2.yx J1.xy*J2.yy;
