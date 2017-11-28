@@ -1,5 +1,5 @@
 @testset "jones.jl" begin
-    for T in (JonesMatrix, DiagonalJonesMatrix, HermitianJonesMatrix)
+    for T in (TTCal.JonesMatrix, TTCal.DiagonalJonesMatrix, TTCal.HermitianJonesMatrix)
         @test zero(T) |> Matrix == [0 0; 0 0]
         @test  one(T) |> Matrix == [1 0; 0 1]
 

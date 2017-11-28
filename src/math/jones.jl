@@ -125,70 +125,49 @@ end
 
 Base.IndexStyle(::Type{<:AbstractJonesMatrix}) = IndexLinear()
 
+Base.zero(::Type{JonesMatrix}) = JonesMatrix(0, 0, 0, 0)
+Base.one( ::Type{JonesMatrix}) = JonesMatrix(1, 0, 0, 1) # the identity matrix
+Base.rand(::Type{JonesMatrix}) = JonesMatrix(rand(Complex128), rand(Complex128),
+                                             rand(Complex128), rand(Complex128))
 
+Base.zero(::Type{DiagonalJonesMatrix}) = DiagonalJonesMatrix(0, 0)
+Base.one( ::Type{DiagonalJonesMatrix}) = DiagonalJonesMatrix(1, 1) # the identity matrix
+Base.rand(::Type{DiagonalJonesMatrix}) = DiagonalJonesMatrix(rand(Float64), rand(Float64))
 
+Base.zero(::Type{HermitianJonesMatrix}) = HermitianJonesMatrix(0, 0, 0)
+Base.one( ::Type{HermitianJonesMatrix}) = HermitianJonesMatrix(1, 0, 1) # the identity matrix
+Base.rand(::Type{HermitianJonesMatrix}) = HermitianJonesMatrix(rand(Float64), rand(Complex128),
+                                                               rand(Float64))
 
-
-
-
-
-#typealias AnyJonesMatrix Union{JonesMatrix, DiagonalJonesMatrix, HermitianJonesMatrix}
-#
-#Base.zero(::Type{JonesMatrix}) = JonesMatrix(0, 0, 0, 0)
-#Base.one(::Type{JonesMatrix}) = JonesMatrix(1, 0, 0, 1) # the identity matrix
-#Base.rand(::Type{JonesMatrix}) = JonesMatrix(rand(Complex128), rand(Complex128),
-#                                             rand(Complex128), rand(Complex128))
-#
-#Base.zero(::Type{DiagonalJonesMatrix}) = DiagonalJonesMatrix(0, 0)
-#Base.one(::Type{DiagonalJonesMatrix}) = DiagonalJonesMatrix(1, 1) # the identity matrix
-#Base.rand(::Type{DiagonalJonesMatrix}) = DiagonalJonesMatrix(rand(Float64), rand(Float64))
-#
-#Base.zero(::Type{HermitianJonesMatrix}) = HermitianJonesMatrix(0, 0, 0)
-#Base.one(::Type{HermitianJonesMatrix}) = HermitianJonesMatrix(1, 0, 1) # the identity matrix
-#Base.rand(::Type{HermitianJonesMatrix}) = HermitianJonesMatrix(rand(Float64), rand(Complex128),
-#                                                               rand(Float64))
-#
 #function JonesMatrix(mat::Matrix)
 #    size(mat) == (2,2) || throw(DimensionMismatch("A Jones matrix must be 2x2."))
 #    JonesMatrix(mat[1,1], mat[1,2], mat[2,1], mat[2,2])
 #end
-#
-#function Base.convert(::Type{Matrix{Complex128}}, J::JonesMatrix)
-#    [J.xx J.xy
-#     J.yx J.yy]
-#end
-#Base.convert(::Type{Matrix}, J::JonesMatrix) = Base.convert(Matrix{Complex128}, J)
-#
-#function Base.convert(::Type{Matrix{Complex128}}, J::DiagonalJonesMatrix)
-#    [J.xx 0
-#     0    J.yy]
-#end
-#Base.convert(::Type{Matrix}, J::DiagonalJonesMatrix) = Base.convert(Matrix{Complex128}, J)
-#
-#function Base.convert(::Type{Matrix{Complex128}}, J::HermitianJonesMatrix)
-#    [J.xx  J.xy
-#     J.xy' J.yy]
-#end
-#Base.convert(::Type{Matrix}, J::HermitianJonesMatrix) = Base.convert(Matrix{Complex128}, J)
-#
-#for op in (:+, :-)
-#    @eval function $op(J1::JonesMatrix, J2::JonesMatrix)
-#        JonesMatrix($op(J1.xx, J2.xx),
-#                    $op(J1.xy, J2.xy),
-#                    $op(J1.yx, J2.yx),
-#                    $op(J1.yy, J2.yy))
-#    end
-#    @eval function $op(J1::DiagonalJonesMatrix, J2::DiagonalJonesMatrix)
-#        DiagonalJonesMatrix($op(J1.xx, J2.xx),
-#                            $op(J1.yy, J2.yy))
-#    end
-#    @eval function $op(J1::HermitianJonesMatrix, J2::HermitianJonesMatrix)
-#        HermitianJonesMatrix($op(J1.xx, J2.xx),
-#                             $op(J1.xy, J2.xy),
-#                             $op(J1.yy, J2.yy))
-#    end
-#end
-#
+
+for op in (:+, :-)
+    @eval function $op(J1::JonesMatrix, J2::JonesMatrix)
+        JonesMatrix($op(J1.xx, J2.xx),
+                    $op(J1.xy, J2.xy),
+                    $op(J1.yx, J2.yx),
+                    $op(J1.yy, J2.yy))
+    end
+    @eval function $op(J1::DiagonalJonesMatrix, J2::DiagonalJonesMatrix)
+        DiagonalJonesMatrix($op(J1.xx, J2.xx),
+                            $op(J1.yy, J2.yy))
+    end
+    @eval function $op(J1::HermitianJonesMatrix, J2::HermitianJonesMatrix)
+        HermitianJonesMatrix($op(J1.xx, J2.xx),
+                             $op(J1.xy, J2.xy),
+                             $op(J1.yy, J2.yy))
+    end
+end
+
+# Custom broadcasting
+Base.Broadcast._containertype(::Type{T}) where {T<:AbstractJonesMatrix} = T
+Base.Broadcast.promote_containertype(::Type{Any}, ::Type{T}) where {T<:AbstractJonesMatrix} = T
+Base.Broadcast.promote_containertype(::Type{T}, ::Type{Any}) where {T<:AbstractJonesMatrix} = T
+
+
 #*(a::Number, J::JonesMatrix) = JonesMatrix(a*J.xx, a*J.xy, a*J.yx, a*J.yy)
 #*(a::Number, J::DiagonalJonesMatrix) = DiagonalJonesMatrix(a*J.xx, a*J.yy)
 #*(a::Real, J::HermitianJonesMatrix) = HermitianJonesMatrix(a*J.xx, a*J.xy, a*J.yy)

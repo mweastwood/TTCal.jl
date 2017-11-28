@@ -2,16 +2,17 @@ using TTCal
 using Base.Test
 using CasaCore.Measures
 using CasaCore.Tables
-#using NPZ
 
 include("setup.jl")
 
 srand(123)
 @testset "TTCal Tests" begin
-    include("special.jl")
-    #include("rungekutta.jl")
-    include("jones.jl")
-    #include("stokes.jl")
+    @testset "math" begin
+        include("math/special.jl")
+        #include("math/rungekutta.jl")
+        include("math/jones.jl")
+        #include("math/stokes.jl")
+    end
     #include("spectra.jl")
     #include("skymodels.jl")
     #include("beammodels.jl")

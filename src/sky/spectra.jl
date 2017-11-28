@@ -1,4 +1,4 @@
-# Copyright (c) 2015, 2016 Michael Eastwood
+# Copyright (c) 2015-2017 Michael Eastwood
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -13,23 +13,23 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-abstract Spectrum
+abstract AbstractSpectrum
 
 doc"""
-    PowerLaw <: Spectrum
+    struct PowerLaw <: AbstractSpectrum
 
 A multi-component power-law spectrum.
 
-``` math
+```math
     \log_{10} S = \log_{10} S_0 + \sum_{n=1}^N \alpha_n \log_{10}\left(\frac{\nu}{\nu_0}\right)^n
 ```
 
 where $S$ is a Stokes parameter, and $\alpha_n$ is the list of spectral indices. At least one
 spectral index needs to be provided.
 """
-type PowerLaw <: Spectrum
+struct PowerLaw <: Spectrum
     stokes :: StokesVector
-    ν :: Float64 # Hz
+    ν :: typeof(1.0*u"Hz")
     α :: Vector{Float64}
 end
 
@@ -51,21 +51,21 @@ function (spectrum::PowerLaw)(ν::AbstractFloat)
     StokesVector(I, Q, U, V)
 end
 
-function ==(lhs::PowerLaw, rhs::PowerLaw)
-    lhs.stokes == rhs.stokes && lhs.ν == rhs.ν && lhs.α == rhs.α
-end
+#function ==(lhs::PowerLaw, rhs::PowerLaw)
+#    lhs.stokes == rhs.stokes && lhs.ν == rhs.ν && lhs.α == rhs.α
+#end
 
 """
-    RFISpectrum <: Spectrum
+    struct RFISpectrum <: AbstractSpectrum
 
 A simple list of frequency channels and the Stokes parameters at each channel.
 """
-type RFISpectrum <: Spectrum
+struct RFISpectrum <: Spectrum
     channels :: Vector{Float64}
     stokes   :: Vector{StokesVector}
     function RFISpectrum(channels, stokes)
         if length(channels) != length(stokes)
-            error("number of frequency channels must match number of Stokes vectors")
+            err("number of frequency channels must match number of Stokes vectors")
         end
         new(channels, stokes)
     end
