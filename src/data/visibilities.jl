@@ -26,16 +26,34 @@ function SinglePolarizationVisibilities(Nant)
     SinglePolarizationVisibilities(data, flags)
 end
 
-#struct DualPolarizationVisibilities{T}
-#end
+struct DualPolarizationVisibilities <: Visibilities{Float64}
+    data  :: Vector{DiagonalJonesVector}
+    flags :: Vector{Vector{Bool}}
+end
 
-#struct FullPolarizationVisibilities{T}
-#end
+function DualPolarizationVisibilities(Nant)
+    data  = [DiagonalJonesVector(Nant) for antenna = 1:Nant]
+    flags = [         fill(true, Nant) for antenna = 1:Nant]
+    DualPolarizationVisibilities(data, flags)
+end
+
+struct FullPolarizationVisibilities <: Visibilities{Float64}
+    data  :: Vector{JonesVector}
+    flags :: Vector{Vector{Bool}}
+end
+
+function FullPolarizationVisibilities(Nant)
+    data  = [JonesVector(Nant) for antenna = 1:Nant]
+    flags = [ fill(true, Nant) for antenna = 1:Nant]
+    FullPolarizationVisibilities(data, flags)
+end
+
+Nant(visibilities::Visibilities) = length(visibilities.data)
 
 function Base.getindex(visibilities::Visibilities, antenna1, antenna2)
     value = visibilities.data[antenna2][antenna1]
     flag  = visibilities.flags[antenna2][antenna1]
-    value, flag
+    value
 end
 
 function Base.setindex!(visibilities::Visibilities, value, antenna1, antenna2)
@@ -46,9 +64,15 @@ function Base.setindex!(visibilities::Visibilities, value, antenna1, antenna2)
     value
 end
 
+function isflagged(visibilities::Visibilities, antenna1, antenna2)
+    visibilities.flags[antenna2][antenna1]
+end
+
 function flag!(visibilities::Visibilities, antenna1, antenna2)
     visibilities.data[antenna2][antenna1]  = 0
+    visibilities.data[antenna1][antenna2]  = 0
     visibilities.flags[antenna2][antenna1] = true
+    visibilities.flags[antenna1][antenna2] = true
     nothing
 end
 
@@ -101,11 +125,6 @@ function slice!(dataset::Dataset{T}, indices; axis=:frequency) where {T}
         err("unknown slice axis $axis")
     end
 end
-
-
-
-
-
 
 "Read dataset from the given measurement set."
 function Dataset(ms::Table; column="DATA", polarization=:full)

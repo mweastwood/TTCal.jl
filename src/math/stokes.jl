@@ -37,6 +37,7 @@ end
 # Abstract array interface
 
 Base.size(::StokesVector) = (4,)
+Base.length(::StokesVector) = 4
 
 function Base.getindex(v::StokesVector, idx::Int)
     @boundscheck checkbounds(v, idx)
@@ -51,40 +52,29 @@ function Base.getindex(v::StokesVector, idx::Int)
     end
 end
 
+StokesVector() = zero(StokesVector)
+Base.zero(::Type{StokesVector}) = StokesVector(0, 0, 0, 0)
+Base.one( ::Type{StokesVector}) = StokesVector(1, 0, 0, 0)
+Base.rand(::Type{StokesVector}) = StokesVector(rand(), rand(), rand(), rand())
 
-#StokesVector() = zero(StokesVector)
-#Base.zero(::Type{StokesVector}) = StokesVector(0, 0, 0, 0)
-#Base.one(::Type{StokesVector}) = StokesVector(1, 0, 0, 0)
-#Base.rand(::Type{StokesVector}) = StokesVector(rand(), rand(), rand(), rand())
-#
-#function StokesVector(v::Vector)
-#    length(v) == 4 || throw(DimensionMismatch("A Stokes vector must have 4 elements."))
-#    StokesVector(v[1],v[2],v[3],v[4])
-#end
-#
-#Base.convert(::Type{Vector{Float64}}, v::StokesVector) = [v.I, v.Q, v.U, v.V]
-#Base.convert(::Type{Vector}, v::StokesVector) = Base.convert(Vector{Float64}, v)
-#
-#function Base.show(io::IO, v::StokesVector)
-#    @printf(io, "(%.3f, %.3f, %.3f, %.3f)", v.I, v.Q, v.U, v.V)
-#end
-#
-#function *(a::Number, v::StokesVector)
-#    StokesVector(a*v.I, a*v.Q, a*v.U, a*v.V)
-#end
-#*(v::StokesVector, a::Number) = a*v
-#/(v::StokesVector, a::Number) = (1/a)*v
-#
-#for op in (:+, :-)
-#    @eval function $op(v1::StokesVector, v2::StokesVector)
-#        StokesVector($op(v1.I,v2.I), $op(v1.Q,v2.Q), $op(v1.U,v2.U), $op(v1.V,v2.V))
-#    end
-#end
-#
+for op in (:+, :-)
+    @eval function Base.$op(v1::StokesVector, v2::StokesVector)
+        StokesVector($op(v1.I, v2.I), $op(v1.Q, v2.Q),
+                     $op(v1.U, v2.U), $op(v1.V, v2.V))
+    end
+end
+
+for op in (:*, :/)
+    @eval function Base.$op(v::StokesVector, a::Number)
+        StokesVector($op(v.I, a), $op(v.Q, a), $op(v.U, a), $op(v.V, a))
+    end
+end
+Base.:*(a::Number, v::StokesVector) = v*a
+
 #function Base.norm(v::StokesVector)
 #    sqrt(abs2(v.I)+abs2(v.Q)+abs2(v.U)+abs2(v.V))
 #end
-#
+
 #"""
 #    MuellerMatrix
 #
@@ -116,24 +106,25 @@ end
 #end
 #
 #Base.norm(M::MuellerMatrix) = vecnorm(M.mat)
-#
-## Note the factor of 0.5 appears to be a convention in radio astronomy (but not physics)
-#const to_stokes = [0.5+0.0im  0.0+0.0im  0.0+0.0im   0.5+0.0im
-#                   0.5+0.0im  0.0+0.0im  0.0+0.0im  -0.5+0.0im
-#                   0.0+0.0im  0.5+0.0im  0.5+0.0im   0.0+0.0im
-#                   0.0+0.0im  0.0+0.5im  0.0-0.5im   0.0+0.0im]
-#const to_linear = [1.0+0.0im   1.0+0.0im  0.0+0.0im  0.0+0.0im
-#                   0.0+0.0im   0.0+0.0im  1.0+0.0im  0.0-1.0im
-#                   0.0+0.0im   0.0+0.0im  1.0+0.0im  0.0+1.0im
-#                   1.0+0.0im  -1.0-0.0im  0.0+0.0im  0.0+0.0im]
-#
-#function StokesVector(correlations::HermitianJonesMatrix)::StokesVector
-#    vec = [correlations.xx, correlations.xy, conj(correlations.xy), correlations.yy]
-#    to_stokes*vec |> real |> StokesVector
-#end
-#
-#function HermitianJonesMatrix(stokes::StokesVector)::HermitianJonesMatrix
-#    correlations = to_linear*Vector(stokes)
-#    HermitianJonesMatrix(real(correlations[1]), correlations[2], real(correlations[4]))
-#end
+
+# Note the factor of 0.5 appears to be a convention in radio astronomy (but not physics)
+const to_stokes = @SMatrix [0.5+0.0im  0.0+0.0im  0.0+0.0im   0.5+0.0im
+                            0.5+0.0im  0.0+0.0im  0.0+0.0im  -0.5+0.0im
+                            0.0+0.0im  0.5+0.0im  0.5+0.0im   0.0+0.0im
+                            0.0+0.0im  0.0+0.5im  0.0-0.5im   0.0+0.0im]
+const to_linear = @SMatrix [1.0+0.0im   1.0+0.0im  0.0+0.0im  0.0+0.0im
+                            0.0+0.0im   0.0+0.0im  1.0+0.0im  0.0-1.0im
+                            0.0+0.0im   0.0+0.0im  1.0+0.0im  0.0+1.0im
+                            1.0+0.0im  -1.0-0.0im  0.0+0.0im  0.0+0.0im]
+
+function StokesVector(correlations::HermitianJonesMatrix)::StokesVector
+    vec = @SVector [correlations.xx, correlations.xy, conj(correlations.xy), correlations.yy]
+    vec = to_stokes * vec
+    StokesVector(real(vec[1]), real(vec[2]), real(vec[3]), real(vec[4]))
+end
+
+function HermitianJonesMatrix(stokes::StokesVector)::HermitianJonesMatrix
+    vec = to_linear*stokes
+    HermitianJonesMatrix(real(vec[1]), vec[2], real(vec[4]))
+end
 

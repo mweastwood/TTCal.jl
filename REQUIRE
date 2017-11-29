@@ -6,3 +6,5 @@ JLD2
 NLopt
 ProgressMeter
 StaticArrays
+Unitful
+UnitfulAstro

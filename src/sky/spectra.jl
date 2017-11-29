@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-abstract AbstractSpectrum
+abstract type AbstractSpectrum end
 
 doc"""
     struct PowerLaw <: AbstractSpectrum
@@ -27,7 +27,7 @@ A multi-component power-law spectrum.
 where $S$ is a Stokes parameter, and $\alpha_n$ is the list of spectral indices. At least one
 spectral index needs to be provided.
 """
-struct PowerLaw <: Spectrum
+struct PowerLaw <: AbstractSpectrum
     stokes :: StokesVector
     ν :: typeof(1.0*u"Hz")
     α :: Vector{Float64}
@@ -36,7 +36,7 @@ end
 PowerLaw(I, Q, U, V, ν, index) = PowerLaw(StokesVector(I, Q, U, V), ν, index)
 PowerLaw(I::Real, ν, index) = PowerLaw(StokesVector(I, 0, 0, 0), ν, index)
 
-function (spectrum::PowerLaw)(ν::AbstractFloat)
+function (spectrum::PowerLaw)(ν)
     spectrum.stokes.I == 0 && return StokesVector(0, 0, 0, 0)
     s = sign(spectrum.stokes.I)
     log_I = log10(abs(spectrum.stokes.I))
@@ -51,40 +51,37 @@ function (spectrum::PowerLaw)(ν::AbstractFloat)
     StokesVector(I, Q, U, V)
 end
 
-#function ==(lhs::PowerLaw, rhs::PowerLaw)
-#    lhs.stokes == rhs.stokes && lhs.ν == rhs.ν && lhs.α == rhs.α
-#end
-
 """
     struct RFISpectrum <: AbstractSpectrum
 
 A simple list of frequency channels and the Stokes parameters at each channel.
 """
-struct RFISpectrum <: Spectrum
-    channels :: Vector{Float64}
-    stokes   :: Vector{StokesVector}
-    function RFISpectrum(channels, stokes)
-        if length(channels) != length(stokes)
-            err("number of frequency channels must match number of Stokes vectors")
-        end
-        new(channels, stokes)
-    end
+struct MeasuredSpectrum <: AbstractSpectrum
+    stokes :: Vector{StokesVector}
+    ν      :: Vector{typeof(1.0*u"Hz")}
 end
 
-function Base.show(io::IO, spectrum::RFISpectrum)
-    N = length(spectrum.channels)
-    ν1 = spectrum.channels[1] / 1e6
-    ν2 = spectrum.channels[end] / 1e6
-    stokes = mean(spectrum.stokes)
-    print(io, @sprintf("RFISpectrum(%d channels between %.3f and %.3f MHz", N, ν1, ν2), ", ", stokes, ")")
-end
-
-function (spectrum::RFISpectrum)(ν::AbstractFloat)
-    idx = indmin(abs2(channel - ν) for channel in spectrum.channels)
-    spectrum.stokes[idx]
-end
-
-function ==(lhs::RFISpectrum, rhs::RFISpectrum)
-    lhs.channels == rhs.channels && lhs.stokes == rhs.stokes
-end
+#struct RFISpectrum <: AbstractSpectrum
+#    channels :: Vector{Float64}
+#    stokes   :: Vector{StokesVector}
+#    function RFISpectrum(channels, stokes)
+#        if length(channels) != length(stokes)
+#            err("number of frequency channels must match number of Stokes vectors")
+#        end
+#        new(channels, stokes)
+#    end
+#end
+#
+#function Base.show(io::IO, spectrum::RFISpectrum)
+#    N = length(spectrum.channels)
+#    ν1 = spectrum.channels[1] / 1e6
+#    ν2 = spectrum.channels[end] / 1e6
+#    stokes = mean(spectrum.stokes)
+#    print(io, @sprintf("RFISpectrum(%d channels between %.3f and %.3f MHz", N, ν1, ν2), ", ", stokes, ")")
+#end
+#
+#function (spectrum::RFISpectrum)(ν::AbstractFloat)
+#    idx = indmin(abs2(channel - ν) for channel in spectrum.channels)
+#    spectrum.stokes[idx]
+#end
 

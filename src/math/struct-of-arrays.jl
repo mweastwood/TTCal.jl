@@ -33,3 +33,65 @@ Base.@propagate_inbounds function Base.setindex!(v::ComplexVector, value, i)
     value
 end
 
+"Implement the \"struct of arrays\" optimization to facilitiate SIMD vectorization."
+struct DiagonalJonesVector <: AbstractVector{DiagonalJonesMatrix}
+    xxreal :: Vector{Float64}
+    xximag :: Vector{Float64}
+    yyreal :: Vector{Float64}
+    yyimag :: Vector{Float64}
+end
+
+DiagonalJonesVector(N) = DiagonalJonesVector(zeros(Float64, N), zeros(Float64, N),
+                                             zeros(Float64, N), zeros(Float64, N))
+Base.size(v::DiagonalJonesVector) = size(v.xxreal)
+Base.length(v::DiagonalJonesVector) = length(v.xxreal)
+Base.eltype(v::DiagonalJonesVector) = DiagonalJonesMatrix
+Base.@propagate_inbounds function Base.getindex(v::DiagonalJonesVector, i)
+    DiagonalJonesMatrix(complex(v.xxreal[i], v.xximag[i]),
+                        complex(v.yyreal[i], v.yyimag[i]))
+end
+Base.@propagate_inbounds function Base.setindex!(v::DiagonalJonesVector, value, i)
+    v.xxreal[i] = real(value.xx)
+    v.xximag[i] = imag(value.xx)
+    v.yyreal[i] = real(value.yy)
+    v.yyimag[i] = imag(value.yy)
+    value
+end
+
+"Implement the \"struct of arrays\" optimization to facilitiate SIMD vectorization."
+struct JonesVector <: AbstractVector{JonesMatrix}
+    xxreal :: Vector{Float64}
+    xximag :: Vector{Float64}
+    xyreal :: Vector{Float64}
+    xyimag :: Vector{Float64}
+    yxreal :: Vector{Float64}
+    yximag :: Vector{Float64}
+    yyreal :: Vector{Float64}
+    yyimag :: Vector{Float64}
+end
+
+JonesVector(N) = JonesVector(zeros(Float64, N), zeros(Float64, N),
+                             zeros(Float64, N), zeros(Float64, N),
+                             zeros(Float64, N), zeros(Float64, N),
+                             zeros(Float64, N), zeros(Float64, N))
+Base.size(v::JonesVector) = size(v.xxreal)
+Base.length(v::JonesVector) = length(v.xxreal)
+Base.eltype(v::JonesVector) = JonesMatrix
+Base.@propagate_inbounds function Base.getindex(v::JonesVector, i)
+    JonesMatrix(complex(v.xxreal[i], v.xximag[i]),
+                complex(v.xyreal[i], v.xyimag[i]),
+                complex(v.yxreal[i], v.yximag[i]),
+                complex(v.yyreal[i], v.yyimag[i]))
+end
+Base.@propagate_inbounds function Base.setindex!(v::JonesVector, value, i)
+    v.xxreal[i] = real(value.xx)
+    v.xximag[i] = imag(value.xx)
+    v.xyreal[i] = real(value.xy)
+    v.xyimag[i] = imag(value.xy)
+    v.yxreal[i] = real(value.yx)
+    v.yximag[i] = imag(value.yx)
+    v.yyreal[i] = real(value.yy)
+    v.yyimag[i] = imag(value.yy)
+    value
+end
+

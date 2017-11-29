@@ -1,4 +1,4 @@
-# Copyright (c) 2015, 2016 Michael Eastwood
+# Copyright (c) 2015-2017 Michael Eastwood
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -13,25 +13,25 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-abstract BeamModel
+abstract type AbstractBeam end
+
+#"""
+#In Julia v0.5 it is no longer possible to define `call(::T, args...)` where `T` is an abstract type.
+#Therefore we will use this macro to define this function for each of the subtypes.
+#"""
+#macro define_for_direction_too(subtype)
+#    quote
+#        function (beam::$subtype)(ν, direction::Direction)::JonesMatrix
+#            direction.sys == dir"AZEL" || error("Direction must be in the AZEL coordinate system.")
+#            azimuth   = longitude(direction)
+#            elevation =  latitude(direction)
+#            beam(ν, azimuth, elevation)
+#        end
+#    end |> esc
+#end
 
 """
-In Julia v0.5 it is no longer possible to define `call(::T, args...)` where `T` is an abstract type.
-Therefore we will use this macro to define this function for each of the subtypes.
-"""
-macro define_for_direction_too(subtype)
-    quote
-        function (beam::$subtype)(ν, direction::Direction)::JonesMatrix
-            direction.sys == dir"AZEL" || error("Direction must be in the AZEL coordinate system.")
-            azimuth   = longitude(direction)
-            elevation =  latitude(direction)
-            beam(ν, azimuth, elevation)
-        end
-    end |> esc
-end
-
-"""
-    ConstantBeam <: BeamModel
+    struct ConstantBeam <: AbstractBeam
 
 In this beam model the Jones matrix is assumed to be the identity in every direction. This is the
 simplest possible beam model and should be used if you wish to avoid the application of a beam
@@ -48,12 +48,11 @@ the flux by a beam model, you should use `ConstantBeam` to avoid applying a beam
     metadata = collect_metadata(measurement_set, beam)
     model_visibilities = genvis(metadata, sources)
 """
-immutable ConstantBeam <: BeamModel end
+struct ConstantBeam <: AbstractBeam end
 (::ConstantBeam)(ν, az, el)::JonesMatrix = one(JonesMatrix)
-@define_for_direction_too ConstantBeam
 
 doc"""
-    SineBeam <: BeamModel
+    SineBeam <: AbstractBeam
 
 This beam is azimuthally symmetric and independent of frequency.  The gain of an antenna scales as
 $\sin(\rm el)^\alpha$.  For an LWA dipole a reasonable approximation to the the antenna gain is
@@ -65,7 +64,7 @@ the diagonal elements of the Jones matrix are $\sin(\rm el)^{\alpha/2}$.
     beam = SineBeam() # equivalent to SineBeam(1.6)
     beam = SineBeam(2.0)
 """
-immutable SineBeam <: BeamModel
+struct SineBeam <: AbstractBeam
     α :: Float64
 end
 
@@ -79,17 +78,16 @@ function (beam::SineBeam)(ν, az, el)::JonesMatrix
     s = sin(el)^(beam.α/2)
     JonesMatrix(s, 0, 0, s)
 end
-@define_for_direction_too SineBeam
 
 doc"""
-    Memo178Beam <: BeamModel
+    Memo178Beam <: AbstractBeam
 
 This beam is based on the parametric fit to EM simulations presented in [LWA memo
 178](http://www.faculty.ece.vt.edu/swe/lwa/memo/lwa0178a.pdf) by Jayce Dowell.
 
 The dipole gain is expressed as
 
-``` math
+```math
     p(\theta) = \left[1-\left(\frac{\theta}{\pi/2}\right)^\alpha\right]\cos^\beta\theta
               + \gamma\left(\frac{\theta}{\pi/2}\right)\cos^\delta\theta,
 ```
@@ -97,7 +95,7 @@ The dipole gain is expressed as
 where $\theta$ is the zenith angle, and $\alpha$, $\beta$, $\gamma$, and $\delta$ are
 parameters that were fit for in the E- and H-planes of the dipole.
 """
-immutable Memo178Beam <: BeamModel end
+struct Memo178Beam <: AbstractBeam end
 
 function (::Memo178Beam)(ν, az, el)::JonesMatrix
     # NOTE: I might have the x and y dipoles swapped here
@@ -105,7 +103,6 @@ function (::Memo178Beam)(ν, az, el)::JonesMatrix
     y = P178(ν, az+π/2, el) |> sqrt
     JonesMatrix(x, 0, 0, y)
 end
-@define_for_direction_too Memo178Beam
 
 const _E178 = [-4.529931167425190e+01 -3.066691727279789e+01 +7.111192148086860e+01 +1.131338637814271e+01
                +1.723596273204143e+02 +1.372536555724785e+02 -2.664504470520252e+02 -3.493942140370373e+01
@@ -158,8 +155,8 @@ function P178(ν, az, el)
     sqrt((E178(ν,el)*cos(az))^2 + (H178(ν,el)*sin(az))^2)
 end
 
-doc"""
-    ZernikeBeam <: BeamModel
+"""
+    ZernikeBeam <: AbstractBeam
 
 This beam is composed of Zernike polynomials.
 
@@ -168,7 +165,7 @@ This beam is composed of Zernike polynomials.
 * Implement the Stokes Q part to the beam model
 * Implement the Stokes U beam as a 45 degree rotation of the Stokes Q beam
 """
-immutable ZernikeBeam <: BeamModel
+struct ZernikeBeam <: AbstractBeam
     coeff :: Vector{Float64}
 end
 
@@ -190,5 +187,4 @@ function (beam::ZernikeBeam)(ν, az, el)::JonesMatrix
     end
     JonesMatrix(sqrt(value), 0, 0, sqrt(value))
 end
-@define_for_direction_too ZernikeBeam
 

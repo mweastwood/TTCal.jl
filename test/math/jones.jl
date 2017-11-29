@@ -19,7 +19,7 @@
         @test J1/J2 ≈ mat1/mat2
         @test det(J1) ≈ det(mat1)
         @test inv(J1) ≈ inv(mat1)
-        @test norm(J1) ≈ vecnorm(mat1)
+        @test norm(J1) ≈ norm(mat1)
         @test J1' == mat1'
         @test conj(J1) == conj(mat1)
 

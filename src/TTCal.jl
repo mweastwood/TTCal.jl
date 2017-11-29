@@ -19,6 +19,12 @@ module TTCal
 
 export Nant, Nfreq, Nbase
 
+export SinglePolarizationVisibilities
+export DualPolarizationVisibilities
+export FullPolarizationVisibilities
+
+export genvis
+
 #export JonesMatrix, DiagonalJonesMatrix, HermitianJonesMatrix
 #export StokesVector, MuellerMatrix
 #
@@ -37,10 +43,7 @@ export Nant, Nfreq, Nbase
 #export PolarizationCalibration, polcal
 #export applycal!, corrupt!, peel!, shave!
 #export PeelingSource, ShavingSource, ZestingSource, PruningSource
-#
-#importall Base.Operators
 
-#using DocOpt
 using ProgressMeter
 using FileIO, JLD2, JSON
 using NLopt # used in fitvis
@@ -63,15 +66,26 @@ include("math/jones.jl")
 include("math/stokes.jl")
 include("math/struct-of-arrays.jl")
 
-#include("sky/spectra.jl")
+include("data/metadata.jl")
+include("data/visibilities.jl")
+
+include("sky/spectra.jl")
+include("sky/shapes.jl")
+include("sky/sources.jl")
+include("sky/models.jl")
+
+include("instrument/beams.jl")
+include("instrument/genvis.jl")
+
+#include("sky/models.jl")
 #include("sky/skymodels.jl")
+
+
 #include("beammodels.jl")
 
 #include("utm.jl")
 #include("ionosphere.jl")
-include("data/metadata.jl")
-include("data/visibilities.jl")
-#include("genvis.jl")
+
 #include("getspec.jl")
 #include("subsrc.jl")
 #include("fitvis.jl")

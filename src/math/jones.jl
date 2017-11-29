@@ -243,35 +243,30 @@ function Base.inv(J::HermitianJonesMatrix)
     1/det(J) * HermitianJonesMatrix(J.yy, -J.xy, J.xx)
 end
 
-# use the Frobenius norm
-Base.norm(J::JonesMatrix) = hypot(J.xx, J.xy, J.yx, J.yy)
-Base.norm(J::DiagonalJonesMatrix) = hypot(J.xx, J.yy)
-Base.norm(J::HermitianJonesMatrix) = hypot(J.xx, J.xy, J.xy, J.yy)
+function Base.kron(J1::JonesMatrix, J2::JonesMatrix)
+    @SMatrix [J1.xx*J2.xx J1.xx*J2.xy J1.xy*J2.xx J1.xy*J2.xy;
+              J1.xx*J2.yx J1.xx*J2.yy J1.xy*J2.yx J1.xy*J2.yy;
+              J1.yx*J2.xx J1.yx*J2.xy J1.yy*J2.xx J1.yy*J2.xy;
+              J1.yx*J2.yx J1.yx*J2.yy J1.yy*J2.yx J1.yy*J2.yy]
+end
 
-#function Base.kron(J1::JonesMatrix, J2::JonesMatrix)
-#    [J1.xx*J2.xx J1.xx*J2.xy J1.xy*J2.xx J1.xy*J2.xy;
-#     J1.xx*J2.yx J1.xx*J2.yy J1.xy*J2.yx J1.xy*J2.yy;
-#     J1.yx*J2.xx J1.yx*J2.xy J1.yy*J2.xx J1.yy*J2.xy;
-#     J1.yx*J2.yx J1.yx*J2.yy J1.yy*J2.yx J1.yy*J2.yy]
-#end
-#
-#doc"""
-#    congruence_transform(J::JonesMatrix, K::HermitianJonesMatrix)
-#
-#Compute the congruence transformation of $K$ with respect to $J$. Using this function instead of
-#explicitly computing $J*K*J'$ guarantees that the final result is exactly Hermitian.
-#
-#``` math
-#    K \rightarrow JKJ^*
-#```
-#"""
-#function congruence_transform(J::JonesMatrix, K::HermitianJonesMatrix)
-#    HermitianJonesMatrix(abs2(J.xx)*K.xx + 2real(J.xx*J.xy'*K.xy) + abs2(J.xy)*K.yy,
-#                         J.xx*J.yx'*K.xx + J.xx*J.yy'*K.xy + J.xy*J.yx'*K.xy' + J.xy*J.yy'*K.yy,
-#                         abs2(J.yx)*K.xx + 2real(J.yx*J.yy'*K.xy) + abs2(J.yy)*K.yy)
-#end
-#
-#function make_hermitian(J::JonesMatrix)
-#    HermitianJonesMatrix(real(J.xx), 0.5*(J.xy+conj(J.yx)), real(J.yy))
-#end
+doc"""
+    congruence_transform(J::JonesMatrix, K::HermitianJonesMatrix)
+
+Compute the congruence transformation of $K$ with respect to $J$. Using this function instead of
+explicitly computing $J*K*J'$ guarantees that the final result is exactly Hermitian.
+
+```math
+    K \rightarrow JKJ^*
+```
+"""
+function congruence_transform(J::JonesMatrix, K::HermitianJonesMatrix)
+    HermitianJonesMatrix(abs2(J.xx)*K.xx + 2real(J.xx*J.xy'*K.xy) + abs2(J.xy)*K.yy,
+                         J.xx*J.yx'*K.xx + J.xx*J.yy'*K.xy + J.xy*J.yx'*K.xy' + J.xy*J.yy'*K.yy,
+                         abs2(J.yx)*K.xx + 2real(J.yx*J.yy'*K.xy) + abs2(J.yy)*K.yy)
+end
+
+function make_hermitian(J::JonesMatrix)
+    HermitianJonesMatrix(real(J.xx), 0.5*(J.xy+conj(J.yx)), real(J.yy))
+end
 
