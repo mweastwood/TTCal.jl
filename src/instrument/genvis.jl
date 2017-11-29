@@ -55,6 +55,7 @@ end
 function genvis!(dataset::Dataset, beam::AbstractBeam, shape::AbstractShape)
     metadata = dataset.metadata
     frame = ReferenceFrame(dataset.metadata)
+    precomputation = additional_precomputation(frame, shape)
     for (idx, time) in enumerate(dataset.metadata.times)
         set!(frame, time)
         if isabovehorizon(frame, shape)
@@ -64,7 +65,8 @@ function genvis!(dataset::Dataset, beam::AbstractBeam, shape::AbstractShape)
                 flux = observe_through_beam(shape, beam, frame, frequency)
                 visibilities = dataset.data[jdx, idx]
                 genvis_onesource_onechannel!(visibilities, shape, frequency,
-                                             flux, metadata.positions, direction, phase_center)
+                                             flux, metadata.positions, direction, phase_center,
+                                             precomputation)
             end
         end
     end
@@ -87,13 +89,16 @@ end
 #end
 
 function genvis_onesource_onechannel!(visibilities, shape, frequency,
-                                      flux, positions, direction, phase_center)
+                                      flux, positions, direction, phase_center,
+                                      precomputation)
     delays  = geometric_delays(positions, direction, phase_center)
     fringes = delays_to_fringes(delays, frequency)
     for antenna1 = 1:Nant(visibilities), antenna2 = antenna1:Nant(visibilities)
-        @inbounds fringe = fringes[antenna1] * conj(fringes[antenna2])
-        #coherency = baseline_coherency(source, frequency, antenna1, antenna2, variables)
-        @inbounds visibilities[antenna1, antenna2] += flux * fringe
+        fringe = fringes[antenna1] * conj(fringes[antenna2])
+        position1 = positions[antenna1]
+        position2 = positions[antenna2]
+        coherency = baseline_coherency(shape, frequency, position1, position2, precomputation)
+        visibilities[antenna1, antenna2] += flux * fringe * coherency
     end
     visibilities
 end
@@ -138,27 +143,27 @@ end
 #    flux, itrf
 #end
 
-#"""
-#    additional_precomputation(meta, frame, source)
-#
-#This function is used to do any computations we would like to only do
-#once per source. For example it is used to compute the major and minor
-#axes for Gaussian sources.
-#"""
-#additional_precomputation(meta, frame, source) = nothing
-#
-#"""
-#    baseline_coherency(source, frequency, antenna1, antenna2, variables)
-#
-#This function computes the coherency between the two given antennas for
-#the given source. For a point source this is unity for all baselines.
-#For a Gaussian source this is a Gaussian function of the baseline length
-#and orientation.
-#
-#Note that the `variables` argument is the output of the
-#`additional_precomputation` function.
-#"""
-#baseline_coherency(source, frequency, antenna1, antenna2, variables) = 1.0
+"""
+    additional_precomputation(meta, frame, source)
+
+This function is used to do any computations we would like to only do
+once per source. For example it is used to compute the major and minor
+axes for Gaussian sources.
+"""
+additional_precomputation(frame, source) = nothing
+
+"""
+    baseline_coherency(source, frequency, antenna1, antenna2, variables)
+
+This function computes the coherency between the two given antennas for
+the given source. For a point source this is unity for all baselines.
+For a Gaussian source this is a Gaussian function of the baseline length
+and orientation.
+
+Note that the `variables` argument is the output of the
+`additional_precomputation` function.
+"""
+baseline_coherency(source, frequency, antenna1, antenna2, variables) = 1
 
 #function time_smearing(itrf, frequency, antenna1, antenna2)
 #    ω = 2π / 86164.09054 # angular rotation speed of the Earth
@@ -243,16 +248,21 @@ function delays_to_fringes(delays, frequency)
     fringes
 end
 
-#function local_north_east(frame, source_direction)
-#    j2000 = measure(frame, source_direction, dir"J2000")
-#    rhat  = [j2000.x, j2000.y, j2000.z] # the source location
-#    north = [0, 0, 1] - j2000.z*rhat    # local north on the celestial sphere
-#    east  = cross(north, rhat)          # local east on the celestial sphere
-#    north = north / norm(north)
-#    east  = east / norm(east)
-#    north, east
-#end
-#
+function local_north_east(frame, direction)
+    j2000 = measure(frame, direction, dir"J2000")
+    north = gram_schmidt(Direction(dir"J2000", 0, 0, 1), j2000)
+    east  = cross(north, j2000)
+    north, east
+end
+
+# TODO: replace this horrible hack with proper arithmetic on directions
+function linear_combination(a::Number, basis1::Direction,
+                            b::Number, basis2::Direction)
+    Direction(basis1.sys, a*basis1.x + b*basis2.x,
+                          a*basis1.y + b*basis2.y,
+                          a*basis1.z + b*basis2.z)
+end
+
 #function get_uvw(frequency, antenna1, antenna2)
 #    λ = c / frequency
 #    u = (antenna1.position.x - antenna2.position.x) / λ
@@ -263,31 +273,30 @@ end
 
 # TODO move functions below this comment out of this file
 
-#function additional_precomputation(meta, frame, source::GaussianSource)
-#    north, east = local_north_east(frame, source.direction)
-#    θ = source.position_angle
-#    major_axis =  cos(θ)*north + sin(θ)*east
-#    minor_axis = -sin(θ)*north + cos(θ)*east
-#    major_width = π^2 * sin(source.major_fwhm)^2 / (4log(2))
-#    minor_width = π^2 * sin(source.minor_fwhm)^2 / (4log(2))
-#    # convert the major and minor axes to the ITRF coordinate system
-#    major_j2000 = Direction(dir"J2000", major_axis[1], major_axis[2], major_axis[3])
-#    minor_j2000 = Direction(dir"J2000", minor_axis[1], minor_axis[2], minor_axis[3])
-#    major_itrf = measure(frame, major_j2000, dir"ITRF")
-#    minor_itrf = measure(frame, minor_j2000, dir"ITRF")
-#    major_itrf, minor_itrf, major_width, minor_width
-#end
-#
-#function baseline_coherency(source::GaussianSource, frequency, antenna1, antenna2, variables)
-#    u, v, w = get_uvw(frequency, antenna1, antenna2)
-#    major_axis, minor_axis, major_width, minor_width = variables
-#    # project the baseline onto the major and minor axes
-#    major_proj = u*major_axis.x + v*major_axis.y + w*major_axis.z
-#    minor_proj = u*minor_axis.x + v*minor_axis.y + w*minor_axis.z
-#    # flux is attenuated on long baselines due to souce being a Gaussian
-#    exp(-major_width*major_proj^2 - minor_width*minor_proj^2)
-#end
-#
+function additional_precomputation(frame, shape::Gaussian)
+    north, east = local_north_east(frame, shape.direction)
+    θ = shape.position_angle
+    major_axis = linear_combination( cos(θ), north, sin(θ), east)
+    minor_axis = linear_combination(-sin(θ), north, cos(θ), east)
+    major_width = π^2 * sin(shape.major_fwhm)^2 / (4log(2))
+    minor_width = π^2 * sin(shape.minor_fwhm)^2 / (4log(2))
+    # convert the major and minor axes to the ITRF coordinate system
+    major_itrf = measure(frame, major_axis, dir"ITRF")
+    minor_itrf = measure(frame, minor_axis, dir"ITRF")
+    major_itrf, minor_itrf, major_width, minor_width
+end
+
+function baseline_coherency(::Gaussian, frequency, position1, position2, variables)
+    major_axis, minor_axis, major_width, minor_width = variables
+    # project the baseline onto the major and minor axes
+    λ = u"c" / frequency
+    baseline = position2 - position1
+    major_proj = dot(baseline, major_axis) / λ
+    minor_proj = dot(baseline, minor_axis) / λ
+    # flux is attenuated on long baselines due to souce being a Gaussian
+    exp(-major_width*major_proj^2 - minor_width*minor_proj^2)
+end
+
 #function baseline_coherency(source::DiskSource, frequency, antenna1, antenna2, variables)
 #    u, v, w = get_uvw(frequency, antenna1, antenna2)
 #    b = sqrt(u^2 + v^2 + w^2) # baseline length

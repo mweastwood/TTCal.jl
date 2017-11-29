@@ -57,6 +57,19 @@ function check_all_unity(dataset)
     true
 end
 
+function check_visibilities_match(dataset1, dataset2)
+    for β = 1:Nfreq(dataset1)
+        α = 1
+        for ant1 = 1:Nant(dataset1), ant2 = ant1:Nant(dataset1)
+            if !(dataset1[β, 1][ant1, ant2] ≈ dataset2[β, 1][ant1, ant2])
+                return false
+            end
+            α += 1
+        end
+    end
+    true
+end
+
 @testset "genvis.jl" begin
     Nant  = 5
     Nfreq = 10
@@ -87,49 +100,55 @@ end
 
         # a source at the phase center should have unity visibilities
         sources = [TTCal.Source("Cristiano Ronaldo",
-                                [TTCal.Point(metadata.phase_centers[1],
-                                             TTCal.PowerLaw(1, 0, 0, 0, 10*u"MHz", [0.0]))])]
+                                TTCal.Point(metadata.phase_centers[1],
+                                            TTCal.PowerLaw(1, 0, 0, 0, 10*u"MHz", [0.0])))]
         dataset = genvis(FullPolarizationVisibilities, metadata, beam, TTCal.SkyModel(sources))
         @test check_all_unity(dataset)
     end
 
-    #@testset "extended sources" begin
-    #    # the general strategy here will be to check that the visibilities match those
-    #    # of a point source in the appropriate limits
-    #    point = PointSource("point", Direction(dir"AZEL", 45degrees, 45degrees),
-    #                                 PowerLaw(4, 3, 2, 1, 10e6, [1.0]))
-    #    gaussian = GaussianSource("gaussian", Direction(dir"AZEL", 45degrees, 45degrees),
-    #                                          PowerLaw(4, 3, 2, 1, 10e6, [1.0]), 0, 0, 0)
-    #    disk = DiskSource("disk", Direction(dir"AZEL", 45degrees, 45degrees),
-    #                              PowerLaw(4, 3, 2, 1, 10e6, [1.0]), 0)
-    #    shapelet = ShapeletSource("shapelet", Direction(dir"AZEL", 45degrees, 45degrees),
-    #                                          PowerLaw(4, 3, 2, 1, 10e6, [1.0]), 0, [1.0])
-    #    point_visibilities = genvis(meta, point)
-    #    gaussian_visibilities = genvis(meta, gaussian)
-    #    disk_visibilities = genvis(meta, disk)
-    #    shapelet_visibilities = genvis(meta, shapelet)
-    #    threshold = eps(Float64)*vecnorm(point_visibilities.data)
-    #    @test vecnorm(point_visibilities.data - gaussian_visibilities.data) < threshold
-    #    @test vecnorm(point_visibilities.data - disk_visibilities.data) < threshold
-    #    @test vecnorm(point_visibilities.data - shapelet_visibilities.data) < threshold
+    @testset "extended sources" begin
+        # the general strategy here will be to check that the visibilities match those
+        # of a point source in the appropriate limits
+        point = TTCal.Source("point",
+                             TTCal.Point(Direction(dir"AZEL", 45*u"°", 45*u"°"),
+                                         TTCal.PowerLaw(4, 3, 2, 1, 10*u"MHz", [1.0])))
+        gaussian = TTCal.Source("gaussian",
+                                TTCal.Gaussian(Direction(dir"AZEL", 45*u"°", 45*u"°"),
+                                               TTCal.PowerLaw(4, 3, 2, 1, 10*u"MHz", [1.0]),
+                                               0., 0., 0.))
+        #disk = DiskSource("disk", Direction(dir"AZEL", 45degrees, 45degrees),
+        #                          PowerLaw(4, 3, 2, 1, 10e6, [1.0]), 0)
+        #shapelet = ShapeletSource("shapelet", Direction(dir"AZEL", 45degrees, 45degrees),
+        #                                      PowerLaw(4, 3, 2, 1, 10e6, [1.0]), 0, [1.0])
+        point_visibilities = genvis(FullPolarizationVisibilities, metadata, beam,
+                                    TTCal.SkyModel(point))
+        gaussian_visibilities = genvis(FullPolarizationVisibilities, metadata, beam,
+                                       TTCal.SkyModel(gaussian))
+        #disk_visibilities = genvis(metadata, disk)
+        #shapelet_visibilities = genvis(metadata, shapelet)
+        @test check_visibilities_match(point_visibilities, gaussian_visibilities)
+        #threshold = eps(Float64)*vecnorm(point_visibilities.data)
+        #@test vecnorm(point_visibilities.data - gaussian_visibilities.data) < threshold
+        #@test vecnorm(point_visibilities.data - disk_visibilities.data) < threshold
+        #@test vecnorm(point_visibilities.data - shapelet_visibilities.data) < threshold
 
-    #    # the first shapelet component is a Gaussian so we can check that the Gaussian and
-    #    # shapelet visibilities match in this limit
-    #    let
-    #        β = deg2rad(1) # the shapelet scale parameter
-    #        fwhm = asin(2sqrt(2log(2))*β) # the Gaussian full-width-half-maximum
-    #        # note that the `asin` comes about because of a small angle approximation that is
-    #        # made in the shapelet `genvis` but not Gaussian `genvis`
-    #        gaussian = GaussianSource("gaussian", Direction(dir"AZEL", 45degrees, 45degrees),
-    #                                              PowerLaw(4, 3, 2, 1, 10e6, [1.0]), fwhm, fwhm, 0)
-    #        shapelet = ShapeletSource("shapelet", Direction(dir"AZEL", 45degrees, 45degrees),
-    #                                              PowerLaw(4, 3, 2, 1, 10e6, [1.0]), β, [1.0])
-    #        gaussian_visibilities = genvis(meta, gaussian)
-    #        shapelet_visibilities = genvis(meta, shapelet)
-    #        threshold = eps(Float64)*vecnorm(gaussian_visibilities.data)
-    #        @test vecnorm(shapelet_visibilities.data - gaussian_visibilities.data) < threshold
-    #    end
-    #end
+        # the first shapelet component is a Gaussian so we can check that the Gaussian and
+        # shapelet visibilities match in this limit
+        #let
+        #    β = deg2rad(1) # the shapelet scale parameter
+        #    fwhm = asin(2sqrt(2log(2))*β) # the Gaussian full-width-half-maximum
+        #    # note that the `asin` comes about because of a small angle approximation that is
+        #    # made in the shapelet `genvis` but not Gaussian `genvis`
+        #    gaussian = GaussianSource("gaussian", Direction(dir"AZEL", 45degrees, 45degrees),
+        #                                          PowerLaw(4, 3, 2, 1, 10e6, [1.0]), fwhm, fwhm, 0)
+        #    shapelet = ShapeletSource("shapelet", Direction(dir"AZEL", 45degrees, 45degrees),
+        #                                          PowerLaw(4, 3, 2, 1, 10e6, [1.0]), β, [1.0])
+        #    gaussian_visibilities = genvis(meta, gaussian)
+        #    shapelet_visibilities = genvis(meta, shapelet)
+        #    threshold = eps(Float64)*vecnorm(gaussian_visibilities.data)
+        #    @test vecnorm(shapelet_visibilities.data - gaussian_visibilities.data) < threshold
+        #end
+    end
 
     #@testset "multi component sources" begin
     #    # a multi-component source should get the same visibilities as each of those sources together
@@ -143,5 +162,7 @@ end
     #    vis2 = genvis(meta, multi)
     #    @test vecnorm(vis1.data - vis2.data) < eps(Float64) * vecnorm(vis1.data)
     #end
+
+    Tables.delete(ms)
 end
 

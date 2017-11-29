@@ -17,6 +17,10 @@ struct SkyModel
     sources :: Vector{Source}
 end
 
+function SkyModel(source::Source)
+    SkyModel([source])
+end
+
 """
     readsky(filename)
 

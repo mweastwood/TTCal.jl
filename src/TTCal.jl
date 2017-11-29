@@ -17,7 +17,7 @@
 
 module TTCal
 
-export Nant, Nfreq, Nbase
+export Nfreq, Ntime, Nant, Nbase
 
 export SinglePolarizationVisibilities
 export DualPolarizationVisibilities

@@ -18,3 +18,7 @@ struct Source{Shapes}
     shapes :: Shapes
 end
 
+function Source(name::String, shape::AbstractShape)
+    Source(name, [shape])
+end
+
