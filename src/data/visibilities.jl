@@ -13,42 +13,21 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-abstract type Visibilities{T} end
-
-struct SinglePolarizationVisibilities{T} <: Visibilities{T}
-    data  :: Vector{ComplexVector{T}}
+struct Visibilities{P <: Polarization, T}
+    data  :: Vector{T}
     flags :: Vector{Vector{Bool}}
 end
 
-function SinglePolarizationVisibilities(Nant)
-    data  = [ComplexVector(Nant) for antenna = 1:Nant]
-    flags = [   fill(true, Nant) for antenna = 1:Nant]
-    SinglePolarizationVisibilities(data, flags)
+function Visibilities(pol::Type{<:Polarization}, Nant)
+    T = vector_type(pol)
+    data  = [         T(Nant) for antenna = 1:Nant]
+    flags = [fill(true, Nant) for antenna = 1:Nant]
+    Visibilities{pol, T}(data, flags)
 end
 
-struct DualPolarizationVisibilities <: Visibilities{Float64}
-    data  :: Vector{DiagonalJonesVector}
-    flags :: Vector{Vector{Bool}}
-end
-
-function DualPolarizationVisibilities(Nant)
-    data  = [DiagonalJonesVector(Nant) for antenna = 1:Nant]
-    flags = [         fill(true, Nant) for antenna = 1:Nant]
-    DualPolarizationVisibilities(data, flags)
-end
-
-struct FullPolarizationVisibilities <: Visibilities{Float64}
-    data  :: Vector{JonesVector}
-    flags :: Vector{Vector{Bool}}
-end
-
-function FullPolarizationVisibilities(Nant)
-    data  = [JonesVector(Nant) for antenna = 1:Nant]
-    flags = [ fill(true, Nant) for antenna = 1:Nant]
-    FullPolarizationVisibilities(data, flags)
-end
-
-Nant(visibilities::Visibilities) = length(visibilities.data)
+Nant( visibilities::Visibilities) = length(visibilities.data)
+Nbase(visibilities::Visibilities) = Nbase(Nant(visibilities))
+polarization(::Visibilities{P, T}) where {P, T} = P
 
 function Base.getindex(visibilities::Visibilities, antenna1, antenna2)
     value = visibilities.data[antenna2][antenna1]
@@ -81,8 +60,9 @@ mutable struct Dataset{T <: Visibilities}
     data     :: Matrix{T} # (number of frequency channels) × (number of time integrations)
 end
 
-function Dataset(T::Type{<:Visibilities}, metadata)
-    data = [T(Nant(metadata)) for freq = 1:Nfreq(metadata), time = 1:Ntime(metadata)]
+function Dataset(metadata; polarization=Full)
+    data = [Visibilities(polarization, Nant(metadata))
+                for freq = 1:Nfreq(metadata), time = 1:Ntime(metadata)]
     Dataset(metadata, data)
 end
 
@@ -92,8 +72,9 @@ end
 
 Nfreq(dataset::Dataset) = Nfreq(dataset.metadata)
 Ntime(dataset::Dataset) = Ntime(dataset.metadata)
-Nant(dataset::Dataset)  =  Nant(dataset.metadata)
+Nant( dataset::Dataset) =  Nant(dataset.metadata)
 Nbase(dataset::Dataset) = Nbase(dataset.metadata)
+polarization(dataset::Dataset) = polarization(first(dataset.data))
 
 function merge!(lhs::Dataset{T}, rhs::Dataset{T}; axis=:frequency) where {T}
     merge!(lhs.metadata, rhs.metadata, axis=axis)
@@ -127,19 +108,13 @@ function slice!(dataset::Dataset{T}, indices; axis=:frequency) where {T}
 end
 
 "Read dataset from the given measurement set."
-function Dataset(ms::Table; column="DATA", polarization=:full)
-    metadata = Metadata(ms::Table)
-    if polarization == :aa
-        return read_single_polarization_visibilities(ms, metadata, column, 1)
-    elseif polarization == :bb
-        return read_single_polarization_visibilities(ms, metadata, column, 4)
-    else
-        err("unknown polarization $polarization")
-    end
+function Dataset(ms::Table; column="DATA", polarization=Full)
+    metadata = Metadata(ms)
+    return read_dataset(ms, metadata, column, polarization)
 end
 
-function read_single_polarization_visibilities(ms, metadata, column, polarization)
-    dataset = Dataset(SinglePolarizationVisibilities, metadata)
+function read_dataset(ms, metadata, column, polarization)
+    dataset = Dataset(metadata, polarization=polarization)
     data  = ms[column]
     flags = read_flags(ms)
     antenna1, antenna2 = read_antenna1_antenna2(ms)
@@ -149,10 +124,30 @@ function read_single_polarization_visibilities(ms, metadata, column, polarizatio
             flags[baseline, frequency] && continue
             ant1 = antenna1[baseline]
             ant2 = antenna2[baseline]
-            visibilities[ant1, ant2] = data[polarization, frequency, baseline]
+            element = read_dataset_element(data, frequency, baseline, polarization)
+            visibilities[ant1, ant2] = element
         end
     end
     dataset
+end
+
+polarization_index(::Type{XX}) = 1
+polarization_index(::Type{XY}) = 2
+polarization_index(::Type{YX}) = 3
+polarization_index(::Type{YY}) = 4
+
+function read_dataset_element(data, frequency, baseline, polarization::Type{<:Single})
+    data[polarization_index(polarization), frequency, baseline]
+end
+function read_dataset_element(data, frequency, baseline, polarization::Type{Dual})
+    DiagonalJonesMatrix(read_dataset_element(data, frequency, baseline, XX),
+                        read_dataset_element(data, frequency, baseline, YY))
+end
+function read_dataset_element(data, frequency, baseline, polarization::Type{Full})
+    JonesMatrix(read_dataset_element(data, frequency, baseline, XX),
+                read_dataset_element(data, frequency, baseline, XY),
+                read_dataset_element(data, frequency, baseline, YX),
+                read_dataset_element(data, frequency, baseline, YY))
 end
 
 "Read flags from the given measurement set."

@@ -32,8 +32,8 @@
 #* `beam` - the antenna primary beam (assumed to be constant if not given)
 #* `sources` - the list of sources to include in the sky model
 #"""
-function genvis(T::Type{<:Visibilities}, metadata::Metadata, beam::AbstractBeam, sky::SkyModel)
-    dataset = Dataset(T, metadata)
+function genvis(metadata::Metadata, beam::AbstractBeam, sky::SkyModel)
+    dataset = Dataset(metadata, polarization=Full)
     genvis!(dataset, beam, sky)
     dataset
 end

@@ -19,10 +19,6 @@ module TTCal
 
 export Nfreq, Ntime, Nant, Nbase
 
-export SinglePolarizationVisibilities
-export DualPolarizationVisibilities
-export FullPolarizationVisibilities
-
 export genvis
 
 #export JonesMatrix, DiagonalJonesMatrix, HermitianJonesMatrix
@@ -57,8 +53,17 @@ struct TTCalException <: Exception
 end
 @noinline err(message) = throw(TTCalException(message))
 function Base.show(io::IO, exception::TTCalException)
-    print(io, "TTCalException: ", exception.message)
+    print(io, "TTCal Error: ", exception.message)
 end
+
+abstract type Polarization end
+struct XX   <: Polarization end
+struct XY   <: Polarization end
+struct YX   <: Polarization end
+struct YY   <: Polarization end
+struct Dual <: Polarization end
+struct Full <: Polarization end
+const Single = Union{XX, XY, YX, YY}
 
 include("math/special.jl")
 include("math/rungekutta.jl")

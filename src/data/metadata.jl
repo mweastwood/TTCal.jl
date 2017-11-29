@@ -22,13 +22,11 @@ end
 
 Nfreq(metadata::Metadata) = length(metadata.frequencies)
 Ntime(metadata::Metadata) = length(metadata.times)
-Nant(metadata::Metadata)  = length(metadata.positions)
+Nant( metadata::Metadata) = length(metadata.positions)
 
 "Number of baselines (counting auto-correlations)"
-function Nbase(metadata::Metadata)
-    N = Nant(metadata)
-    (N*(N+1)) ÷ 2
-end
+Nbase(metadata::Metadata) = Nbase(Nant(metadata))
+Nbase(Nant::Integer) = (Nant*(Nant+1)) ÷ 2
 
 function merge!(lhs::Metadata, rhs::Metadata; axis=:frequency)
     if axis == :frequency

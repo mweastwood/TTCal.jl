@@ -94,7 +94,7 @@ end
 
     @testset "point sources" begin
         # test that genvis agrees with the above reference implementation
-        new = genvis(FullPolarizationVisibilities, metadata, beam, sky)
+        new = genvis(metadata, beam, sky)
         old = old_genvis_equivalent(metadata, beam, sky)
         @test check_new_and_old_genvis(new, old)
 
@@ -102,7 +102,7 @@ end
         sources = [TTCal.Source("Cristiano Ronaldo",
                                 TTCal.Point(metadata.phase_centers[1],
                                             TTCal.PowerLaw(1, 0, 0, 0, 10*u"MHz", [0.0])))]
-        dataset = genvis(FullPolarizationVisibilities, metadata, beam, TTCal.SkyModel(sources))
+        dataset = genvis(metadata, beam, TTCal.SkyModel(sources))
         @test check_all_unity(dataset)
     end
 
@@ -120,10 +120,8 @@ end
         #                          PowerLaw(4, 3, 2, 1, 10e6, [1.0]), 0)
         #shapelet = ShapeletSource("shapelet", Direction(dir"AZEL", 45degrees, 45degrees),
         #                                      PowerLaw(4, 3, 2, 1, 10e6, [1.0]), 0, [1.0])
-        point_visibilities = genvis(FullPolarizationVisibilities, metadata, beam,
-                                    TTCal.SkyModel(point))
-        gaussian_visibilities = genvis(FullPolarizationVisibilities, metadata, beam,
-                                       TTCal.SkyModel(gaussian))
+        point_visibilities = genvis(metadata, beam, TTCal.SkyModel(point))
+        gaussian_visibilities = genvis(metadata, beam, TTCal.SkyModel(gaussian))
         #disk_visibilities = genvis(metadata, disk)
         #shapelet_visibilities = genvis(metadata, shapelet)
         @test check_visibilities_match(point_visibilities, gaussian_visibilities)

@@ -1,4 +1,4 @@
-# Copyright (c) 2016-2017 Michael Eastwood
+# Copyright (c) 2015-2017 Michael Eastwood
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -12,6 +12,39 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+struct Calibration{P <: Polarization, T}
+    data :: T
+end
+
+function Calibration(pol::Type{<:Polarization}, Nant)
+    T = vector_type(pol)
+    data = T(Nant)
+    Calibration{pol, T}(data)
+end
+
+struct Bandpass{P <: Polarization, T}
+    data :: Vector{Calibration{P, T}}
+end
+
+function Bandpass(metadata; polarization=Full)
+    data = [Calibration(polarization, Nant(metadata)) for freq = 1:Nfreq(metadata)]
+    Bandpass(data)
+end
+
+
+
+
+
+
+
+function calibrate(data, model)
+    #output =
+end
+
+
+
+
 
 #abstract Calibration
 #
@@ -428,7 +461,6 @@ function unpolarized_stefcal_step(gains                 :: AbstractVector{T},
         denominator += conj(GM) * GM
         denominator += G
     end
-    denominator
     ok = abs2(denominator) > eps(Float64)
     step = conj(numerator/denominator) - gains[antenna]
     step

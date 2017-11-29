@@ -95,3 +95,10 @@ Base.@propagate_inbounds function Base.setindex!(v::JonesVector, value, i)
     value
 end
 
+vector_type(::Type{XX})   = ComplexVector{Float64}
+vector_type(::Type{XY})   = ComplexVector{Float64}
+vector_type(::Type{YX})   = ComplexVector{Float64}
+vector_type(::Type{YY})   = ComplexVector{Float64}
+vector_type(::Type{Dual}) = DiagonalJonesVector
+vector_type(::Type{Full}) = JonesVector
+
