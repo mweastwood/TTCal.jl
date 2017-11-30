@@ -21,10 +21,11 @@ end
 
 ComplexVector(N) = ComplexVector(Complex128, N)
 ComplexVector(T, N) = ComplexVector(zeros(real(T), N), zeros(real(T), N))
+ComplexVector{T}(N) where {T} = ComplexVector(T, N)
 Base.size(v::ComplexVector) = size(v.real)
 Base.length(v::ComplexVector) = length(v.real)
 Base.eltype(v::ComplexVector{T}) where {T} = complex(T)
-Base.@propagate_inbounds function Base.getindex(v::ComplexVector, i)
+Base.@propagate_inbounds function Base.getindex(v::ComplexVector, i::Integer)
     complex(v.real[i], v.imag[i])
 end
 Base.@propagate_inbounds function Base.setindex!(v::ComplexVector, value, i)
@@ -46,7 +47,7 @@ DiagonalJonesVector(N) = DiagonalJonesVector(zeros(Float64, N), zeros(Float64, N
 Base.size(v::DiagonalJonesVector) = size(v.xxreal)
 Base.length(v::DiagonalJonesVector) = length(v.xxreal)
 Base.eltype(v::DiagonalJonesVector) = DiagonalJonesMatrix
-Base.@propagate_inbounds function Base.getindex(v::DiagonalJonesVector, i)
+Base.@propagate_inbounds function Base.getindex(v::DiagonalJonesVector, i::Integer)
     DiagonalJonesMatrix(complex(v.xxreal[i], v.xximag[i]),
                         complex(v.yyreal[i], v.yyimag[i]))
 end
@@ -77,7 +78,7 @@ JonesVector(N) = JonesVector(zeros(Float64, N), zeros(Float64, N),
 Base.size(v::JonesVector) = size(v.xxreal)
 Base.length(v::JonesVector) = length(v.xxreal)
 Base.eltype(v::JonesVector) = JonesMatrix
-Base.@propagate_inbounds function Base.getindex(v::JonesVector, i)
+Base.@propagate_inbounds function Base.getindex(v::JonesVector, i::Integer)
     JonesMatrix(complex(v.xxreal[i], v.xximag[i]),
                 complex(v.xyreal[i], v.xyimag[i]),
                 complex(v.yxreal[i], v.yximag[i]),

@@ -76,7 +76,7 @@ end
     name, ms = createms(Nant, Nfreq)
     metadata = TTCal.Metadata(ms)
     beam = TTCal.ConstantBeam()
-    sky  = TTCal.readsky("sources.json")
+    sky  = readsky("sources.json")
 
     #@testset "geometric delays" begin
     #    # check that the near field and far field routines give equal geometric delays

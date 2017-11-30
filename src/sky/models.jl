@@ -79,7 +79,7 @@ end
 
 function get_shapes(name, c)
     if haskey(c, "components")
-        shapes = [get_shapes(name, d) for d in c["components"]]
+        return [get_shapes(name, d) for d in c["components"]]
     #elseif haskey(c, "rfi-frequencies") && haskey(c, "rfi-I")
     #    # RFISource
     #    position = get_source_position(c)
@@ -93,7 +93,7 @@ function get_shapes(name, c)
             major_fwhm = deg2rad(c["major-fwhm"]/3600)
             minor_fwhm = deg2rad(c["minor-fwhm"]/3600)
             position_angle = deg2rad(c["position-angle"])
-            shapes = [Gaussian(dir, spec, major_fwhm, minor_fwhm, position_angle)]
+            return Gaussian(dir, spec, major_fwhm, minor_fwhm, position_angle)
         #elseif haskey(c, "radius")
         #    # Disk
         #    radius = deg2rad(c["radius"]/3600)
@@ -105,10 +105,9 @@ function get_shapes(name, c)
         #    source = ShapeletSource(name, dir, spec, scale, coeff)
         else
             # Point
-            shapes = [Point(dir, spec)]
+            return Point(dir, spec)
         end
     end
-    return shapes
 end
 
 function get_source_direction(name, c)

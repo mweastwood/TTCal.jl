@@ -28,11 +28,14 @@ end
 Nant( visibilities::Visibilities) = length(visibilities.data)
 Nbase(visibilities::Visibilities) = Nbase(Nant(visibilities))
 polarization(::Visibilities{P, T}) where {P, T} = P
+Base.eltype( ::Visibilities{P, T}) where {P, T} = eltype(T)
+
+function Base.getindex(visibilities::Visibilities, antenna)
+    visibilities.data[antenna]
+end
 
 function Base.getindex(visibilities::Visibilities, antenna1, antenna2)
-    value = visibilities.data[antenna2][antenna1]
-    flag  = visibilities.flags[antenna2][antenna1]
-    value
+    visibilities.data[antenna2][antenna1]
 end
 
 function Base.setindex!(visibilities::Visibilities, value, antenna1, antenna2)
@@ -66,8 +69,50 @@ function Dataset(metadata; polarization=Full)
     Dataset(metadata, data)
 end
 
+function Base.rand!(dataset::Dataset)
+    for time = 1:Ntime(dataset), frequency = 1:Nfreq(dataset)
+        visibilities = dataset[frequency, time]
+        for antenna1 = 1:Nant(dataset), antenna2 = antenna1:Nant(dataset)
+            visibilities[antenna1, antenna2] = rand(eltype(dataset))
+        end
+    end
+    dataset
+end
+
 function Base.getindex(dataset::Dataset, channel, time)
     dataset.data[channel, time]
+end
+
+function flag_antennas!(dataset::Dataset, antennas)
+    for time = 1:Ntime(dataset), frequency = 1:Nfreq(dataset)
+        visibilities = dataset[frequency, time]
+        for antenna1 in antennas, antenna2 = 1:Nant(dataset)
+            flag!(visibilities, antenna1, antenna2)
+        end
+    end
+    antennas
+end
+
+function flag_frequencies!(dataset::Dataset, frequencies)
+    for time = 1:Ntime(dataset), frequency in frequencies
+        visibilities = dataset[frequency, time]
+        for antenna1 = 1:Nant(dataset), antenna2 = antenna1:Nant(dataset)
+            flag!(visibilities, antenna1, antenna2)
+        end
+    end
+    antennas
+end
+
+function match_flags!(to, from)
+    for time = 1:Ntime(to), frequency = 1:Nfreq(to)
+        to_visibilities   =   to[frequency, time]
+        from_visibilities = from[frequency, time]
+        for antenna1 = 1:Nant(to), antenna2 = antenna1:Nant(to)
+            if isflagged(from_visibilities, antenna1, antenna2)
+                flag!(to_visibilities, antenna1, antenna2)
+            end
+        end
+    end
 end
 
 Nfreq(dataset::Dataset) = Nfreq(dataset.metadata)
@@ -75,6 +120,7 @@ Ntime(dataset::Dataset) = Ntime(dataset.metadata)
 Nant( dataset::Dataset) =  Nant(dataset.metadata)
 Nbase(dataset::Dataset) = Nbase(dataset.metadata)
 polarization(dataset::Dataset) = polarization(first(dataset.data))
+Base.eltype( dataset::Dataset) = eltype(first(dataset.data))
 
 function merge!(lhs::Dataset{T}, rhs::Dataset{T}; axis=:frequency) where {T}
     merge!(lhs.metadata, rhs.metadata, axis=axis)
@@ -183,6 +229,43 @@ function read_antenna1_antenna2(ms::Table)
     antenna1, antenna2
 end
 
+function write(ms::Table, dataset::Dataset; column="DATA")
+    data  = zeros(Complex64, 4, Nfreq(dataset), Nbase(dataset))
+    flags = zeros(     Bool, 4, Nfreq(dataset), Nbase(dataset))
+    antenna1, antenna2 = read_antenna1_antenna2(ms)
+    pol = polarization(dataset)
+    for frequency = 1:Nfreq(dataset)
+        visibilities = dataset[frequency, 1]
+        for baseline = 1:Nbase(dataset)
+            ant1 = antenna1[baseline]
+            ant2 = antenna2[baseline]
+            flags[:, frequency, baseline] = isflagged(visibilities, ant1, ant2)
+            write_dataset_element!(data, frequency, baseline, visibilities[ant1, ant2], pol)
+        end
+    end
+    if column == "DATA" || column == "CORRECTED_DATA"
+        ms["FLAG"]     = flags
+        ms["FLAG_ROW"] = zeros(Bool, Nbase(dataset))
+    end
+    ms[column] = data
+end
+
+function write_dataset_element!(data, frequency, baseline, element, polarization::Type{<:Single})
+    data[polarization_index(polarization), frequency, baseline] = element
+    element
+end
+function write_dataset_element!(data, frequency, baseline, element, polarization::Type{Dual})
+    write_dataset_element!(data, frequency, baseline, element.xx, XX)
+    write_dataset_element!(data, frequency, baseline, element.yy, YY)
+    element
+end
+function write_dataset_element!(data, frequency, baseline, element, polarization::Type{Full})
+    write_dataset_element!(data, frequency, baseline, element.xx, XX)
+    write_dataset_element!(data, frequency, baseline, element.xy, XY)
+    write_dataset_element!(data, frequency, baseline, element.yx, YX)
+    write_dataset_element!(data, frequency, baseline, element.yy, YY)
+    element
+end
 
 
 

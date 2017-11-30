@@ -28,41 +28,42 @@ const RK4_tableau = @SMatrix [1/2 0.0 0.0 0.0;
                               0.0 0.0 1.0 0.0;
                               1/6 1/3 1/3 1/6]
 
-struct RKWorkspace{T}
-    x :: Vector{T}
-    k :: Vector{Vector{T}}
-    δ :: Vector{T}
+struct RKWorkspace{V<:AbstractVector}
+    x :: V
+    k :: Vector{V}
+    δ :: V
 end
 
-#function rkstep!(workspace, tableau, f!, x)
-#    N = length(x)
-#    order = size(tableau, 1)
-#
-#    # Calculate the intermediate steps
-#    f!(workspace.k[1], x)
-#    for row = 1:order-1
-#        x′ = copy(x)
-#        for col = 1:row
-#            $tableau[row,col] == 0 && continue
-#            k′ = k[col]
-#            for i in eachindex(x′, k′)
-#                @inbounds x′[i] += k′[i] * $tableau[row,col]
-#            end
-#        end
-#        k[row+1] = rkstep.func(x′, args...)
-#    end
-#
-#    # Calculate the final step
-#    δ = zeros(eltype(x), size(x))
-#    for col = 1:order
-#        k′ = k[col]
-#        for i in eachindex(δ, k′)
-#            @inbounds δ[i] += k′[i] * $tableau[order,col]
-#        end
-#    end
-#    δ
-#end
-#
+function RKWorkspace(v::V, N::Int) where {V<:AbstractVector}
+    x = similar(v)
+    k = [similar(v) for n = 1:N]
+    δ = similar(v)
+    RKWorkspace(x, k, δ)
+end
+
+function rk2!(workspace, f!, x)
+    k1 = workspace.k[1]; k2 = workspace.k[2]
+    f!(k1, x)
+    @. workspace.x = x + 0.5*k1
+    f!(k2, workspace.x)
+    @. workspace.δ = x + k2
+    workspace.δ[:]
+end
+
+function rk4!(workspace, f!, x)
+    k1 = workspace.k[1]; k2 = workspace.k[2]
+    k3 = workspace.k[3]; k4 = workspace.k[4]
+    f!(k1, x)
+    @. workspace.x = x + 0.5*k1
+    f!(k2, workspace.x)
+    @. workspace.x = x + 0.5*k2
+    f!(k3, workspace.x)
+    @. workspace.x = x + k3
+    f!(k4, workspace.x)
+    @. workspace.δ = x + (k1 + 2*k2 + 2*k3 + k4)/6
+    workspace.δ[:]
+end
+
 #"""
 #    RK2(step)
 #

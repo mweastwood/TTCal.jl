@@ -18,8 +18,7 @@
 module TTCal
 
 export Nfreq, Ntime, Nant, Nbase
-
-export genvis
+export readsky, genvis, calibrate, applycal!
 
 #export JonesMatrix, DiagonalJonesMatrix, HermitianJonesMatrix
 #export StokesVector, MuellerMatrix
@@ -94,7 +93,7 @@ include("instrument/genvis.jl")
 #include("getspec.jl")
 #include("subsrc.jl")
 #include("fitvis.jl")
-#include("calibration.jl")
+include("calibration.jl")
 #include("peel.jl")
 #include("commandline.jl")
 

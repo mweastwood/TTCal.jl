@@ -13,23 +13,109 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-struct Calibration{P <: Polarization, T}
+const CalElementTypes = Union{Complex128, DiagonalJonesMatrix, JonesMatrix}
+
+struct Solution{P <: Polarization, T} <: AbstractVector{eltype(T)}
     data :: T
 end
 
-function Calibration(pol::Type{<:Polarization}, Nant)
+function Solution(pol::Type{<:Polarization}, Nant)
     T = vector_type(pol)
     data = T(Nant)
-    Calibration{pol, T}(data)
+    data[:] = one(eltype(data))
+    Solution{pol, T}(data)
 end
 
-struct Bandpass{P <: Polarization, T}
-    data :: Vector{Calibration{P, T}}
+Nant(cal::Solution) = length(cal.data)
+polarization(::Solution{P, T}) where {P, T} = P
+Base.eltype( ::Solution{P, T}) where {P, T} = eltype(T)
+
+Base.getindex( cal::Solution, antenna) = cal.data[antenna]
+Base.setindex!(cal::Solution, value, antenna) = cal.data[antenna] = value
+Base.similar(  cal::Solution) = Solution(polarization(cal), Nant(cal))
+Base.length(   cal::Solution) = length(cal.data)
+
+struct Calibration{P <: Polarization, T}
+    data :: Matrix{Solution{P, T}}
 end
 
-function Bandpass(metadata; polarization=Full)
-    data = [Calibration(polarization, Nant(metadata)) for freq = 1:Nfreq(metadata)]
-    Bandpass(data)
+Nfreq(cal::Calibration) = size(cal.data, 1)
+Ntime(cal::Calibration) = size(cal.data, 2)
+
+Base.getindex(cal::Calibration, frequency, time) = cal.data[frequency, time]
+
+function Calibration(metadata; polarization=Full, collapse_frequency=false, collapse_time=false)
+    N = collapse_frequency ? 1 : Nfreq(metadata)
+    M = collapse_time      ? 1 : Ntime(metadata)
+    data = [Solution(polarization, Nant(metadata)) for freq = 1:N, time = 1:M]
+    Calibration(data)
+end
+
+function calibrate(data::Dataset, model::Dataset)
+    calibration = Calibration(data.metadata, polarization=polarization(data))
+    calibrate!(calibration, data, model)
+    calibration
+end
+
+function calibrate!(calibration::Calibration, data::Dataset, model::Dataset)
+    match_flags!(model, data)
+    if Nfreq(calibration) == Ntime(calibration) == 1
+        calibrate_onefrequency_onetime!(calibration, data, model)
+    elseif Nfreq(calibration) == 1
+        calibrate_onefrequency!(calibration, data, model)
+    elseif Ntime(calibration) == 1
+        calibrate_onetime!(calibration, data, model)
+    else
+        for time = 1:Ntime(calibration), frequency = 1:Nfreq(calibration)
+            solve!(calibration[frequency, time], data[frequency, time], model[frequency, time])
+        end
+    end
+end
+
+function calibrate_onefrequency!(calibration::Calibration, data::Dataset, model::Dataset)
+    for time = 1:Ntime(calibration)
+        data_slice  = [getindex.( data[:, time], antenna) for antenna = 1:Nant(data)]
+        model_slice = [getindex.(model[:, time], antenna) for antenna = 1:Nant(data)]
+        solve!(calibration[1, time].data, data_slice, model_slice)
+    end
+end
+
+function calibrate_onetime!(calibration::Calibration, data::Dataset, model::Dataset)
+    for frequency = 1:Nfreq(calibration)
+        data_slice  = [getindex.( data[frequency, :], antenna) for antenna = 1:Nant(data)]
+        model_slice = [getindex.(model[frequency, :], antenna) for antenna = 1:Nant(data)]
+        solve!(calibration[frequency, 1].data, data_slice, model_slice)
+    end
+end
+
+function calibrate_onefrequency_onetime!(calibration::Calibration, data::Dataset, model::Dataset)
+    data_slice  = [getindex.( data[:], antenna) for antenna = 1:Nant(data)]
+    model_slice = [getindex.(model[:], antenna) for antenna = 1:Nant(data)]
+    solve!(calibration[1, 1].data, data_slice, model_slice)
+end
+
+function solve!(gains, measured_visibilities, model_visibilities)
+    workspace = RKWorkspace(gains, 4)
+    function step!(output, input)
+        stefcal_step!(output, input, measured_visibilities, model_visibilities)
+    end
+    iter = 0
+    maxiter = 50
+    tolerance = 1e-3
+    converged = false
+    while !converged && iter < maxiter
+        newgains = rk4!(workspace, step!, gains)
+        relative_change = norm(gains - newgains)/norm(gains)
+        if relative_change < tolerance
+            converged = true
+        end
+        gains[:] = newgains
+        iter += 1
+    end
+    if !converged
+        warn("calibration did not converge")
+    end
+    gains
 end
 
 
@@ -38,29 +124,6 @@ end
 
 
 
-function calibrate(data, model)
-    #output =
-end
-
-
-
-
-
-#abstract Calibration
-#
-#macro generate_calibration(name, jones)
-#    quote
-#        Base.@__doc__ immutable $name <: Calibration
-#            jones :: Matrix{$jones}
-#            flags :: Matrix{Bool}
-#        end
-#        function $name(Nant::Int, Nfreq::Int)
-#            $name(ones($jones, Nant, Nfreq), zeros(Bool, Nant, Nfreq))
-#        end
-#        Base.similar(cal::$name) = $name(Nant(cal), Nfreq(cal))
-#    end |> esc
-#end
-#
 #"""
 #    GainCalibration
 #
@@ -143,88 +206,6 @@ end
 ##    end
 ##    npzwrite(filename, Dict("gains" => gains, "flags" => flags))
 ##end
-#
-## corrupt / applycal
-#
-#doc"""
-#    corrupt!(visibilities, metadata, calibration)
-#
-#*Description*
-#
-#Corrupt the visibilities as if they were observed with the given calibration.
-#That is if we have the model visibility $V_{i,j}$ on baseline $i,j$, and the
-#corresponding Jones matrices $J_i$ and $J_j$ for antennas $i$ and $j$ compute
-#
-#$$V_{i,j} \rightarrow J_i V_{i,j} J_j^*$$
-#
-#*Arguments*
-#
-#* `visibilities` - the list of visibilities to corrupt
-#* `metadata` - the metadata describing the interferometer
-#* `calibration` - the calibration in question
-#"""
-#function corrupt!(visibilities::Visibilities, meta::Metadata, calibration::Calibration)
-#    for β = 1:Nfreq(meta), α = 1:Nbase(meta)
-#        antenna1 = meta.baselines[α].antenna1
-#        antenna2 = meta.baselines[α].antenna2
-#        # If the calibration has only one frequency channel, then it is a wideband
-#        # solution and we should apply it to every frequency channel. Otherwise we
-#        # should use the calibration from the frequency channel in question.
-#        if Nfreq(calibration) == 1
-#            J₁ = calibration.jones[antenna1,1]
-#            J₂ = calibration.jones[antenna2,1]
-#            flag = calibration.flags[antenna1,1] | calibration.flags[antenna2,1]
-#        else
-#            J₁ = calibration.jones[antenna1,β]
-#            J₂ = calibration.jones[antenna2,β]
-#            flag = calibration.flags[antenna1,β] | calibration.flags[antenna2,β]
-#        end
-#        V  = visibilities.data[α,β]
-#        visibilities.data[α,β] = J₁*V*J₂'
-#        visibilities.flags[α,β] = ifelse(flag, true, visibilities.flags[α,β])
-#    end
-#    visibilities
-#end
-#
-#
-#doc"""
-#    applycal!(visibilities, metadata, calibration)
-#
-#*Description*
-#
-#Apply the calibration to the given visibilities.
-#That is if we have the model visibility $V_{i,j}$ on baseline $i,j$, and the
-#corresponding Jones matrices $J_i$ and $J_j$ for antennas $i$ and $j$ compute
-#
-#$$V_{i,j} \rightarrow J_i^{-1} V_{i,j} (J_j^{-1})^*$$
-#
-#*Arguments*
-#
-#* `visibilities` - the list of visibilities to corrupt
-#* `metadata` - the metadata describing the interferometer
-#* `calibration` - the calibration in question
-#"""
-#function applycal!(visibilities::Visibilities, meta::Metadata, calibration::Calibration)
-#    inverse_cal = invert(calibration)
-#    corrupt!(visibilities, meta, inverse_cal)
-#    visibilities
-#end
-#
-#doc"""
-#    invert(calibration)
-#
-#Returns the inverse of the given calibration.
-#The Jones matrices $J$ of each antenna is set to $J^{-1}$.
-#"""
-#function invert(calibration::Calibration)
-#    output = similar(calibration)
-#    for i in eachindex(     output.jones,      output.flags,
-#                       calibration.jones, calibration.flags)
-#        output.jones[i] = inv(calibration.jones[i])
-#        output.flags[i] = calibration.flags[i]
-#    end
-#    output
-#end
 #
 ## gaincal / polcal
 #
@@ -431,24 +412,60 @@ end
 
 # step functions
 
-function unpolarized_stefcal_step!(steps,
-                                   gains,
-                                   measured_visibilities,
-                                   model_visibilities)
+function stefcal_step(gains, measured_visibilities, model_visibilities)
+    step = similar(gains)
+    stefcal_step!(step, gains, measured_visibilities, model_visibilities)
+    step
+end
+
+function stefcal_step!(steps, gains, measured_visibilities, model_visibilities)
     N = length(gains)
     for antenna = 1:N
-        steps[idx] = unpolarized_stefcal_step(gains[antenna],
-                                              measured_visibilities[antenna],
-                                              model_visibilities[antenna],
-                                              antenna)
+        steps[antenna] = _stefcal_step(gains,
+                                       measured_visibilities[antenna],
+                                       model_visibilities[antenna],
+                                       antenna)
     end
     steps
 end
 
-function unpolarized_stefcal_step(gains                 :: AbstractVector{T},
-                                  measured_visibilities :: AbstractVector{T},
-                                  model_visibilities    :: AbstractVector{T},
-                                  antenna               :: Int) where {T<:Complex}
+function _stefcal_step(gains, measured_visibilities, model_visibilities, antenna)
+    numerator, denominator = numerator_denominator(gains,
+                                                   measured_visibilities,
+                                                   model_visibilities,
+                                                   antenna)
+    ok = abs(det(denominator)) > eps(Float64)
+    if !ok
+        return zero(typeof(numerator))
+    else
+        newgain = (denominator\numerator)'
+        oldgain = gains[antenna]
+        return newgain - oldgain
+    end
+end
+
+"handle the case where we are given multiple frequencies or times to solve jointly"
+function numerator_denominator(gains                 :: AbstractVector{T},
+                               measured_visibilities :: AbstractArray{<:AbstractVector},
+                               model_visibilities    :: AbstractArray{<:AbstractVector},
+                               antenna               :: Int) where {T<:CalElementTypes}
+    numerator   = zero(T)
+    denominator = zero(T)
+    for idx in eachindex(measured_visibilities, model_visibilities)
+        V = measured_visibilities[idx]
+        M =    model_visibilities[idx]
+        num, den = numerator_denominator(gains, V, M, antenna)
+        numerator   += num
+        denominator += den
+    end
+    numerator, denominator
+end
+
+"handle the case where we are given a single frequency and time to solve"
+function numerator_denominator(gains                 :: AbstractVector{T},
+                               measured_visibilities :: AbstractVector{T},
+                               model_visibilities    :: AbstractVector{T},
+                               antenna               :: Int) where {T<:CalElementTypes}
     N = length(gains)
     numerator   = zero(T)
     denominator = zero(T)
@@ -456,14 +473,12 @@ function unpolarized_stefcal_step(gains                 :: AbstractVector{T},
         @inbounds G = gains[idx]
         @inbounds V = measured_visibilities[idx]
         @inbounds M = model_visibilities[idx]
-        GM = G*M
-        numerator   += conj(GM) *  V
-        denominator += conj(GM) * GM
-        denominator += G
+        GM  = G*M
+        GM′ = GM'
+        numerator   += GM′* V
+        denominator += GM′*GM
     end
-    ok = abs2(denominator) > eps(Float64)
-    step = conj(numerator/denominator) - gains[antenna]
-    step
+    numerator, denominator
 end
 
 #doc"""
@@ -536,4 +551,106 @@ end
 #end
 #
 #@inline inner_multiply(::Type{JonesMatrix}, X, Y) = X'*Y
+
+# corrupt / applycal
+
+#doc"""
+#    corrupt!(visibilities, metadata, calibration)
+#
+#*Description*
+#
+#Corrupt the visibilities as if they were observed with the given calibration.
+#That is if we have the model visibility $V_{i,j}$ on baseline $i,j$, and the
+#corresponding Jones matrices $J_i$ and $J_j$ for antennas $i$ and $j$ compute
+#
+#$$V_{i,j} \rightarrow J_i V_{i,j} J_j^*$$
+#
+#*Arguments*
+#
+#* `visibilities` - the list of visibilities to corrupt
+#* `metadata` - the metadata describing the interferometer
+#* `calibration` - the calibration in question
+#"""
+function corrupt!(dataset::Dataset, calibration::Calibration)
+    if Nfreq(calibration) == Ntime(calibration) == 1
+        corrupt_onefrequency_onetime!(dataset, calibration)
+    elseif Nfreq(calibration) == 1
+        corrupt_onefrequency!(dataset, calibration)
+    elseif Ntime(calibration) == 1
+        corrupt_onetime!(dataset, calibration)
+    else
+        for time = 1:Ntime(dataset), frequency = 1:Nfreq(dataset)
+            corrupt!(dataset[frequency, time], calibration[frequency, time])
+        end
+    end
+    dataset
+end
+
+function corrupt_onefrequency!(dataset::Dataset, calibration::Calibration)
+    for time = 1:Ntime(dataset), frequency = 1:Nfreq(dataset)
+        corrupt!(dataset[frequency, time], calibration[1, time])
+    end
+end
+
+function corrupt_onetime!(dataset::Dataset, calibration::Calibration)
+    for time = 1:Ntime(dataset), frequency = 1:Nfreq(dataset)
+        corrupt!(dataset[frequency, time], calibration[frequency, 1])
+    end
+end
+
+function corrupt_onefrequency_onetime!(dataset::Dataset, calibration::Calibration)
+    for time = 1:Ntime(dataset), frequency = 1:Nfreq(dataset)
+        corrupt!(dataset[frequency, time], calibration[1, 1])
+    end
+end
+
+function corrupt!(visibilities::Visibilities, solution::Solution)
+    for antenna1 = 1:Nant(visibilities), antenna2 = antenna1:Nant(visibilities)
+        isflagged(visibilities, antenna1, antenna2) && continue
+        V  = visibilities[antenna1, antenna2]
+        J₁ = solution[antenna1]
+        J₂ = solution[antenna2]
+        visibilities[antenna1, antenna2] = J₁*V*J₂'
+    end
+    visibilities
+end
+
+
+#doc"""
+#    applycal!(visibilities, metadata, calibration)
+#
+#*Description*
+#
+#Apply the calibration to the given visibilities.
+#That is if we have the model visibility $V_{i,j}$ on baseline $i,j$, and the
+#corresponding Jones matrices $J_i$ and $J_j$ for antennas $i$ and $j$ compute
+#
+#$$V_{i,j} \rightarrow J_i^{-1} V_{i,j} (J_j^{-1})^*$$
+#
+#*Arguments*
+#
+#* `visibilities` - the list of visibilities to corrupt
+#* `metadata` - the metadata describing the interferometer
+#* `calibration` - the calibration in question
+#"""
+function applycal!(dataset::Dataset, calibration::Calibration)
+    corrupt!(dataset, invert(calibration))
+end
+
+#doc"""
+#    invert(calibration)
+#
+#Returns the inverse of the given calibration.
+#The Jones matrices $J$ of each antenna is set to $J^{-1}$.
+#"""
+function invert(calibration::Calibration)
+    calibration = deepcopy(calibration)
+    for time = 1:Ntime(calibration), frequency = 1:Nfreq(calibration)
+        solution = calibration[frequency, time]
+        for antenna = 1:Nant(solution)
+            solution[antenna] = inv(solution[antenna])
+        end
+    end
+    calibration
+end
 
