@@ -28,7 +28,7 @@ Base.eltype(v::ComplexVector{T}) where {T} = complex(T)
 Base.@propagate_inbounds function Base.getindex(v::ComplexVector, i::Integer)
     complex(v.real[i], v.imag[i])
 end
-Base.@propagate_inbounds function Base.setindex!(v::ComplexVector, value, i)
+Base.@propagate_inbounds function Base.setindex!(v::ComplexVector, value, i::Integer)
     v.real[i] = real(value)
     v.imag[i] = imag(value)
     value
@@ -51,7 +51,7 @@ Base.@propagate_inbounds function Base.getindex(v::DiagonalJonesVector, i::Integ
     DiagonalJonesMatrix(complex(v.xxreal[i], v.xximag[i]),
                         complex(v.yyreal[i], v.yyimag[i]))
 end
-Base.@propagate_inbounds function Base.setindex!(v::DiagonalJonesVector, value, i)
+Base.@propagate_inbounds function Base.setindex!(v::DiagonalJonesVector, value, i::Integer)
     v.xxreal[i] = real(value.xx)
     v.xximag[i] = imag(value.xx)
     v.yyreal[i] = real(value.yy)
@@ -84,7 +84,7 @@ Base.@propagate_inbounds function Base.getindex(v::JonesVector, i::Integer)
                 complex(v.yxreal[i], v.yximag[i]),
                 complex(v.yyreal[i], v.yyimag[i]))
 end
-Base.@propagate_inbounds function Base.setindex!(v::JonesVector, value, i)
+Base.@propagate_inbounds function Base.setindex!(v::JonesVector, value, i::Integer)
     v.xxreal[i] = real(value.xx)
     v.xximag[i] = imag(value.xx)
     v.xyreal[i] = real(value.xy)

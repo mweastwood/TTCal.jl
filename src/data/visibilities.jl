@@ -30,19 +30,19 @@ Nbase(visibilities::Visibilities) = Nbase(Nant(visibilities))
 polarization(::Visibilities{P, T}) where {P, T} = P
 Base.eltype( ::Visibilities{P, T}) where {P, T} = eltype(T)
 
-function Base.getindex(visibilities::Visibilities, antenna)
+Base.@propagate_inbounds function Base.getindex(visibilities::Visibilities, antenna)
     visibilities.data[antenna]
 end
 
-function Base.getindex(visibilities::Visibilities, antenna1, antenna2)
+Base.@propagate_inbounds function Base.getindex(visibilities::Visibilities, antenna1, antenna2)
     visibilities.data[antenna2][antenna1]
 end
 
-function Base.setindex!(visibilities::Visibilities, value, antenna1, antenna2)
-    visibilities.data[antenna2][antenna1]  = value
-    visibilities.data[antenna1][antenna2]  = value'
-    visibilities.flags[antenna2][antenna1] = false
-    visibilities.flags[antenna1][antenna2] = false
+Base.@propagate_inbounds function Base.setindex!(visibilities::Visibilities, value, ant1, ant2)
+    visibilities.data[ant2][ant1]  = value
+    visibilities.data[ant1][ant2]  = value'
+    visibilities.flags[ant2][ant1] = false
+    visibilities.flags[ant1][ant2] = false
     value
 end
 
@@ -51,8 +51,8 @@ function isflagged(visibilities::Visibilities, antenna1, antenna2)
 end
 
 function flag!(visibilities::Visibilities, antenna1, antenna2)
-    visibilities.data[antenna2][antenna1]  = 0
-    visibilities.data[antenna1][antenna2]  = 0
+    visibilities.data[antenna2][antenna1]  = zero(eltype(visibilities))
+    visibilities.data[antenna1][antenna2]  = zero(eltype(visibilities))
     visibilities.flags[antenna2][antenna1] = true
     visibilities.flags[antenna1][antenna2] = true
     nothing
@@ -93,6 +93,16 @@ function flag_antennas!(dataset::Dataset, antennas)
     antennas
 end
 
+function flag_baselines!(dataset::Dataset, baselines)
+    for time = 1:Ntime(dataset), frequency = 1:Nfreq(dataset)
+        visibilities = dataset[frequency, time]
+        for (antenna1, antenna2) in baselines
+            flag!(visibilities, antenna1, antenna2)
+        end
+    end
+    baselines
+end
+
 function flag_frequencies!(dataset::Dataset, frequencies)
     for time = 1:Ntime(dataset), frequency in frequencies
         visibilities = dataset[frequency, time]
@@ -100,7 +110,7 @@ function flag_frequencies!(dataset::Dataset, frequencies)
             flag!(visibilities, antenna1, antenna2)
         end
     end
-    antennas
+    frequencies
 end
 
 function match_flags!(to, from)
@@ -164,9 +174,14 @@ function read_dataset(ms, metadata, column, polarization)
     data  = ms[column]
     flags = read_flags(ms)
     antenna1, antenna2 = read_antenna1_antenna2(ms)
-    for frequency = 1:Nfreq(metadata)
+    pack_data!(dataset, data, flags, antenna1, antenna2, polarization)
+    dataset
+end
+
+function pack_data!(dataset, data, flags, antenna1, antenna2, polarization)
+    for frequency = 1:Nfreq(dataset)
         visibilities = dataset[frequency, 1]
-        for baseline = 1:Nbase(metadata)
+        for baseline = 1:Nbase(dataset)
             flags[baseline, frequency] && continue
             ant1 = antenna1[baseline]
             ant2 = antenna2[baseline]
@@ -177,19 +192,19 @@ function read_dataset(ms, metadata, column, polarization)
     dataset
 end
 
-polarization_index(::Type{XX}) = 1
-polarization_index(::Type{XY}) = 2
-polarization_index(::Type{YX}) = 3
-polarization_index(::Type{YY}) = 4
+@inline polarization_index(::Type{XX}) = 1
+@inline polarization_index(::Type{XY}) = 2
+@inline polarization_index(::Type{YX}) = 3
+@inline polarization_index(::Type{YY}) = 4
 
-function read_dataset_element(data, frequency, baseline, polarization::Type{<:Single})
+@inline function read_dataset_element(data, frequency, baseline, polarization::Type{<:Single})
     data[polarization_index(polarization), frequency, baseline]
 end
-function read_dataset_element(data, frequency, baseline, polarization::Type{Dual})
+@inline function read_dataset_element(data, frequency, baseline, polarization::Type{Dual})
     DiagonalJonesMatrix(read_dataset_element(data, frequency, baseline, XX),
                         read_dataset_element(data, frequency, baseline, YY))
 end
-function read_dataset_element(data, frequency, baseline, polarization::Type{Full})
+@inline function read_dataset_element(data, frequency, baseline, polarization::Type{Full})
     JonesMatrix(read_dataset_element(data, frequency, baseline, XX),
                 read_dataset_element(data, frequency, baseline, XY),
                 read_dataset_element(data, frequency, baseline, YX),
@@ -267,42 +282,76 @@ function write_dataset_element!(data, frequency, baseline, element, polarization
     element
 end
 
+"Read dataset from the given JLD2 file."
+function Dataset(path::String)
+    local dataset
+    jldopen(path, "r") do file
+        dataset = file["DATASET"]
+    end
+    dataset
+end
 
+function write(path::String, dataset::Dataset)
+    jldopen(path, "w", compress=true) do file
+        file["DATASET"] = dataset
+    end
+end
 
+#function read_dataset_jld2(file)
+#    #metadata = file["METADATA"]
+#    #pol    = file["POLARIZATION"]
+#    #vector = file["DATA"]
+#    #flags  = file["FLAGS"]
+#    #read_dataset_jld2(pol, metadata, vector, flags)
+#end
 
-
-
-
-#"Write visibilities to the measurement set."
-#function write(ms::Table, column, data::Visibilities; apply_flags::Bool=true)
-#    reorganized_data = zeros(Complex64, 4, Nfreq(data), Nbase(data))
-#    for α = 1:Nbase(data), β = 1:Nfreq(data)
-#        reorganized_data[1,β,α] = data.data[α,β].xx
-#        reorganized_data[2,β,α] = data.data[α,β].xy
-#        reorganized_data[3,β,α] = data.data[α,β].yx
-#        reorganized_data[4,β,α] = data.data[α,β].yy
-#    end
-#    ms[column] = reorganized_data
-#    if apply_flags
-#        flags = zeros(Bool, 4, Nfreq(data), Nbase(data))
-#        for α = 1:Nbase(data), β = 1:Nfreq(data)
-#            if data.flags[α,β]
-#                flags[:,β,α] = true
+#function read_dataset_jld2(::Type{TTCal.Dual}, metadata, vector, flags)
+#    dataset = Dataset(metadata, polarization=TTCal.Dual)
+#    array = reshape(vector, (4, Nbase(dataset), Nfreq(dataset), Ntime(dataset)))
+#    for time = 1:Ntime(dataset), frequency = 1:Nfreq(dataset)
+#        visibilities = dataset[frequency, time]
+#        baseline = 1
+#        for antenna1 = 1:Nant(dataset), antenna2 = antenna1:Nant(dataset)
+#            if !flags[baseline, frequency, time]
+#                J = DiagonalJonesMatrix(complex(array[1, baseline, frequency, time],
+#                                                array[2, baseline, frequency, time]),
+#                                        complex(array[3, baseline, frequency, time],
+#                                                array[4, baseline, frequency, time]))
+#                visibilities[antenna1, antenna2] = J
 #            end
+#            baseline += 1
 #        end
-#        ms["FLAG"] = flags
 #    end
+#    dataset
 #end
-#
-#function organize_data(raw_data)
-#    data = zeros(JonesMatrix, size(raw_data,3), size(raw_data,2))
-#    for α = 1:size(raw_data,3), β = 1:size(raw_data,2)
-#        data[α,β] = JonesMatrix(raw_data[1,β,α], raw_data[2,β,α],
-#                                raw_data[3,β,α], raw_data[4,β,α])
+
+#function write_dataset_jld2!(file, dataset::Dataset, ::Type{TTCal.Dual})
+#    T = Float64
+#    array = zeros(   T, 4, Nbase(dataset), Nfreq(dataset), Ntime(dataset))
+#    flags = zeros(Bool,    Nbase(dataset), Nfreq(dataset), Ntime(dataset))
+#    for time = 1:Ntime(dataset), frequency = 1:Nfreq(dataset)
+#        visibilities = dataset[frequency, time]
+#        baseline = 1
+#        for antenna1 = 1:Nant(dataset), antenna2 = antenna1:Nant(dataset)
+#            J = visibilities[antenna1, antenna2]
+#            array[1, baseline, frequency, time] = real(J.xx)
+#            array[2, baseline, frequency, time] = imag(J.xx)
+#            array[3, baseline, frequency, time] = real(J.yy)
+#            array[4, baseline, frequency, time] = imag(J.yy)
+#            flags[   baseline, frequency, time] = isflagged(visibilities, antenna1, antenna2)
+#            baseline += 1
+#        end
 #    end
-#    data
+#    file["DATA"]  = vec(array)
+#    file["FLAGS"] = vec(flags)
+#    file["POLARIZATION"] = TTCal.Dual
 #end
-#
+
+
+
+
+
+
 
 #function flag_short_baselines!(data, meta, minuvw)
 #    for β = 1:Nfreq(meta)

@@ -22,7 +22,9 @@ end
 function Solution(pol::Type{<:Polarization}, Nant)
     T = vector_type(pol)
     data = T(Nant)
-    data[:] = one(eltype(data))
+    for antenna = 1:Nant
+        data[antenna] = one(eltype(data))
+    end
     Solution{pol, T}(data)
 end
 
@@ -34,6 +36,7 @@ Base.getindex( cal::Solution, antenna) = cal.data[antenna]
 Base.setindex!(cal::Solution, value, antenna) = cal.data[antenna] = value
 Base.similar(  cal::Solution) = Solution(polarization(cal), Nant(cal))
 Base.length(   cal::Solution) = length(cal.data)
+Base.size(     cal::Solution) = size(cal.data)
 
 struct Calibration{P <: Polarization, T}
     data :: Matrix{Solution{P, T}}
@@ -66,25 +69,31 @@ function calibrate!(calibration::Calibration, data::Dataset, model::Dataset)
     elseif Ntime(calibration) == 1
         calibrate_onetime!(calibration, data, model)
     else
+        prg = Progress(Ntime(calibration)*Nfreq(calibration))
         for time = 1:Ntime(calibration), frequency = 1:Nfreq(calibration)
-            solve!(calibration[frequency, time], data[frequency, time], model[frequency, time])
+            solve!(calibration[frequency, time].data, data[frequency, time], model[frequency, time])
+            next!(prg)
         end
     end
 end
 
 function calibrate_onefrequency!(calibration::Calibration, data::Dataset, model::Dataset)
+    prg = Progress(Ntime(calibration))
     for time = 1:Ntime(calibration)
         data_slice  = [getindex.( data[:, time], antenna) for antenna = 1:Nant(data)]
         model_slice = [getindex.(model[:, time], antenna) for antenna = 1:Nant(data)]
         solve!(calibration[1, time].data, data_slice, model_slice)
+        next!(prg)
     end
 end
 
 function calibrate_onetime!(calibration::Calibration, data::Dataset, model::Dataset)
+    prg = Progress(Nfreq(calibration))
     for frequency = 1:Nfreq(calibration)
         data_slice  = [getindex.( data[frequency, :], antenna) for antenna = 1:Nant(data)]
         model_slice = [getindex.(model[frequency, :], antenna) for antenna = 1:Nant(data)]
         solve!(calibration[frequency, 1].data, data_slice, model_slice)
+        next!(prg)
     end
 end
 
