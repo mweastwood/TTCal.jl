@@ -152,7 +152,11 @@ function merge!(lhs::Dataset{T}, rhs::Dataset{T}; axis=:frequency) where {T}
     lhs
 end
 
-function slice!(dataset::Dataset{T}, indices; axis=:frequency) where {T}
+function slice!(dataset::Dataset{T}, index::Integer; axis=:frequency) where{T}
+    slice!(metadata, index:index, axis=axis)
+end
+
+function slice!(dataset::Dataset{T}, indices::AbstractVector; axis=:frequency) where {T}
     slice!(dataset.metadata, indices, axis=axis)
     if axis == :frequency
         dataset.data = dataset.data[indices, :]

@@ -40,7 +40,11 @@ function merge!(lhs::Metadata, rhs::Metadata; axis=:frequency)
     lhs
 end
 
-function slice!(metadata::Metadata, indices; axis=:frequency)
+function slice!(metadata::Metadata, index::Integer; axis=:frequency)
+    slice!(metadata, index:index, axis=axis)
+end
+
+function slice!(metadata::Metadata, indices::AbstractVector; axis=:frequency)
     if axis == :frequency
         new_frequencies = metadata.frequencies[indices]
         resize!(metadata.frequencies, length(new_frequencies))

@@ -54,8 +54,9 @@ function Calibration(metadata; polarization=Full, collapse_frequency=false, coll
     Calibration(data)
 end
 
-function calibrate(data::Dataset, model::Dataset)
-    calibration = Calibration(data.metadata, polarization=polarization(data))
+function calibrate(data::Dataset, model::Dataset; collapse_frequency=false, collapse_time=false)
+    calibration = Calibration(data.metadata, polarization=polarization(data),
+                              collapse_frequency=collapse_frequency, collapse_time=collapse_time)
     calibrate!(calibration, data, model)
     calibration
 end
