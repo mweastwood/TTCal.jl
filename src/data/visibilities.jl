@@ -153,7 +153,7 @@ function merge!(lhs::Dataset{T}, rhs::Dataset{T}; axis=:frequency) where {T}
 end
 
 function slice!(dataset::Dataset{T}, index::Integer; axis=:frequency) where{T}
-    slice!(metadata, index:index, axis=axis)
+    slice!(dataset, index:index, axis=axis)
 end
 
 function slice!(dataset::Dataset{T}, indices::AbstractVector; axis=:frequency) where {T}

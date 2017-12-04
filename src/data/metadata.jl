@@ -53,6 +53,10 @@ function slice!(metadata::Metadata, indices::AbstractVector; axis=:frequency)
         new_times = metadata.times[indices]
         resize!(metadata.times, length(new_times))
         metadata.times[:] = new_times
+        # (don't forget to slice the list of phase centers too)
+        new_phase_centers = metadata.phase_centers[indices]
+        resize!(metadata.phase_centers, length(new_phase_centers))
+        metadata.phase_centers[:] = new_phase_centers
     else
         err("unknown slice axis $axis")
     end
