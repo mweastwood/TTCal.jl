@@ -54,57 +54,60 @@ function Calibration(metadata; polarization=Full, collapse_frequency=false, coll
     Calibration(data)
 end
 
-function calibrate(data::Dataset, model::Dataset; collapse_frequency=false, collapse_time=false)
+function calibrate(data::Dataset, model::Dataset;
+                   collapse_frequency=false, collapse_time=false,
+                   quiet=false)
     calibration = Calibration(data.metadata, polarization=polarization(data),
                               collapse_frequency=collapse_frequency, collapse_time=collapse_time)
-    calibrate!(calibration, data, model)
+    calibrate!(calibration, data, model, quiet)
     calibration
 end
 
-function calibrate!(calibration::Calibration, data::Dataset, model::Dataset)
+function calibrate!(calibration::Calibration, data::Dataset, model::Dataset, quiet=false)
     match_flags!(model, data)
     if Nfreq(calibration) == Ntime(calibration) == 1
-        calibrate_onefrequency_onetime!(calibration, data, model)
+        calibrate_onefrequency_onetime!(calibration, data, model, quiet)
     elseif Nfreq(calibration) == 1
-        calibrate_onefrequency!(calibration, data, model)
+        calibrate_onefrequency!(calibration, data, model, quiet)
     elseif Ntime(calibration) == 1
-        calibrate_onetime!(calibration, data, model)
+        calibrate_onetime!(calibration, data, model, quiet)
     else
-        prg = Progress(Ntime(calibration)*Nfreq(calibration))
+        quiet || (prg = Progress(Ntime(calibration)*Nfreq(calibration)))
         for time = 1:Ntime(calibration), frequency = 1:Nfreq(calibration)
-            solve!(calibration[frequency, time].data, data[frequency, time], model[frequency, time])
-            next!(prg)
+            solve!(calibration[frequency, time].data,
+                   data[frequency, time], model[frequency, time], quiet)
+            quiet || next!(prg)
         end
     end
 end
 
-function calibrate_onefrequency!(calibration::Calibration, data::Dataset, model::Dataset)
-    prg = Progress(Ntime(calibration))
+function calibrate_onefrequency!(calibration::Calibration, data::Dataset, model::Dataset, quiet)
+    quiet || (prg = Progress(Ntime(calibration)))
     for time = 1:Ntime(calibration)
         data_slice  = [getindex.( data[:, time], antenna) for antenna = 1:Nant(data)]
         model_slice = [getindex.(model[:, time], antenna) for antenna = 1:Nant(data)]
-        solve!(calibration[1, time].data, data_slice, model_slice)
-        next!(prg)
+        solve!(calibration[1, time].data, data_slice, model_slice, quiet)
+        quiet || next!(prg)
     end
 end
 
-function calibrate_onetime!(calibration::Calibration, data::Dataset, model::Dataset)
-    prg = Progress(Nfreq(calibration))
+function calibrate_onetime!(calibration::Calibration, data::Dataset, model::Dataset, quiet)
+    quiet || (prg = Progress(Nfreq(calibration)))
     for frequency = 1:Nfreq(calibration)
         data_slice  = [getindex.( data[frequency, :], antenna) for antenna = 1:Nant(data)]
         model_slice = [getindex.(model[frequency, :], antenna) for antenna = 1:Nant(data)]
-        solve!(calibration[frequency, 1].data, data_slice, model_slice)
-        next!(prg)
+        solve!(calibration[frequency, 1].data, data_slice, model_slice, quiet)
+        quiet || next!(prg)
     end
 end
 
-function calibrate_onefrequency_onetime!(calibration::Calibration, data::Dataset, model::Dataset)
+function calibrate_onefrequency_onetime!(calibration::Calibration, data::Dataset, model::Dataset, quiet)
     data_slice  = [getindex.( data[:], antenna) for antenna = 1:Nant(data)]
     model_slice = [getindex.(model[:], antenna) for antenna = 1:Nant(data)]
-    solve!(calibration[1, 1].data, data_slice, model_slice)
+    solve!(calibration[1, 1].data, data_slice, model_slice, quiet)
 end
 
-function solve!(gains, measured_visibilities, model_visibilities)
+function solve!(gains, measured_visibilities, model_visibilities, quiet=false)
     workspace = RKWorkspace(gains, 4)
     function step!(output, input)
         stefcal_step!(output, input, measured_visibilities, model_visibilities)
@@ -122,7 +125,7 @@ function solve!(gains, measured_visibilities, model_visibilities)
         gains[:] = newgains
         iter += 1
     end
-    if !converged
+    if !quiet && !converged
         warn("calibration did not converge")
     end
     gains
@@ -581,6 +584,13 @@ end
 #* `metadata` - the metadata describing the interferometer
 #* `calibration` - the calibration in question
 #"""
+
+function corrupt(dataset::Dataset, calibration::Calibration)
+    corrupted = deepcopy(dataset)
+    corrupt!(corrupted, calibration)
+    corrupted
+end
+
 function corrupt!(dataset::Dataset, calibration::Calibration)
     if Nfreq(calibration) == Ntime(calibration) == 1
         corrupt_onefrequency_onetime!(dataset, calibration)
@@ -643,6 +653,12 @@ end
 #* `metadata` - the metadata describing the interferometer
 #* `calibration` - the calibration in question
 #"""
+function applycal(dataset::Dataset, calibration::Calibration)
+    calibrated = deepcopy(dataset)
+    applycal!(calibrated, calibration)
+    calibrated
+end
+
 function applycal!(dataset::Dataset, calibration::Calibration)
     corrupt!(dataset, invert(calibration))
 end
