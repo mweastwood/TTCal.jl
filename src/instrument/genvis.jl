@@ -32,9 +32,15 @@
 #* `beam` - the antenna primary beam (assumed to be constant if not given)
 #* `sources` - the list of sources to include in the sky model
 #"""
-function genvis(metadata::Metadata, beam::AbstractBeam, sky::SkyModel)
-    dataset = Dataset(metadata, polarization=Full)
+function genvis(metadata::Metadata, beam::AbstractBeam, sky::SkyModel; polarization=Full)
+    dataset = Dataset(metadata, polarization=polarization)
     genvis!(dataset, beam, sky)
+    dataset
+end
+
+function genvis(metadata::Metadata, beam::AbstractBeam, source::Source; polarization=Full)
+    dataset = Dataset(metadata, polarization=polarization)
+    genvis!(dataset, beam, source)
     dataset
 end
 
@@ -98,7 +104,7 @@ function genvis_onesource_onechannel!(visibilities, shape, frequency,
         position1 = positions[antenna1]
         position2 = positions[antenna2]
         coherency = baseline_coherency(shape, frequency, position1, position2, precomputation)
-        visibilities[antenna1, antenna2] += flux * fringe * coherency
+        accumulate!(visibilities, antenna1, antenna2, flux*fringe*coherency)
     end
     visibilities
 end
@@ -114,6 +120,13 @@ function observe_through_beam(shape::AbstractShape, beam::AbstractBeam,
     flux
 end
 
+function accumulate!(visibilities::Visibilities{Full, T}, antenna1, antenna2, value) where {T}
+    visibilities[antenna1, antenna2] += value
+end
+
+function accumulate!(visibilities::Visibilities{Dual, T}, antenna1, antenna2, value) where {T}
+    visibilities[antenna1, antenna2] += DiagonalJonesMatrix(value.xx, value.yy)
+end
 
 #"""
 #    refract_and_corrupt(meta, beam, frame, source)
