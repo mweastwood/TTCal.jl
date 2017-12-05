@@ -49,24 +49,6 @@ end
 #Shapelets are eigenfunctions of the fourier transform operator.  They form an orthonormal basis for
 #real functions mapping $\mathbb R^2 \mapsto \mathbb R$.
 #"""
-#type ShapeletSource <: Source
-#    name :: String
-#    direction :: Direction
-#    spectrum :: PowerLaw
-#    scale :: Float64 # scale factor of the shapelets (radians)
-#    coeff :: Vector{Float64} # list of shapelet coefficients
-#end
-#
-#"""
-#    MultiSource <: Source
-#
-#An astronomical source that has multiple components.
-#"""
-#type MultiSource <: Source
-#    name :: String
-#    components :: Vector{Source}
-#end
-#
 #"""
 #    RFISource <: Source
 #
@@ -78,17 +60,34 @@ end
 #    position :: Position
 #    spectrum :: RFISpectrum
 #end
-#
 
 
 
-function isabovehorizon(frame::ReferenceFrame, direction::Direction, threshold = 0)
+
+function isabovehorizon(frame::ReferenceFrame, direction::Direction; threshold=0)
     azel = measure(frame, direction, dir"AZEL")
     el = latitude(azel)
     el > threshold
 end
 
-function isabovehorizon(frame::ReferenceFrame, shape::AbstractShape, threshold = 0)
+function isabovehorizon(frame::ReferenceFrame, shape::AbstractShape; threshold=0)
     isabovehorizon(frame, shape.direction, threshold)
 end
+
+function isrising(frame::ReferenceFrame, shape::AbstractShape)
+    azel = measure(frame, shape.direction, dir"AZEL")
+    az = longitude(azel) # ∈ (-π/2, π/2)
+    az > 0
+end
+
+function Base.:*(number::Real, shape::Point)
+    Point(shape.direction, number*shape.spectrum)
+end
+
+function Base.:*(number::Real, shape::Gaussian)
+    Gaussian(shape.direction, number*shape.spectrum,
+             shape.major_fwhm, shape.minor_fwhm, shape.position_angle)
+end
+
+Base.:*(shape::AbstractShape, number::Real) = number*shape
 

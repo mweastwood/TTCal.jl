@@ -51,6 +51,11 @@ function (spectrum::PowerLaw)(ν)
     StokesVector(I, Q, U, V)
 end
 
+function Base.:*(number::Real, spectrum::PowerLaw)
+    PowerLaw(number*spectrum.stokes, spectrum.ν, spectrum.α)
+end
+Base.:*(spectrum::PowerLaw, number::Real) = number*spectrum
+
 """
     struct RFISpectrum <: AbstractSpectrum
 

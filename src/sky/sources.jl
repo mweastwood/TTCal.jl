@@ -22,3 +22,21 @@ function Source(name::String, shape::AbstractShape)
     Source(name, [shape])
 end
 
+function isabovehorizon(frame::ReferenceFrame, source::Source; threshold=0)
+    for shape in source.shapes
+        if !isabovehorizon(frame, shape, threshold=threshold)
+            return false
+        end
+    end
+    true
+end
+
+function isrising(frame::ReferenceFrame, source::Source)
+    for shape in source.shapes
+        if !isrising(frame, shape)
+            return false
+        end
+    end
+    true
+end
+
