@@ -29,7 +29,7 @@ srand(123)
     end
     #include("utm.jl")
     #include("ionosphere.jl")
-    #include("getspec.jl")
+    include("getspec.jl")
     #include("subsrc.jl")
     #include("fitvis.jl")
     include("calibration.jl")

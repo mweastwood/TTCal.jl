@@ -34,8 +34,10 @@ function rotate_phase_center_onechannel!(visibilities, frequency, positions,
     delays = geometric_delays(positions, old_phase_center, new_phase_center)
     fringes = delays_to_fringes(delays, frequency)
     for antenna1 = 1:Nant(visibilities), antenna2 = antenna1:Nant(visibilities)
-        fringe = fringes[antenna1] * conj(fringes[antenna2])
-        visibilities[antenna1, antenna2] *= fringe
+        if !isflagged(visibilities, antenna1, antenna2)
+            fringe = fringes[antenna1] * conj(fringes[antenna2])
+            visibilities[antenna1, antenna2] *= fringe
+        end
     end
     visibilities
 end

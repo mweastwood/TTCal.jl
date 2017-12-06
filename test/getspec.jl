@@ -1,76 +1,67 @@
-function test_getspec_direction(meta, source)
-    data = genvis(meta, source)
-    dir = source.direction
-    stokes_flux = source.spectrum.(meta.channels)
-    measured_flux = getspec(data, meta, dir)
-    for β = 1:Nfreq(meta)
-        linear_flux = HermitianJonesMatrix(stokes_flux[β])
-        @test linear_flux.xx ≈ measured_flux[β].xx
-        @test linear_flux.xy ≈ measured_flux[β].xy
-        @test linear_flux.yy ≈ measured_flux[β].yy
-    end
-end
+#function test_getspec_direction(meta, source)
+#    data = genvis(meta, source)
+#    dir = source.direction
+#    stokes_flux = source.spectrum.(meta.channels)
+#    measured_flux = getspec(data, meta, dir)
+#    for β = 1:Nfreq(meta)
+#        linear_flux = HermitianJonesMatrix(stokes_flux[β])
+#        @test linear_flux.xx ≈ measured_flux[β].xx
+#        @test linear_flux.xy ≈ measured_flux[β].xy
+#        @test linear_flux.yy ≈ measured_flux[β].yy
+#    end
+#end
 
-function test_getspec_source(meta, source)
-    data = genvis(meta, source)
-    stokes_flux = source.spectrum.(meta.channels)
-    measured_flux = getspec(data, meta, source)
-    for β = 1:Nfreq(meta)
-        linear_flux = HermitianJonesMatrix(stokes_flux[β])
-        @test linear_flux.xx ≈ measured_flux[β].xx
-        @test linear_flux.xy ≈ measured_flux[β].xy
-        @test linear_flux.yy ≈ measured_flux[β].yy
-    end
-end
-
-function test_getspec_multi(meta, source)
-    data = genvis(meta, source)
-    linear_flux = [TTCal.get_total_flux(source, ν) for ν in meta.channels]
-    measured_flux = getspec(data, meta, source)
-    for β = 1:Nfreq(meta)
-        @test linear_flux[β].xx ≈ measured_flux[β].xx
-        @test linear_flux[β].xy ≈ measured_flux[β].xy
-        @test linear_flux[β].yy ≈ measured_flux[β].yy
-    end
+function test_getspec_source(metadata, source)
+    data = genvis(metadata, TTCal.ConstantBeam(), source)
+    stokes_flux   = TTCal.total_flux.(source, metadata.frequencies)
+    measured_flux = getspec(data, source)
+    @test stokes_flux ≈ measured_flux
 end
 
 @testset "getspec.jl" begin
-    Nant = 10
-    Nfreq = 2
-    name, ms = createms(Nant, Nfreq)
-    meta = Metadata(ms)
-    beam = ConstantBeam()
+    metadata = TTCal.Metadata([50.0u"MHz", 74.3u"MHz", 93.1u"MHz"],
+                              [Epoch(epoch"UTC", (2017-1858)*u"yr")],
+                              [Position(pos"ITRF", 100randn(), 100randn(), 100randn()) for n = 1:3],
+                              [Direction(dir"AZEL", 0u"°", 90u"°")])
+
 
     @testset "point sources" begin
         # unpolarized
-        source = PointSource("FRB", Direction(dir"AZEL", 10degrees, 30degrees),
-                                    PowerLaw(rand(), 0, 0, 0, 10e6, [-rand()]))
-        test_getspec_direction(meta, source)
-        test_getspec_source(meta, source)
+        source = TTCal.Source("FRB",
+                              TTCal.Point(Direction(dir"AZEL", 10u"°", 30u"°"),
+                                          TTCal.PowerLaw(rand(), 0, 0, 0, 100u"MHz", [-rand()])))
+        #test_getspec_direction(metadata, source)
+        test_getspec_source(metadata, source)
 
         # polarized
-        source = PointSource("FRB", Direction(dir"AZEL", 10degrees, 30degrees),
-                                    PowerLaw(rand(StokesVector), 10e6, [-rand()]))
-        test_getspec_direction(meta, source)
-        test_getspec_source(meta, source)
+        stokes = rand(TTCal.StokesVector)
+        source = TTCal.Source("FRB",
+                              TTCal.Point(Direction(dir"AZEL", 10u"°", 30u"°"),
+                                          TTCal.PowerLaw(stokes, 100u"MHz", [-rand()])))
+        #test_getspec_direction(meta, source)
+        test_getspec_source(metadata, source)
     end
 
     @testset "gaussian sources" begin
-        source = GaussianSource("test", Direction(dir"AZEL", 10degrees, 30degrees),
-                                        PowerLaw(rand(StokesVector), 10e6, [-rand()]),
-                                        deg2rad(500/3600), deg2rad(300/3600), deg2rad(50))
-        test_getspec_source(meta, source)
+        stokes = rand(TTCal.StokesVector)
+        source = TTCal.Source("test",
+                              TTCal.Gaussian(Direction(dir"AZEL", 10u"°", 30u"°"),
+                                             TTCal.PowerLaw(stokes, 10u"MHz", [-rand()]),
+                                             deg2rad(500/3600), deg2rad(300/3600), deg2rad(50)))
+        test_getspec_source(metadata, source)
     end
 
     @testset "multi-component sources" begin
         # this test is pretty gnarly
-        components = [PointSource("1", Direction(dir"AZEL", 10degrees, 30degrees),
-                                  PowerLaw(rand(StokesVector), 10e6, [-rand()])),
-                      GaussianSource("2", Direction(dir"AZEL", 10degrees, 30degrees),
-                                     PowerLaw(rand(StokesVector), 10e6, [-rand()]),
-                                     deg2rad(500/3600), deg2rad(300/3600), deg2rad(50))]
-        source = MultiSource("multi", components)
-        test_getspec_multi(meta, source)
+        stokes = rand(TTCal.StokesVector)
+        point = TTCal.Point(Direction(dir"AZEL", 10u"°", 30u"°"),
+                            TTCal.PowerLaw(stokes, 10u"MHz", [-rand()]))
+        stokes = rand(TTCal.StokesVector)
+        gaussian = TTCal.Gaussian(Direction(dir"AZEL", 10u"°", 30u"°"),
+                                  TTCal.PowerLaw(stokes, 10u"MHz", [-rand()]),
+                                  deg2rad(500/3600), deg2rad(300/3600), deg2rad(50))
+        source = TTCal.Source("multi", [point, gaussian])
+        test_getspec_source(metadata, source)
     end
 end
 

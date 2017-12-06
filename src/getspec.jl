@@ -55,7 +55,7 @@ end
 
 function getspec_internal!(output, dataset, source::Source)
     # TODO: handle multiple time integrations correctly
-    frame = ReferenceFrame(dataset)
+    frame = ReferenceFrame(dataset.metadata)
     if isabovehorizon(frame, source)
         model = genvis(dataset.metadata, ConstantBeam(), source, polarization=polarization(dataset))
         flatten_spectrum!(model, source)
@@ -63,20 +63,22 @@ function getspec_internal!(output, dataset, source::Source)
     end
 end
 
-function getspec_internal!(spectrum, visibilities, meta, model::Matrix{JonesMatrix})
-    for β = 1:Nfreq(meta)
-        numerator   = zero(JonesMatrix)
-        denominator = zero(JonesMatrix)
-        for α = 1:Nbase(meta)
-            antenna1 = meta.baselines[α].antenna1
-            antenna2 = meta.baselines[α].antenna2
-            antenna1 == antenna2 && continue # don't use autocorrelations
-            visibilities.flags[α,β] && continue
-            numerator   += model[α,β]'*visibilities.data[α,β]
-            denominator += model[α,β]'*model[α,β]
+function getspec_internal!(spectrum, dataset, model::Dataset)
+    for frequency = 1:Nfreq(dataset)
+        visibilities       = dataset[frequency, 1]
+        model_visibilities =   model[frequency, 1]
+        numerator   = zero(eltype(dataset))
+        denominator = zero(eltype(dataset))
+        for ant1 = 1:Nant(dataset), ant2 = ant1+1:Nant(dataset)
+            isflagged(visibilities, ant1, ant2) && continue
+            J1 = visibilities[ant1, ant2]
+            J2 = model_visibilities[ant1, ant2]
+            J′ = J2'
+            numerator   += J′*J1
+            denominator += J′*J2
         end
         if abs(det(denominator)) > eps(Float64)
-            spectrum[β] = make_hermitian(denominator \ numerator)
+            spectrum[frequency] = make_hermitian(denominator \ numerator) |> StokesVector
         end
     end
     spectrum
@@ -93,18 +95,21 @@ end
 # We then scale these visibilities by the total flux of the source (counting
 # all of the components) so that the flux of the model visibilities is unity.
 
-function flatten_spectrum!(meta, model, source::Source)
-    for β = 1:Nfreq(meta)
-        flux = get_total_flux(source, meta.channels[β])
-        for α = 1:Nbase(meta)
-            model[α,β] = model[α,β] / flux
+function flatten_spectrum!(model, source::Source)
+    # TODO: handle multiple time integrations correctly
+    for frequency = 1:Nfreq(model)
+        visibilities = model[frequency, 1]
+        flux = total_flux(source, model.metadata.frequencies[frequency])
+        jones = HermitianJonesMatrix(flux)
+        for ant1 = 1:Nant(model), ant2 = ant1:Nant(model)
             # Note that the following form is incorrect
-            #     model[α,β] = flux \ model[α,β]
+            #     model[ant1, ant2] = flux \ model[ant1, ant2]
             # This decision is determined by the requirement that if the data and
             # model are exactly equal, we should get `flux` back exactly. The form
             # of the estimator in `getspec_internal!` (more specifically the order
             # of the matrix multiplications) then determines the order of the matrix
             # multiplications here.
+            visibilities[ant1, ant2] = visibilities[ant1, ant2]/jones
         end
     end
 end

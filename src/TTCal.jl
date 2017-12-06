@@ -20,6 +20,7 @@ module TTCal
 export Nfreq, Ntime, Nant, Nbase
 export readsky, genvis, calibrate, applycal!, peel!
 export rotate_phase_center!
+export getspec
 
 #export JonesMatrix, DiagonalJonesMatrix, HermitianJonesMatrix
 #export StokesVector, MuellerMatrix

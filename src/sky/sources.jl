@@ -40,3 +40,11 @@ function isrising(frame::ReferenceFrame, source::Source)
     true
 end
 
+function total_flux(source, ν)
+    output = zero(StokesVector)
+    for shape in source.shapes
+        output += shape.spectrum(ν)
+    end
+    output
+end
+
