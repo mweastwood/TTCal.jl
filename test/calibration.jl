@@ -84,13 +84,9 @@
             dataset = TTCal.Dataset(meta, polarization=pol)
             rand!(dataset)
 
-            gains = TTCal.Calibration(pol, Nant)
-            gains[:] = one(eltype(gains))
-
-            step = TTCal.stefcal_step(gains, dataset[1, 1], dataset[1, 1])
-            @show step
-
-            @test 1 == 1
+            gains = TTCal.Calibration(meta, polarization=pol)
+            step  = TTCal.stefcal_step(gains[1, 1].data, dataset[1, 1], dataset[1, 1])
+            @test norm(step) < Nant*eps(Float64)
         end
         #N = 100
         #data  = [rand(JonesMatrix) for i = 1:N, j = 1:N]

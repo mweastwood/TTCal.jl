@@ -71,7 +71,7 @@ function isabovehorizon(frame::ReferenceFrame, direction::Direction; threshold=0
 end
 
 function isabovehorizon(frame::ReferenceFrame, shape::AbstractShape; threshold=0)
-    isabovehorizon(frame, shape.direction, threshold)
+    isabovehorizon(frame, shape.direction, threshold=threshold)
 end
 
 function isrising(frame::ReferenceFrame, shape::AbstractShape)
