@@ -60,16 +60,16 @@ end
 
 function genvis!(dataset::Dataset, beam::AbstractBeam, shape::AbstractShape)
     metadata = dataset.metadata
-    frame = ReferenceFrame(dataset.metadata)
+    frame = ReferenceFrame(metadata)
     precomputation = additional_precomputation(frame, shape)
-    for (idx, time) in enumerate(dataset.metadata.times)
+    for (idx, time) in enumerate(metadata.times)
         set!(frame, time)
         if isabovehorizon(frame, shape)
             phase_center = measure(frame, metadata.phase_centers[idx], dir"ITRF")
             direction    = measure(frame, shape.direction, dir"ITRF")
-            for (jdx, frequency) in enumerate(dataset.metadata.frequencies)
+            for (jdx, frequency) in enumerate(metadata.frequencies)
                 flux = observe_through_beam(shape, beam, frame, frequency)
-                visibilities = dataset.data[jdx, idx]
+                visibilities = dataset[jdx, idx]
                 genvis_onesource_onechannel!(visibilities, shape, frequency,
                                              flux, metadata.positions, direction, phase_center,
                                              precomputation)

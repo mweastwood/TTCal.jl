@@ -14,10 +14,11 @@ srand(123)
         include("math/jones.jl")
         include("math/stokes.jl")
     end
-    #@testset "data" begin
+    @testset "data" begin
     #    #include("data/metadata.jl")
     #    #include("data/visibilities.jl")
-    #end
+        include("data/rotate-phase-center.jl")
+    end
     @testset "sky" begin
         include("sky/spectra.jl")
         #include("sky/skymodels.jl")

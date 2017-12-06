@@ -1,4 +1,4 @@
-# Copyright (c) 2015, 2016 Michael Eastwood
+# Copyright (c) 2015-2017 Michael Eastwood
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -13,52 +13,53 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-"""
-    getspec(visibilities, metadata, source)
-    getspec(visibilities, metadata, direction)
-
-*Description*
-
-This function will measure the flux as a function of frequency for the given source
-or the given direction. All four correlations are included in this measurement so
-that all four Stokes parameters can be calculated if desired.
-
-The flux of a resolved source will be systematically underestimated by this routine
-if you only supply a direction. However if you provide the full source model
-including the resolved components then `getspec` will correctly account for the
-resolved flux in its measurement.
-
-Note that this function is susceptible to sidelobe contamination from other
-bright sources in the field.
-
-*Arguments*
-
-* `visibilities` - the measured visibilities from which to estimate the flux
-* `metadata` - the metadata describing the interferometer
-* `source` or `direction` - the source model or direction in which to estimate the flux
-
-Note that if you supply a direction, `getspec` will estimate the flux of a point
-source in that direction. If you know your source is resolved, supply a source model
-instead.
-"""
-function getspec(visibilities::Visibilities, meta::Metadata, source::Source)
-    spectrum = zeros(HermitianJonesMatrix, Nfreq(meta))
-    getspec_internal!(spectrum, visibilities, meta, source)
+#"""
+#    getspec(visibilities, metadata, source)
+#    getspec(visibilities, metadata, direction)
+#
+#*Description*
+#
+#This function will measure the flux as a function of frequency for the given source
+#or the given direction. All four correlations are included in this measurement so
+#that all four Stokes parameters can be calculated if desired.
+#
+#The flux of a resolved source will be systematically underestimated by this routine
+#if you only supply a direction. However if you provide the full source model
+#including the resolved components then `getspec` will correctly account for the
+#resolved flux in its measurement.
+#
+#Note that this function is susceptible to sidelobe contamination from other
+#bright sources in the field.
+#
+#*Arguments*
+#
+#* `visibilities` - the measured visibilities from which to estimate the flux
+#* `metadata` - the metadata describing the interferometer
+#* `source` or `direction` - the source model or direction in which to estimate the flux
+#
+#Note that if you supply a direction, `getspec` will estimate the flux of a point
+#source in that direction. If you know your source is resolved, supply a source model
+#instead.
+#"""
+function getspec(dataset::Dataset, source::Source)
+    spectrum = zeros(StokesVector, Nfreq(dataset))
+    getspec_internal!(spectrum, dataset, source)
     spectrum
 end
 
-function getspec(visibilities::Visibilities, meta::Metadata, direction::Direction)
-    flat = PowerLaw(1, 0, 0, 0, 10e6, [0.0])
-    point = PointSource("dummy", direction, flat)
-    getspec(visibilities, meta, point)
-end
+#function getspec(visibilities::Visibilities, meta::Metadata, direction::Direction)
+#    flat = PowerLaw(1, 0, 0, 0, 10e6, [0.0])
+#    point = PointSource("dummy", direction, flat)
+#    getspec(visibilities, meta, point)
+#end
 
-function getspec_internal!(output, visibilities, meta, source::Source)
-    frame = reference_frame(meta)
+function getspec_internal!(output, dataset, source::Source)
+    # TODO: handle multiple time integrations correctly
+    frame = ReferenceFrame(dataset)
     if isabovehorizon(frame, source)
-        model = genvis_internal(meta, ConstantBeam(), [source])
-        flatten_spectrum!(meta, model, source)
-        getspec_internal!(output, visibilities, meta, model)
+        model = genvis(dataset.metadata, ConstantBeam(), source, polarization=polarization(dataset))
+        flatten_spectrum!(model, source)
+        getspec_internal!(output, dataset, model)
     end
 end
 
@@ -108,15 +109,15 @@ function flatten_spectrum!(meta, model, source::Source)
     end
 end
 
-function get_total_flux(source::Source, ν)
-    source.spectrum(ν) |> HermitianJonesMatrix
-end
-
-function get_total_flux(source::MultiSource, ν)
-    output = zero(HermitianJonesMatrix)
-    for component in source.components
-        output += get_total_flux(component, ν)
-    end
-    output
-end
+#function get_total_flux(source::Source, ν)
+#    source.spectrum(ν) |> HermitianJonesMatrix
+#end
+#
+#function get_total_flux(source::MultiSource, ν)
+#    output = zero(HermitianJonesMatrix)
+#    for component in source.components
+#        output += get_total_flux(component, ν)
+#    end
+#    output
+#end
 

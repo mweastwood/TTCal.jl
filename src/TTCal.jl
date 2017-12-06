@@ -19,6 +19,7 @@ module TTCal
 
 export Nfreq, Ntime, Nant, Nbase
 export readsky, genvis, calibrate, applycal!, peel!
+export rotate_phase_center!
 
 #export JonesMatrix, DiagonalJonesMatrix, HermitianJonesMatrix
 #export StokesVector, MuellerMatrix
@@ -72,6 +73,9 @@ include("math/struct-of-arrays.jl")
 
 include("data/metadata.jl")
 include("data/visibilities.jl")
+include("data/datasets.jl")
+include("data/flagging.jl")
+include("data/rotate-phase-center.jl")
 
 include("sky/spectra.jl")
 include("sky/shapes.jl")
@@ -90,7 +94,7 @@ include("instrument/genvis.jl")
 #include("utm.jl")
 #include("ionosphere.jl")
 
-#include("getspec.jl")
+include("getspec.jl")
 #include("subsrc.jl")
 #include("fitvis.jl")
 include("calibration.jl")
