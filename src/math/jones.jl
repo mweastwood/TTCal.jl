@@ -270,3 +270,9 @@ function make_hermitian(J::JonesMatrix)
     HermitianJonesMatrix(real(J.xx), 0.5*(J.xy+conj(J.yx)), real(J.yy))
 end
 
+function make_hermitian(J::DiagonalJonesMatrix)
+    HermitianJonesMatrix(real(J.xx), 0, real(J.yy))
+end
+
+make_hermitian(J::HermitianJonesMatrix) = J
+

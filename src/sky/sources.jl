@@ -48,3 +48,9 @@ function total_flux(source, ν)
     output
 end
 
+function Base.:*(number::Real, source::Source)
+    Source(source.name, [number*shape for shape in source.shapes])
+end
+
+Base.:*(source::Source, number::Real) = number*source
+

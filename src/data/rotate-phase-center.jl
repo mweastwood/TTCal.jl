@@ -25,6 +25,7 @@ function rotate_phase_center!(dataset::Dataset, new_phase_center::Direction)
             rotate_phase_center_onechannel!(visibilities, frequency, metadata.positions,
                                             old_phase_center_itrf, new_phase_center_itrf)
         end
+        dataset.metadata.phase_centers[idx] = new_phase_center
     end
     dataset
 end
