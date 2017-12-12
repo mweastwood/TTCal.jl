@@ -47,11 +47,15 @@ function getspec(dataset::Dataset, source::Source)
     spectrum
 end
 
-#function getspec(visibilities::Visibilities, meta::Metadata, direction::Direction)
-#    flat = PowerLaw(1, 0, 0, 0, 10e6, [0.0])
-#    point = PointSource("dummy", direction, flat)
-#    getspec(visibilities, meta, point)
-#end
+function getspec(dataset::Dataset, direction::Direction)
+    spectrum = zeros(StokesVector, Nfreq(dataset))
+    getspec_internal!(spectrum, dataset, direction)
+    spectrum
+end
+
+function getflux(dataset::Dataset, source_or_direction)
+    mean(getspec(dataset, source_or_direction))
+end
 
 function getspec_internal!(output, dataset, source::Source)
     # TODO: handle multiple time integrations correctly
@@ -64,6 +68,7 @@ function getspec_internal!(output, dataset, source::Source)
 end
 
 function getspec_internal!(spectrum, dataset, model::Dataset)
+    #@show measure(ReferenceFrame(dataset.metadata), dataset.metadata.phase_centers[1], dir"ITRF")
     for frequency = 1:Nfreq(dataset)
         visibilities       = dataset[frequency, 1]
         model_visibilities =   model[frequency, 1]
@@ -76,9 +81,44 @@ function getspec_internal!(spectrum, dataset, model::Dataset)
             J′ = J2'
             numerator   += J′*J1
             denominator += J′*J2
+            #if ant1 == 1 && ant2 == 2
+                #@show visibilities[ant1, ant2] model_visibilities[ant1, ant2] numerator denominator
+            #end
         end
         if abs(det(denominator)) > eps(Float64)
             spectrum[frequency] = make_hermitian(denominator \ numerator) |> StokesVector
+        end
+    end
+    spectrum
+end
+
+function getspec_internal!(spectrum, dataset, direction::Direction)
+    # TODO: handle multiple time integrations correctly
+    metadata = dataset.metadata
+    frame = ReferenceFrame(metadata)
+    itrf_direction    = measure(frame, direction, dir"ITRF")
+    itrf_phase_center = measure(frame, metadata.phase_centers[1], dir"ITRF")
+    #@show measure(ReferenceFrame(dataset.metadata), dataset.metadata.phase_centers[1], dir"ITRF")
+    delays = geometric_delays(metadata.positions, itrf_direction, itrf_phase_center)
+    #@show delays[1:2]
+    for frequency = 1:Nfreq(dataset)
+        fringes = delays_to_fringes(delays, metadata.frequencies[frequency])
+        #@show fringes[1:2]
+        visibilities = dataset[frequency, 1]
+        numerator   = zero(eltype(dataset))
+        denominator = 0
+        for antenna1 = 1:Nant(visibilities), antenna2 = antenna1+1:Nant(visibilities)
+            if !isflagged(visibilities, antenna1, antenna2)
+                fringe = fringes[antenna1] * conj(fringes[antenna2])
+                numerator   += conj(fringe)*visibilities[antenna1, antenna2]
+                denominator += 1
+                #if antenna1 == 1 && antenna2 == 2
+                    #@show fringe visibilities[antenna1, antenna2] numerator
+                #end
+            end
+        end
+        if denominator > 0
+            spectrum[frequency] = make_hermitian(numerator / denominator) |> StokesVector
         end
     end
     spectrum
@@ -94,35 +134,4 @@ end
 # So we generate the model visibilities using the input source model as given.
 # We then scale these visibilities by the total flux of the source (counting
 # all of the components) so that the flux of the model visibilities is unity.
-
-function flatten_spectrum!(model, source::Source)
-    # TODO: handle multiple time integrations correctly
-    for frequency = 1:Nfreq(model)
-        visibilities = model[frequency, 1]
-        flux = total_flux(source, model.metadata.frequencies[frequency])
-        jones = HermitianJonesMatrix(flux)
-        for ant1 = 1:Nant(model), ant2 = ant1:Nant(model)
-            # Note that the following form is incorrect
-            #     model[ant1, ant2] = flux \ model[ant1, ant2]
-            # This decision is determined by the requirement that if the data and
-            # model are exactly equal, we should get `flux` back exactly. The form
-            # of the estimator in `getspec_internal!` (more specifically the order
-            # of the matrix multiplications) then determines the order of the matrix
-            # multiplications here.
-            visibilities[ant1, ant2] = visibilities[ant1, ant2]/jones
-        end
-    end
-end
-
-#function get_total_flux(source::Source, ν)
-#    source.spectrum(ν) |> HermitianJonesMatrix
-#end
-#
-#function get_total_flux(source::MultiSource, ν)
-#    output = zero(HermitianJonesMatrix)
-#    for component in source.components
-#        output += get_total_flux(component, ν)
-#    end
-#    output
-#end
 

@@ -43,3 +43,46 @@ function rotate_phase_center_onechannel!(visibilities, frequency, positions,
     visibilities
 end
 
+"Bring the source into focus."
+function rotate_phase_center!(dataset::Dataset, source::Source)
+    frame = ReferenceFrame(dataset.metadata)
+    model = genvis(dataset.metadata, ConstantBeam(), source)
+    flatten_spectrum!(model, source)
+    for time = 1:Ntime(dataset)
+        set!(frame, dataset.metadata.times[time])
+        for frequency = 1:Nfreq(dataset)
+            visibilities       = dataset[frequency, time]
+            model_visibilities =   model[frequency, time]
+            rotate_phase_center_onechannel!(visibilities, model_visibilities)
+        end
+        direction = mean_direction(frame, source, mean(dataset.metadata.frequencies))
+        dataset.metadata.phase_centers[time] = direction
+    end
+end
+
+function rotate_phase_center_onechannel!(data::Visibilities, model::Visibilities)
+    for ant1 = 1:Nant(data), ant2 = ant1:Nant(data)
+        # TODO is this order, correct? it doesn't matter if these are diagonal matrices...
+        data[ant1, ant2] = data[ant1, ant2] / model[ant1, ant2]
+    end
+end
+
+function flatten_spectrum!(model, source::Source)
+    # TODO: handle multiple time integrations correctly
+    for frequency = 1:Nfreq(model)
+        visibilities = model[frequency, 1]
+        flux = total_flux(source, model.metadata.frequencies[frequency])
+        jones = HermitianJonesMatrix(flux)
+        for ant1 = 1:Nant(model), ant2 = ant1:Nant(model)
+            # Note that the following form is incorrect
+            #     model[ant1, ant2] = flux \ model[ant1, ant2]
+            # This decision is determined by the requirement that if the data and
+            # model are exactly equal, we should get `flux` back exactly. The form
+            # of the estimator in `getspec_internal!` (more specifically the order
+            # of the matrix multiplications) then determines the order of the matrix
+            # multiplications here.
+            visibilities[ant1, ant2] = visibilities[ant1, ant2]/jones
+        end
+    end
+end
+

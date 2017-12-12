@@ -213,8 +213,7 @@ function geometric_delays(positions::Vector{Position},
     # far field
     delays = zeros(typeof(1.0*u"s"), length(positions))
     for i = 1:length(positions)
-        path_difference  = dot(positions[i], direction)
-        path_difference -= dot(positions[i], phase_center)
+        path_difference = dot(positions[i], direction - phase_center)
         delays[i] = path_difference / u"c"
     end
     delays
@@ -268,14 +267,6 @@ function local_north_east(frame, direction)
     north, east
 end
 
-# TODO: replace this horrible hack with proper arithmetic on directions
-function linear_combination(a::Number, basis1::Direction,
-                            b::Number, basis2::Direction)
-    Direction(basis1.sys, a*basis1.x + b*basis2.x,
-                          a*basis1.y + b*basis2.y,
-                          a*basis1.z + b*basis2.z)
-end
-
 #function get_uvw(frequency, antenna1, antenna2)
 #    λ = c / frequency
 #    u = (antenna1.position.x - antenna2.position.x) / λ
@@ -289,8 +280,8 @@ end
 function additional_precomputation(frame, shape::Gaussian)
     north, east = local_north_east(frame, shape.direction)
     θ = shape.position_angle
-    major_axis = linear_combination( cos(θ), north, sin(θ), east)
-    minor_axis = linear_combination(-sin(θ), north, cos(θ), east)
+    major_axis =  cos(θ)*north + sin(θ)*east
+    minor_axis = -sin(θ)*north + cos(θ)*east
     major_width = π^2 * sin(shape.major_fwhm)^2 / (4log(2))
     minor_width = π^2 * sin(shape.minor_fwhm)^2 / (4log(2))
     # convert the major and minor axes to the ITRF coordinate system

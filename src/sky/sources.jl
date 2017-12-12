@@ -48,6 +48,16 @@ function total_flux(source, ν)
     output
 end
 
+function mean_direction(frame, source, ν)
+    output = Measures.UnnormalizedDirection(dir"ITRF", 0, 0, 0)
+    for shape in source.shapes
+        stokes  = shape.spectrum(ν)
+        itrf    = measure(frame, shape.direction, dir"ITRF")
+        output += stokes.I*itrf
+    end
+    Direction(output) # normalizes
+end
+
 function Base.:*(number::Real, source::Source)
     Source(source.name, [number*shape for shape in source.shapes])
 end

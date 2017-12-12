@@ -2,7 +2,7 @@ using TTCal
 using Base.Test
 using CasaCore.Measures
 using CasaCore.Tables
-using Unitful
+using Unitful, UnitfulAstro
 
 include("setup.jl")
 
@@ -31,7 +31,7 @@ srand(123)
     #include("ionosphere.jl")
     include("getspec.jl")
     #include("subsrc.jl")
-    #include("fitvis.jl")
+    include("fitvis.jl")
     include("calibration.jl")
     #include("peel.jl")
 end

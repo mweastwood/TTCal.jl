@@ -1,15 +1,9 @@
-#function test_getspec_direction(meta, source)
-#    data = genvis(meta, source)
-#    dir = source.direction
-#    stokes_flux = source.spectrum.(meta.channels)
-#    measured_flux = getspec(data, meta, dir)
-#    for β = 1:Nfreq(meta)
-#        linear_flux = HermitianJonesMatrix(stokes_flux[β])
-#        @test linear_flux.xx ≈ measured_flux[β].xx
-#        @test linear_flux.xy ≈ measured_flux[β].xy
-#        @test linear_flux.yy ≈ measured_flux[β].yy
-#    end
-#end
+function test_getspec_direction(metadata, source, direction)
+    data = genvis(metadata, TTCal.ConstantBeam(), source)
+    stokes_flux   = TTCal.total_flux.(source, metadata.frequencies)
+    measured_flux = getspec(data, direction)
+    @test stokes_flux ≈ measured_flux
+end
 
 function test_getspec_source(metadata, source)
     data = genvis(metadata, TTCal.ConstantBeam(), source)
@@ -30,7 +24,7 @@ end
         source = TTCal.Source("FRB",
                               TTCal.Point(Direction(dir"AZEL", 10u"°", 30u"°"),
                                           TTCal.PowerLaw(rand(), 0, 0, 0, 100u"MHz", [-rand()])))
-        #test_getspec_direction(metadata, source)
+        test_getspec_direction(metadata, source, Direction(dir"AZEL", 10u"°", 30u"°"))
         test_getspec_source(metadata, source)
 
         # polarized
@@ -38,7 +32,7 @@ end
         source = TTCal.Source("FRB",
                               TTCal.Point(Direction(dir"AZEL", 10u"°", 30u"°"),
                                           TTCal.PowerLaw(stokes, 100u"MHz", [-rand()])))
-        #test_getspec_direction(meta, source)
+        test_getspec_direction(metadata, source, Direction(dir"AZEL", 10u"°", 30u"°"))
         test_getspec_source(metadata, source)
     end
 
