@@ -91,30 +91,31 @@ end
 
 function fitvis_rotate_source_model(frame, source, from, to)
     R = Measures.RotationMatrix(from, to)
-    shapes = AbstractShape[]
-    for shape in source.shapes
-        push!(shapes, fitvis_rotate_shape(frame, shape, R))
-    end
+    shapes = [fitvis_rotate_shape(frame, shape, R) for shape in source.shapes]
     Source(source.name, shapes)
 end
 
 function fitvis_rotate_shape(frame, shape::Point, R)
     direction = R*measure(frame, shape.direction, R.sys)
+    direction = measure(frame, direction, dir"J2000")
     Point(direction, shape.spectrum)
 end
 
 function fitvis_rotate_shape(frame, shape::Gaussian, R)
     direction = R*measure(frame, shape.direction, R.sys)
+    direction = measure(frame, direction, dir"J2000")
     Gaussian(direction, shape.spectrum, shape.major_fwhm, shape.minor_fwhm, shape.position_angle)
 end
 
 function fitvis_rotate_shape(frame, shape::Disk, R)
     direction = R*measure(frame, shape.direction, R.sys)
+    direction = measure(frame, direction, dir"J2000")
     Disk(direction, shape.spectrum, shape.radius)
 end
 
 function fitvis_rotate_shape(frame, shape::Shapelet, R)
     direction = R*measure(frame, shape.direction, R.sys)
+    direction = measure(frame, direction, dir"J2000")
     Shapelet(direction, shape.spectrum, shape.scale, shape.coeff)
 end
 
