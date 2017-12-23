@@ -13,29 +13,26 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-function peel!(dataset::Dataset, beam::AbstractBeam, sky::SkyModel)
-               #peeliter = 3, maxiter = 20, tolerance = 1e-3, quiet = false
+function peel!(dataset::Dataset, beam::AbstractBeam, sky::SkyModel;
+               peeliter = 5, maxiter = 50, tolerance = 1e-3, minuvw=15.0, quiet = false,
+               collapse_frequency=false, collapse_time=false)
+    frame = ReferenceFrame(dataset.metadata)
+    sky = SkyModel(filter(s->isabovehorizon(frame, s), sky.sources))
     coherencies  = [genvis(dataset.metadata, beam, source, polarization=polarization(dataset))
                     for source in sky.sources]
-    calibrations = [Calibration(dataset.metadata, polarization=polarization(dataset))
-                    for source in sky.sources]
-    peel!(calibrations, deepcopy(coherencies), deepcopy(dataset))
+    calibrations = [Calibration(dataset.metadata, polarization=polarization(dataset),
+                                collapse_frequency=collapse_frequency,
+                                collapse_time=collapse_time) for source in sky.sources]
+    peel!(calibrations, deepcopy(coherencies), deepcopy(dataset),
+          peeliter, maxiter, tolerance, minuvw, quiet)
     for (coherency, calibration) in zip(coherencies, calibrations)
         subtract_with_gains!(dataset, coherency, calibration)
     end
     calibrations
-    #frame = reference_frame(meta)
-    #sources = filter(sources) do source
-    #    isabovehorizon(frame, unwrap(source))
-    #end
-    #calibrations = [calibration_type(meta, source) for source in sources]
-    #coherencies  = [genvis(meta, beam, unwrap(source)) for source in sources]
-    #peel!(calibrations, coherencies, visibilities, meta, peeliter, maxiter, tolerance, quiet)
-    #calibrations
 end
 
-function peel!(calibrations, coherencies, dataset)
-    flag_short_baselines!(dataset, 15)
+function peel!(calibrations, coherencies, dataset, peeliter, maxiter, tolerance, minuvw, quiet)
+    flag_short_baselines!(dataset, minuvw)
     Nsource = length(calibrations)
 
     # Subtract all of the sources
@@ -44,18 +41,13 @@ function peel!(calibrations, coherencies, dataset)
     end
 
     # Derive a calibration towards each source
-    #peeliter = 5
-    #prg = Progress(peeliter*Nsource)
-    peeliter = 5
+    quiet || (prg = Progress(peeliter*Nsource))
     for iter = 1:peeliter
         for (coherency, calibration) in zip(coherencies, calibrations)
             add_with_gains!(dataset, coherency, calibration)
-            #do_peeling_solve!(calibration_toward_source, visibilities, coherency, meta, maxiter, tolerance)
-            calibrate!(calibration, dataset, coherency, true)
+            calibrate!(calibration, dataset, coherency, maxiter, tolerance, true)
             subtract_with_gains!(dataset, coherency, calibration)
-
-            #quiet || next!(p)
-            #next!(prg)
+            quiet || next!(prg)
         end
     end
     #if !quiet

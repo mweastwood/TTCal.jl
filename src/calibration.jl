@@ -63,58 +63,61 @@ function calibrate(data::Dataset, model::Dataset;
     calibration
 end
 
-function calibrate!(calibration::Calibration, data::Dataset, model::Dataset, quiet=false)
+function calibrate!(calibration::Calibration, data::Dataset, model::Dataset,
+                    maxiter=50, tolerance=1e-3, quiet=false)
     match_flags!(model, data)
     if Nfreq(calibration) == Ntime(calibration) == 1
-        calibrate_onefrequency_onetime!(calibration, data, model, quiet)
+        calibrate_onefrequency_onetime!(calibration, data, model, maxiter, tolerance, quiet)
     elseif Nfreq(calibration) == 1
-        calibrate_onefrequency!(calibration, data, model, quiet)
+        calibrate_onefrequency!(calibration, data, model, maxiter, tolerance, quiet)
     elseif Ntime(calibration) == 1
-        calibrate_onetime!(calibration, data, model, quiet)
+        calibrate_onetime!(calibration, data, model, maxiter, tolerance, quiet)
     else
         quiet || (prg = Progress(Ntime(calibration)*Nfreq(calibration)))
         for time = 1:Ntime(calibration), frequency = 1:Nfreq(calibration)
             solve!(calibration[frequency, time].data,
-                   data[frequency, time], model[frequency, time], quiet)
+                   data[frequency, time], model[frequency, time],
+                   maxiter, tolerance, quiet)
             quiet || next!(prg)
         end
     end
 end
 
-function calibrate_onefrequency!(calibration::Calibration, data::Dataset, model::Dataset, quiet)
+function calibrate_onefrequency!(calibration::Calibration, data::Dataset, model::Dataset,
+                                 maxiter, tolerance, quiet)
     quiet || (prg = Progress(Ntime(calibration)))
     for time = 1:Ntime(calibration)
         data_slice  = [getindex.( data[:, time], antenna) for antenna = 1:Nant(data)]
         model_slice = [getindex.(model[:, time], antenna) for antenna = 1:Nant(data)]
-        solve!(calibration[1, time].data, data_slice, model_slice, quiet)
+        solve!(calibration[1, time].data, data_slice, model_slice, maxiter, tolerance, quiet)
         quiet || next!(prg)
     end
 end
 
-function calibrate_onetime!(calibration::Calibration, data::Dataset, model::Dataset, quiet)
+function calibrate_onetime!(calibration::Calibration, data::Dataset, model::Dataset,
+                            maxiter, tolerance, quiet)
     quiet || (prg = Progress(Nfreq(calibration)))
     for frequency = 1:Nfreq(calibration)
         data_slice  = [getindex.( data[frequency, :], antenna) for antenna = 1:Nant(data)]
         model_slice = [getindex.(model[frequency, :], antenna) for antenna = 1:Nant(data)]
-        solve!(calibration[frequency, 1].data, data_slice, model_slice, quiet)
+        solve!(calibration[frequency, 1].data, data_slice, model_slice, maxiter, tolerance, quiet)
         quiet || next!(prg)
     end
 end
 
-function calibrate_onefrequency_onetime!(calibration::Calibration, data::Dataset, model::Dataset, quiet)
+function calibrate_onefrequency_onetime!(calibration::Calibration, data::Dataset, model::Dataset,
+                                         maxiter, tolerance, quiet)
     data_slice  = [getindex.( data[:], antenna) for antenna = 1:Nant(data)]
     model_slice = [getindex.(model[:], antenna) for antenna = 1:Nant(data)]
-    solve!(calibration[1, 1].data, data_slice, model_slice, quiet)
+    solve!(calibration[1, 1].data, data_slice, model_slice, maxiter, tolerance, quiet)
 end
 
-function solve!(gains, measured_visibilities, model_visibilities, quiet=false)
+function solve!(gains, measured_visibilities, model_visibilities, maxiter, tolerance, quiet)
     workspace = RKWorkspace(gains, 4)
     function step!(output, input)
         stefcal_step!(output, input, measured_visibilities, model_visibilities)
     end
     iter = 0
-    maxiter = 50
-    tolerance = 1e-3
     converged = false
     while !converged && iter < maxiter
         newgains = rk4!(workspace, step!, gains)

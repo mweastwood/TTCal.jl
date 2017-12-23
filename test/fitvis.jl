@@ -7,16 +7,16 @@
     tolerance = eps(Float64)
     spectrum  = TTCal.PowerLaw(1, 0, 0, 0, 100u"MHz", [-0.5])
     direction = Direction(dir"AZEL", 10u"°", 30u"°")
-    itrf = measure(ReferenceFrame(metadata), direction, dir"ITRF")
-    ra   = longitude(itrf)
-    dec  =  latitude(itrf)
+    j2000 = measure(ReferenceFrame(metadata), direction, dir"J2000")
+    ra   = longitude(j2000)
+    dec  =  latitude(j2000)
     δra  = uconvert(u"rad", 10randn()*u"arcminute")
     δdec = uconvert(u"rad", 10randn()*u"arcminute")
-    itrf′ = Direction(dir"ITRF", ra+δra, dec+δdec)
+    j2000′ = Direction(dir"J2000", ra+δra, dec+δdec)
 
     @testset "point sources" begin
-        before = TTCal.Source("A", TTCal.Point(itrf,  spectrum))
-        after  = TTCal.Source("B", TTCal.Point(itrf′, spectrum))
+        before = TTCal.Source("A", TTCal.Point(j2000,  spectrum))
+        after  = TTCal.Source("B", TTCal.Point(j2000′, spectrum))
         data = genvis(metadata, TTCal.ConstantBeam(), after, polarization=TTCal.Dual)
         fit  = fitvis(data, before, tolerance=tolerance)
         @test fit.shapes[1].direction ≈ after.shapes[1].direction
@@ -26,8 +26,8 @@
         a = deg2rad(500/3600)
         b = deg2rad(300/3600)
         c = deg2rad(50)
-        before = TTCal.Source("A", TTCal.Gaussian(itrf,  spectrum, a, b, c))
-        after  = TTCal.Source("B", TTCal.Gaussian(itrf′, spectrum, a, b, c))
+        before = TTCal.Source("A", TTCal.Gaussian(j2000,  spectrum, a, b, c))
+        after  = TTCal.Source("B", TTCal.Gaussian(j2000′, spectrum, a, b, c))
         data = genvis(metadata, TTCal.ConstantBeam(), after, polarization=TTCal.Dual)
         fit  = fitvis(data, before, tolerance=tolerance)
         @test fit.shapes[1].direction ≈ after.shapes[1].direction

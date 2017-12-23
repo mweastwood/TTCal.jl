@@ -34,6 +34,10 @@ function Base.rand!(dataset::Dataset)
     dataset
 end
 
+function Base.getindex(dataset::Dataset, index)
+    dataset.data[index]
+end
+
 function Base.getindex(dataset::Dataset, channel, time)
     dataset.data[channel, time]
 end
