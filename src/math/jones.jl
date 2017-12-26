@@ -179,6 +179,7 @@ end
 
 Base.:*(a::Number, J::AbstractJonesMatrix) = J*a
 Base.:/(a::Number, J::AbstractJonesMatrix) = a*inv(J)
+Base.:\(a::Number, J::AbstractJonesMatrix) = J/a
 
 function Base.:*(J1::JonesMatrix, J2::JonesMatrix)
     JonesMatrix(J1.xx*J2.xx + J1.xy*J2.yx, J1.xx*J2.xy + J1.xy*J2.yy,
