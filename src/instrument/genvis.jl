@@ -128,6 +128,14 @@ function accumulate!(visibilities::Visibilities{Dual, T}, antenna1, antenna2, va
     visibilities[antenna1, antenna2] += DiagonalJonesMatrix(value.xx, value.yy)
 end
 
+function accumulate!(visibilities::Visibilities{XX, T}, antenna1, antenna2, value) where {T}
+    visibilities[antenna1, antenna2] += value.xx
+end
+
+function accumulate!(visibilities::Visibilities{YY, T}, antenna1, antenna2, value) where {T}
+    visibilities[antenna1, antenna2] += value.yy
+end
+
 #"""
 #    refract_and_corrupt(meta, beam, frame, source)
 #

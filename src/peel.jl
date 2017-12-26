@@ -14,7 +14,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 function peel!(dataset::Dataset, beam::AbstractBeam, sky::SkyModel;
-               peeliter = 5, maxiter = 50, tolerance = 1e-3, minuvw=15.0, quiet = false,
+               peeliter=5, maxiter=50, tolerance=1e-3, minuvw=15.0, quiet = false,
                collapse_frequency=false, collapse_time=false)
     frame = ReferenceFrame(dataset.metadata)
     sky = SkyModel(filter(s->isabovehorizon(frame, s), sky.sources))

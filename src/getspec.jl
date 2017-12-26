@@ -68,7 +68,6 @@ function getspec_internal!(output, dataset, source::Source)
 end
 
 function getspec_internal!(spectrum, dataset, model::Dataset)
-    #@show measure(ReferenceFrame(dataset.metadata), dataset.metadata.phase_centers[1], dir"ITRF")
     for frequency = 1:Nfreq(dataset)
         visibilities       = dataset[frequency, 1]
         model_visibilities =   model[frequency, 1]
@@ -81,12 +80,10 @@ function getspec_internal!(spectrum, dataset, model::Dataset)
             J′ = J2'
             numerator   += J′*J1
             denominator += J′*J2
-            #if ant1 == 1 && ant2 == 2
-                #@show visibilities[ant1, ant2] model_visibilities[ant1, ant2] numerator denominator
-            #end
         end
         if abs(det(denominator)) > eps(Float64)
-            spectrum[frequency] = make_hermitian(denominator \ numerator) |> StokesVector
+            spectrum[frequency] = create_stokes_vector(denominator \ numerator,
+                                                       polarization(dataset))
         end
     end
     spectrum
@@ -98,12 +95,9 @@ function getspec_internal!(spectrum, dataset, direction::Direction)
     frame = ReferenceFrame(metadata)
     itrf_direction    = measure(frame, direction, dir"ITRF")
     itrf_phase_center = measure(frame, metadata.phase_centers[1], dir"ITRF")
-    #@show measure(ReferenceFrame(dataset.metadata), dataset.metadata.phase_centers[1], dir"ITRF")
     delays = geometric_delays(metadata.positions, itrf_direction, itrf_phase_center)
-    #@show delays[1:2]
     for frequency = 1:Nfreq(dataset)
         fringes = delays_to_fringes(delays, metadata.frequencies[frequency])
-        #@show fringes[1:2]
         visibilities = dataset[frequency, 1]
         numerator   = zero(eltype(dataset))
         denominator = 0
@@ -112,16 +106,22 @@ function getspec_internal!(spectrum, dataset, direction::Direction)
                 fringe = fringes[antenna1] * conj(fringes[antenna2])
                 numerator   += conj(fringe)*visibilities[antenna1, antenna2]
                 denominator += 1
-                #if antenna1 == 1 && antenna2 == 2
-                    #@show fringe visibilities[antenna1, antenna2] numerator
-                #end
             end
         end
         if denominator > 0
-            spectrum[frequency] = make_hermitian(numerator / denominator) |> StokesVector
+            spectrum[frequency] = create_stokes_vector(denominator \ numerator,
+                                                       polarization(dataset))
         end
     end
     spectrum
+end
+
+create_stokes_vector(value, ::Any) = StokesVector(make_hermitian(value))
+function create_stokes_vector(value, ::Type{TTCal.XX})
+    StokesVector(HermitianJonesMatrix(real(value), 0, 0))
+end
+function create_stokes_vector(value, ::Type{TTCal.YY})
+    StokesVector(HermitianJonesMatrix(0, 0, real(value)))
 end
 
 # Design justification

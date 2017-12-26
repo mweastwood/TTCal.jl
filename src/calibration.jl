@@ -56,15 +56,16 @@ end
 
 function calibrate(data::Dataset, model::Dataset;
                    collapse_frequency=false, collapse_time=false,
-                   quiet=false)
+                   maxiter=50, tolerance=1e-3, minuvw=15.0, quiet=false)
+    flag_short_baselines!(data, minuvw)
     calibration = Calibration(data.metadata, polarization=polarization(data),
                               collapse_frequency=collapse_frequency, collapse_time=collapse_time)
-    calibrate!(calibration, data, model, quiet)
+    calibrate!(calibration, data, model, maxiter, tolerance, quiet)
     calibration
 end
 
 function calibrate!(calibration::Calibration, data::Dataset, model::Dataset,
-                    maxiter=50, tolerance=1e-3, quiet=false)
+                    maxiter, tolerance, quiet)
     match_flags!(model, data)
     if Nfreq(calibration) == Ntime(calibration) == 1
         calibrate_onefrequency_onetime!(calibration, data, model, maxiter, tolerance, quiet)

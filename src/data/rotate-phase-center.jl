@@ -46,7 +46,7 @@ end
 "Bring the source into focus."
 function rotate_phase_center!(dataset::Dataset, source::Source)
     frame = ReferenceFrame(dataset.metadata)
-    model = genvis(dataset.metadata, ConstantBeam(), source)
+    model = genvis(dataset.metadata, ConstantBeam(), source, polarization=polarization(dataset))
     flatten_spectrum!(model, source)
     for time = 1:Ntime(dataset)
         set!(frame, dataset.metadata.times[time])
@@ -81,8 +81,13 @@ function flatten_spectrum!(model, source::Source)
             # of the estimator in `getspec_internal!` (more specifically the order
             # of the matrix multiplications) then determines the order of the matrix
             # multiplications here.
-            visibilities[ant1, ant2] = visibilities[ant1, ant2]/jones
+            visibilities[ant1, ant2] = flatten_spectrum(visibilities[ant1, ant2], jones,
+                                                        polarization(model))
         end
     end
 end
+
+flatten_spectrum(value, jones, ::Any) = value/jones
+flatten_spectrum(value, jones, ::Type{TTCal.XX}) = value/jones.xx
+flatten_spectrum(value, jones, ::Type{TTCal.YY}) = value/jones.yy
 
