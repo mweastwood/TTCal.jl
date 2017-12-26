@@ -63,7 +63,9 @@ end
 function rotate_phase_center_onechannel!(data::Visibilities, model::Visibilities)
     for ant1 = 1:Nant(data), ant2 = ant1:Nant(data)
         # TODO is this order, correct? it doesn't matter if these are diagonal matrices...
-        data[ant1, ant2] = data[ant1, ant2] / model[ant1, ant2]
+        if !isflagged(data, ant1, ant2)
+            data[ant1, ant2] = data[ant1, ant2] / model[ant1, ant2]
+        end
     end
 end
 
@@ -81,8 +83,10 @@ function flatten_spectrum!(model, source::Source)
             # of the estimator in `getspec_internal!` (more specifically the order
             # of the matrix multiplications) then determines the order of the matrix
             # multiplications here.
-            visibilities[ant1, ant2] = flatten_spectrum(visibilities[ant1, ant2], jones,
-                                                        polarization(model))
+            if !isflagged(visibilities, ant1, ant2)
+                visibilities[ant1, ant2] = flatten_spectrum(visibilities[ant1, ant2], jones,
+                                                            polarization(model))
+            end
         end
     end
 end
