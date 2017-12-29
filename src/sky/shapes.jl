@@ -89,5 +89,9 @@ function Base.:*(number::Real, shape::Gaussian)
              shape.major_fwhm, shape.minor_fwhm, shape.position_angle)
 end
 
+function Base.:*(number::Real, shape::Shapelet)
+    Shapelet(shape.direction, number*shape.spectrum, shape.scale, shape.coeff)
+end
+
 Base.:*(shape::AbstractShape, number::Real) = number*shape
 

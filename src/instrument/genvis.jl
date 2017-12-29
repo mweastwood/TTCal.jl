@@ -320,37 +320,36 @@ end
 #        return besselj1(2π*δθb)/(π*δθb)
 #    end
 #end
-#
-#function additional_precomputation(meta, frame, source::ShapeletSource)
-#    north, east = local_north_east(frame, source.direction)
-#    north_j2000 = Direction(dir"J2000", north[1], north[2], north[3])
-#    east_j2000  = Direction(dir"J2000",  east[1],  east[2],  east[3])
-#    north_itrf  = measure(frame, north_j2000, dir"ITRF")
-#    east_itrf   = measure(frame,  east_j2000, dir"ITRF")
-#    north_itrf, east_itrf
-#end
-#
-#function baseline_coherency(source::ShapeletSource, frequency, antenna1, antenna2, variables)
-#    u, v, w = get_uvw(frequency, antenna1, antenna2)
-#    north, east = variables
-#    β = source.scale
-#    # project the baseline onto the sky
-#    x = u*east.x  + v*east.y  + w*east.z
-#    y = u*north.x + v*north.y + w*north.z
-#    π2 = π*π
-#    exponential = exp(-2π2*β^2*(x^2+y^2))
-#    # compute the contribution from each shapelet component
-#    out = zero(Complex128)
-#    idx = 1
-#    nmax = round(Int, sqrt(length(source.coeff))) - 1
-#    for n2 = 0:nmax, n1 = 0:nmax
-#        if source.coeff[idx] != 0
-#            phase = (1im)^(n1+n2)
-#            shapelet = phase * hermite(n1, 2π*x*β) * hermite(n2, 2π*y*β) * exponential
-#            out += source.coeff[idx] * shapelet
-#        end
-#        idx += 1
-#    end
-#    out
-#end
+
+function additional_precomputation(frame, source::Shapelet)
+    north, east = local_north_east(frame, source.direction)
+    north_itrf  = measure(frame, north, dir"ITRF")
+    east_itrf   = measure(frame,  east, dir"ITRF")
+    north_itrf, east_itrf
+end
+
+function baseline_coherency(source::Shapelet, frequency, position1, position2, variables)
+    λ = u"c" / frequency
+    baseline = position1 - position2
+    north, east = variables
+    β = source.scale
+    # project the baseline onto the sky
+    x = dot(baseline,  east) / λ
+    y = dot(baseline, north) / λ
+    π2 = π*π
+    exponential = exp(-2π2*β^2*(x^2+y^2))
+    # compute the contribution from each shapelet component
+    out = zero(Complex128)
+    idx = 1
+    nmax = round(Int, sqrt(length(source.coeff))) - 1
+    for n2 = 0:nmax, n1 = 0:nmax
+        if source.coeff[idx] != 0
+            phase = (1im)^(n1+n2)
+            shapelet = phase * hermite(n1, 2π*x*β) * hermite(n2, 2π*y*β) * exponential
+            out += source.coeff[idx] * shapelet
+        end
+        idx += 1
+    end
+    out
+end
 

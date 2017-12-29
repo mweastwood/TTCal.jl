@@ -98,11 +98,11 @@ function get_shapes(name, c)
         #    # Disk
         #    radius = deg2rad(c["radius"]/3600)
         #    source = DiskSource(name, dir, spec, radius)
-        #elseif haskey(c, "coefficients")
-        #    # Shapelet
-        #    scale = c["scale-parameter"]
-        #    coeff = c["coefficients"]
-        #    source = ShapeletSource(name, dir, spec, scale, coeff)
+        elseif haskey(c, "coefficients")
+            # Shapelet
+            scale = c["scale-parameter"]
+            coeff = convert(Vector{Float64}, c["coefficients"])
+            source = Shapelet(dir, spec, scale, coeff)
         else
             # Point
             return Point(dir, spec)
