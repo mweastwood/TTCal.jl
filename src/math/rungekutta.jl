@@ -13,21 +13,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-"The Butcher tableau for the 2nd-order Runge-Kutta method."
-const RK2_tableau = @SMatrix [1/2 0.0
-                              0.0 1.0]
-
-"The Butcher tableau for the 3rd-order Runge-Kutta method."
-const RK3_tableau = @SMatrix [1/2 0.0 0.0;
-                             -1.0 2.0 0.0;
-                              1/6 2/3 1/6]
-
-"The Butcher tableau for the 4th-order Runge-Kutta method."
-const RK4_tableau = @SMatrix [1/2 0.0 0.0 0.0;
-                              0.0 1/2 0.0 0.0;
-                              0.0 0.0 1.0 0.0;
-                              1/6 1/3 1/3 1/6]
-
 struct RKWorkspace{V<:AbstractVector}
     x :: V
     k :: Vector{V}
@@ -63,77 +48,4 @@ function rk4!(workspace, f!, x)
     @. workspace.δ = x + (k1 + 2*k2 + 2*k3 + k4)/6
     workspace.δ[:]
 end
-
-#"""
-#    RK2(step)
-#
-#Wrap a step function with the 2nd-order Runge-Kutta method. For example
-#
-#    # Compute an approximation of exp(1)
-#    rk = RK2(x -> x)
-#    rk(1) + 1
-#
-#**Arguments:**
-#
-#* `step(x, args...)` must return the step to take from the starting location `x`
-#* `x` is the starting location
-#* `args` is simply passed on as the second argument to `step`
-#"""
-#@generate_step RK2 RK2_tableau
-#
-#"""
-#    RK3(step)
-#
-#Wrap a step function with the 3rd-order Runge-Kutta method. For example
-#
-#    # Compute an approximation of exp(1)
-#    rk = RK3(x -> x)
-#    rk(1) + 1
-#
-#**Arguments:**
-#
-#* `step(x, args...)` must return the step to take from the starting location `x`
-#* `x` is the starting location
-#* `args` is simply passed on as the second argument to `step`
-#"""
-#@generate_step RK3 RK3_tableau
-#
-#"""
-#    RK4(step)
-#
-#Wrap a step function with the 4th-order Runge-Kutta method. For example
-#
-#    # Compute an approximation of exp(1)
-#    rk = RK4(x -> x)
-#    rk(1) + 1
-#
-#**Arguments:**
-#
-#* `step(x, args...)` must return the step to take from the starting location `x`
-#* `x` is the starting location
-#* `args` is simply passed on as the second argument to `step`
-#"""
-#@generate_step RK4 RK4_tableau
-#
-#"""
-#    iterate(step, maxiter, tolerance, x, args...)
-#
-#Repeatedly call `step(x, args...)` while updating the value of `x` until either the step size is
-#sufficiently small or the maximum number of iterations is reached.
-#"""
-#function iterate(step, maxiter, tolerance, x, args...)
-#    iter = 0
-#    converged = false
-#    while !converged && iter < maxiter
-#        δ = step(x, args...)
-#        if vecnorm(δ) < tolerance * vecnorm(x)
-#            converged = true
-#        end
-#        for i in eachindex(x, δ)
-#            x[i] += δ[i]
-#        end
-#        iter += 1
-#    end
-#    converged
-#end
 

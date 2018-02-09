@@ -1,6 +1,7 @@
-# TTCal
+# TTCal.jl Documentation
 
-TTCal is a calibration routine developed for the OVRO LWA.
+TTCal is a calibration routine developed for the Owens Valley Radio Observatory Long Wavelength
+Array (OVRO-LWA).
 
 ## Overview
 
@@ -22,10 +23,10 @@ relatively fast software package.  This is why I wrote TTCal.
 
 ## Getting Started
 
-TTCal requires version 0.4 of the [Julia](http://julialang.org/) programming language. Julia is a
+TTCal requires version 0.4 of the [Julia](https://julialang.org/) programming language. Julia is a
 dynamic language designed for scientific computing with a just-in-time compiler based on
 [LLVM](http://llvm.org/). The syntax should be familiar to users of
-[Matlab](http://www.mathworks.com/products/matlab/) and [Python](https://www.python.org/), but
+[Matlab](https://www.mathworks.com/products/matlab/) and [Python](https://www.python.org/), but
 Python users should be aware that the first element of an array is accessed with `x[1]`.
 
 Once Julia is installed, the REPL (read-eval-print loop) can be started by typing `julia` from the
