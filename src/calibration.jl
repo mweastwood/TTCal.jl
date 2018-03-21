@@ -76,10 +76,16 @@ function calibrate!(calibration::Calibration, data::Dataset, model::Dataset,
     else
         quiet || (prg = Progress(Ntime(calibration)*Nfreq(calibration)))
         for time = 1:Ntime(calibration), frequency = 1:Nfreq(calibration)
-            solve!(calibration[frequency, time].data,
-                   data[frequency, time], model[frequency, time],
-                   maxiter, tolerance, quiet)
-            quiet || next!(prg)
+            converged = solve!(calibration[frequency, time].data,
+                               data[frequency, time], model[frequency, time],
+                               maxiter, tolerance)
+            if !quiet
+                if !converged
+                    print("\r")
+                    warn("Calibration did not converge (integration: $time, channel: $frequency")
+                end
+                next!(prg)
+            end
         end
     end
 end
@@ -90,8 +96,15 @@ function calibrate_onefrequency!(calibration::Calibration, data::Dataset, model:
     for time = 1:Ntime(calibration)
         data_slice  = [getindex.( data[:, time], antenna) for antenna = 1:Nant(data)]
         model_slice = [getindex.(model[:, time], antenna) for antenna = 1:Nant(data)]
-        solve!(calibration[1, time].data, data_slice, model_slice, maxiter, tolerance, quiet)
-        quiet || next!(prg)
+        converged = solve!(calibration[1, time].data, data_slice, model_slice,
+                           maxiter, tolerance)
+        if !quiet
+            if !converged
+                print("\r")
+                warn("Calibration did not converge (integration: $time)")
+            end
+            next!(prg)
+        end
     end
 end
 
@@ -101,8 +114,15 @@ function calibrate_onetime!(calibration::Calibration, data::Dataset, model::Data
     for frequency = 1:Nfreq(calibration)
         data_slice  = [getindex.( data[frequency, :], antenna) for antenna = 1:Nant(data)]
         model_slice = [getindex.(model[frequency, :], antenna) for antenna = 1:Nant(data)]
-        solve!(calibration[frequency, 1].data, data_slice, model_slice, maxiter, tolerance, quiet)
-        quiet || next!(prg)
+        converged = solve!(calibration[frequency, 1].data, data_slice, model_slice,
+                           maxiter, tolerance)
+        if !quiet
+            if !converged
+                print("\r")
+                warn("Calibration did not converge (channel: $frequency)")
+            end
+            next!(prg)
+        end
     end
 end
 
@@ -110,10 +130,14 @@ function calibrate_onefrequency_onetime!(calibration::Calibration, data::Dataset
                                          maxiter, tolerance, quiet)
     data_slice  = [getindex.( data[:], antenna) for antenna = 1:Nant(data)]
     model_slice = [getindex.(model[:], antenna) for antenna = 1:Nant(data)]
-    solve!(calibration[1, 1].data, data_slice, model_slice, maxiter, tolerance, quiet)
+    converged = solve!(calibration[1, 1].data, data_slice, model_slice, maxiter, tolerance)
+    if !quiet
+        converged || warn("Calibration did not converge")
+        next!(prg)
+    end
 end
 
-function solve!(gains, measured_visibilities, model_visibilities, maxiter, tolerance, quiet)
+function solve!(gains, measured_visibilities, model_visibilities, maxiter, tolerance)
     workspace = RKWorkspace(gains, 4)
     function step!(output, input)
         stefcal_step!(output, input, measured_visibilities, model_visibilities)
@@ -129,10 +153,7 @@ function solve!(gains, measured_visibilities, model_visibilities, maxiter, toler
         gains[:] = newgains
         iter += 1
     end
-    if !quiet && !converged
-        warn("calibration did not converge")
-    end
-    gains
+    converged
 end
 
 
