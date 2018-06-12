@@ -212,46 +212,38 @@ baseline_coherency(source, frequency, antenna1, antenna2, variables) = 1
 #end
 
 """
-    geometric_delays(positions, direction, phase_center)
+    geometric_delays(antenna_positions, source_direction, phase_center)
 
 Compute the geometric delay to each antenna for a source in the far field of the interferometer.
 """
-function geometric_delays(positions::Vector{Position},
-                          direction::Direction, phase_center::Direction)
+function geometric_delays(antenna_positions::Vector{Position}, source_direction::Direction,
+                          phase_center::Direction)
     # far field
-    delays = zeros(typeof(1.0*u"s"), length(positions))
-    for i = 1:length(positions)
-        path_difference = dot(positions[i], direction - phase_center)
+    delays = zeros(typeof(1.0*u"s"), length(antenna_positions))
+    for i = 1:length(antenna_positions)
+        path_difference = dot(antenna_positions[i], source_direction - phase_center)
         delays[i] = path_difference / u"c"
     end
     delays
 end
 
-#"""
-#    geometric_delays(antennas, source_position::Position, phase_center)
-#
-#Compute the geometric delay to each antenna for a source in the near field
-#of the interferometer.
-#"""
-#function geometric_delays(antennas, source_position::Position, phase_center)
-#    # near field
-#    l = -phase_center.x
-#    m = -phase_center.y
-#    n = -phase_center.z
-#    ξ = source_position.x
-#    η = source_position.y
-#    ζ = source_position.z
-#    D = sqrt(ξ^2 + η^2 + ζ^2)
-#    delays = zeros(length(antennas))
-#    for i = 1:length(antennas)
-#        antenna_position = antennas[i].position
-#        x = antenna_position.x
-#        y = antenna_position.y
-#        z = antenna_position.z
-#        delays[i] = (D - sqrt((x-ξ)^2 + (y-η)^2 + (z-ζ)^2) + x*l + y*m + z*n) / c
-#    end
-#    delays
-#end
+"""
+    geometric_delays(antenna_positions, source_position, phase_center)
+
+Compute the geometric delay to each antenna for a source in the near field of the interferometer.
+"""
+function geometric_delays(antenna_positions::Vector{Position}, source_position::Position,
+                          phase_center::Direction)
+    # near field
+    D = norm(source_position)
+    delays = zeros(typeof(1.0*u"s"), length(antenna_positions))
+    for i = 1:length(antenna_positions)
+        path_difference = (D - norm(source_position - antenna_positions[i])
+                             - dot(phase_center, antenna_positions[i]))
+        delays[i] = path_difference / u"c"
+    end
+    delays
+end
 
 doc"""
     delays_to_fringes(delays, frequency)

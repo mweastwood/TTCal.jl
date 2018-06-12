@@ -38,14 +38,34 @@ Base.similar(  cal::Solution) = Solution(polarization(cal), Nant(cal))
 Base.length(   cal::Solution) = length(cal.data)
 Base.size(     cal::Solution) = size(cal.data)
 
-struct Calibration{P <: Polarization, T}
+mutable struct Calibration{P <: Polarization, T}
     data :: Matrix{Solution{P, T}}
 end
 
 Nfreq(cal::Calibration) = size(cal.data, 1)
 Ntime(cal::Calibration) = size(cal.data, 2)
+Nant( cal::Calibration) = length(cal.data[1, 1])
 
 Base.getindex(cal::Calibration, frequency, time) = cal.data[frequency, time]
+
+function merge!(lhs::Calibration{P, T}, rhs::Calibration{P, T}; axis=:frequency) where {P, T}
+    Nfreq,  Ntime  = size(lhs.data)
+    Nfreq′, Ntime′ = size(rhs.data)
+    if axis == :frequency
+        data = Array{Solution{P, T}}(Nfreq+Nfreq′, Ntime)
+        data[    1:Nfreq, :] = lhs.data
+        data[Nfreq+1:end, :] = rhs.data
+        lhs.data = data
+    elseif axis == :time
+        data = Array{Solution{P, T}}(Nfreq, Ntime+Ntime′)
+        data[:,     1:Ntime] = lhs.data
+        data[:, Ntime+1:end] = rhs.data
+        lhs.data = data
+    else
+        err("unknown merge axis $axis")
+    end
+    lhs
+end
 
 function Calibration(metadata; polarization=Full, collapse_frequency=false, collapse_time=false)
     N = collapse_frequency ? 1 : Nfreq(metadata)

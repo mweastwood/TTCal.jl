@@ -41,20 +41,14 @@
 #source in that direction. If you know your source is resolved, supply a source model
 #instead.
 #"""
-function getspec(dataset::Dataset, source::Source)
+function getspec(dataset::Dataset, source::Union{Source, Direction, Position})
     spectrum = zeros(StokesVector, Nfreq(dataset))
     getspec_internal!(spectrum, dataset, source)
     spectrum
 end
 
-function getspec(dataset::Dataset, direction::Direction)
-    spectrum = zeros(StokesVector, Nfreq(dataset))
-    getspec_internal!(spectrum, dataset, direction)
-    spectrum
-end
-
-function getflux(dataset::Dataset, source_or_direction)
-    mean(getspec(dataset, source_or_direction))
+function getflux(dataset::Dataset, source::Union{Source, Direction, Position})
+    mean(getspec(dataset, source))
 end
 
 function getspec_internal!(output, dataset, source::Source)
@@ -96,6 +90,21 @@ function getspec_internal!(spectrum, dataset, direction::Direction)
     itrf_direction    = measure(frame, direction, dir"ITRF")
     itrf_phase_center = measure(frame, metadata.phase_centers[1], dir"ITRF")
     delays = geometric_delays(metadata.positions, itrf_direction, itrf_phase_center)
+    getspec_from_delays!(spectrum, dataset, delays)
+end
+
+function getspec_internal!(spectrum, dataset, position::Position)
+    # TODO: handle multiple time integrations correctly
+    metadata = dataset.metadata
+    frame = ReferenceFrame(metadata)
+    itrf_position     = measure(frame, position, pos"ITRF")
+    itrf_phase_center = measure(frame, metadata.phase_centers[1], dir"ITRF")
+    delays = geometric_delays(metadata.positions, itrf_position, itrf_phase_center)
+    getspec_from_delays!(spectrum, dataset, delays)
+end
+
+function getspec_from_delays!(spectrum, dataset, delays)
+    metadata = dataset.metadata
     for frequency = 1:Nfreq(dataset)
         fringes = delays_to_fringes(delays, metadata.frequencies[frequency])
         visibilities = dataset[frequency, 1]
